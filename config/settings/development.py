@@ -25,42 +25,66 @@ ALLOWED_HOSTS = [
 ]
 
 # ===================================================================
-# DATABASE — PostgreSQL (Docker)
+# DATABASE — PostgreSQL (Docker) with SQLite fallback
 # ===================================================================
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('POSTGRES_DB', 'bolayetu_dev'),
-        'USER': os.environ.get('POSTGRES_USER', 'bolayetu'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'bolayetu_dev_pass'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'db'),  # Docker service name
-        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        'CONN_MAX_AGE': 60,
+USE_SQLITE = os.environ.get('USE_SQLITE', 'False').lower() in ('true', '1', 'yes')
+
+if USE_SQLITE:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
-
-# ===================================================================
-# CACHE — Redis (Docker)
-# ===================================================================
-
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/0'),
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        },
-        'KEY_PREFIX': 'bolayetu_dev',
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'bolayetu_dev'),
+            'USER': os.environ.get('POSTGRES_USER', 'bolayetu'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'bolayetu_dev_pass'),
+            'HOST': os.environ.get('POSTGRES_HOST', 'db'),  # Docker service name
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': 60,
+        }
     }
-}
 
 # ===================================================================
-# CELERY — Redis broker
+# CACHE — Redis (Docker) with Local Memory fallback
 # ===================================================================
 
-CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
-CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+if USE_SQLITE:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'bolayetu-local-cache',
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/0'),
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'KEY_PREFIX': 'bolayetu_dev',
+        }
+    }
+
+# ===================================================================
+# CELERY — Redis broker with eager fallback
+# ===================================================================
+
+if USE_SQLITE:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_BROKER_URL = 'memory://'
+    CELERY_RESULT_BACKEND = 'cache+memory://'
+else:
+    CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+    CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
