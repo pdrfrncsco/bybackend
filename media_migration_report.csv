@@ -1,0 +1,4 @@
+model,pk,field,file_field_value,local_exists,r2_exists,action,error
+Tenant,9f7246f2-7e24-4dad-81cc-e023ee1e9e77,logo,tenants/bolayetu_desporto.png,True,True,uploaded,
+Club,f9bb8f93-7fbf-4720-bfbc-119c11c4f9ce,logo,clubs/10.png,True,True,uploaded,
+Player,210f867a-b70b-4e35-85da-eba7aba8598e,avatar,players/T_2.png,True,True,uploaded,
