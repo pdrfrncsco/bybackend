@@ -1,6 +1,6 @@
 from django.db import models
 from core.models import BaseModel, Tenant
-from clubes.models import Club
+from clubs.models import Club
 from estadios.models import Stadium
 from torneios.models import Tournament
 from arbitros.models import Referee

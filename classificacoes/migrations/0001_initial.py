@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('clubes', '0004_alter_club_stadium_name'),
+        ('clubs', '0004_alter_club_stadium_name'),
         ('core', '0001_initial'),
         ('torneios', '0004_alter_tournament_type'),
     ]
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                 ('goals_for', models.IntegerField(default=0)),
                 ('goals_against', models.IntegerField(default=0)),
                 ('points', models.IntegerField(default=0)),
-                ('club', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='standings', to='clubes.club')),
+                ('club', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='standings', to='clubs.club')),
                 ('group', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='standings', to='torneios.tournamentgroup')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='standings', to='core.tenant')),
                 ('tournament', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='standings', to='torneios.tournament')),

@@ -90,7 +90,7 @@ def create_jogador_clube_request(jogador_profile, clube_profile, mensagem="") ->
 def decide_jogador_clube_request(request_id, status, user_decisor, mensagem_resposta=None) -> JogadorClubeRequest:
     """
     Aprova ou rejeita um pedido de ingresso jogador-clube.
-    Se aprovado, atualiza o modelo Player e inicia o histórico de clubes.
+    Se aprovado, atualiza o modelo Player e inicia o histórico de clubs.
     """
     try:
         req = JogadorClubeRequest.objects.select_related('jogador', 'clube').get(pk=request_id)
@@ -117,7 +117,7 @@ def decide_jogador_clube_request(request_id, status, user_decisor, mensagem_resp
         player = getattr(req.jogador, 'athlete', None)
         today = date.today()
 
-        # 1. Fechar o histórico de clubes anterior do jogador
+        # 1. Fechar o histórico de clubs anterior do jogador
         JogadorHistoricoClube.objects.filter(
             jogador=req.jogador,
             data_fim__isnull=True

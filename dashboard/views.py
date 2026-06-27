@@ -8,7 +8,7 @@ from django.db.models.functions import TruncMonth
 from datetime import timedelta
 
 from core.permissions import IsManager
-from clubes.models import Club
+from clubs.models import Club
 from jogadores.models import Player, PlayerHistory
 from torneios.models import Tournament
 from partidas.models import Match
@@ -218,7 +218,7 @@ class DashboardOverviewView(APIView):
                 }
             )
 
-        # Top clubes por gols (gols a partir do histórico + total de jogadores por clube)
+        # Top clubs por gols (gols a partir do histórico + total de jogadores por clube)
         top_clubs_by_players = []
 
         players_per_club = (

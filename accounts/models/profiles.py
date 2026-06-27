@@ -43,14 +43,14 @@ class ClubeProfile(BaseModel):
     email = models.EmailField(blank=True)
     telefone = models.CharField(max_length=50, blank=True)
     website = models.URLField(blank=True)
-    logo = models.ImageField(upload_to="clubes/logos/", null=True, blank=True)
-    banner = models.ImageField(upload_to="clubes/banners/", null=True, blank=True)
+    logo = models.ImageField(upload_to="clubs/logos/", null=True, blank=True)
+    banner = models.ImageField(upload_to="clubs/banners/", null=True, blank=True)
     estadio = models.CharField(max_length=255, blank=True)
     cores = models.CharField(max_length=100, blank=True)
 
     class Meta:
         verbose_name = "Perfil de Clube"
-        verbose_name_plural = "Perfis de Clubes"
+        verbose_name_plural = "Perfis de Clubs"
 
     def __str__(self):
         return self.nome
@@ -92,7 +92,7 @@ class AdeptoProfile(BaseModel):
     foto = models.ImageField(upload_to="adeptos/fotos/", null=True, blank=True)
     cidade = models.CharField(max_length=100, blank=True)
     pais = models.CharField(max_length=100, blank=True)
-    clubes_favoritos = models.ManyToManyField(
+    clubs_favoritos = models.ManyToManyField(
         ClubeProfile,
         blank=True,
         related_name="seguidores"

@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('clubes', '0002_clubhistory'),
+        ('clubs', '0002_clubhistory'),
         ('core', '0001_initial'),
         ('jogadores', '0004_alter_player_position'),
         ('partidas', '0004_remove_match_stadium'),
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                 ('match', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='events', to='partidas.match')),
                 ('player', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='match_events', to='jogadores.player')),
                 ('secondary_player', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='secondary_match_events', to='jogadores.player')),
-                ('team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='match_events', to='clubes.club')),
+                ('team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='match_events', to='clubs.club')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='match_events', to='core.tenant')),
             ],
             options={
@@ -69,7 +69,7 @@ class Migration(migrations.Migration):
                 ('is_captain', models.BooleanField(default=False)),
                 ('match', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lineup_entries', to='partidas.match')),
                 ('player', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lineup_entries', to='jogadores.player')),
-                ('team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lineup_entries', to='clubes.club')),
+                ('team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lineup_entries', to='clubs.club')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='match_lineups', to='core.tenant')),
             ],
             options={

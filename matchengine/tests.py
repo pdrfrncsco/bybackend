@@ -4,7 +4,7 @@ from rest_framework.test import APITestCase
 
 from core.models import Tenant
 from usuarios.models import User
-from clubes.models import Club
+from clubs.models import Club
 from jogadores.models import Player
 from partidas.models import Match
 

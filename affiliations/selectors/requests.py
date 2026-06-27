@@ -26,9 +26,9 @@ def get_jogador_clube_requests() -> QuerySet[JogadorClubeRequest]:
     ).all()
 
 
-def get_jogador_historico_clubes() -> QuerySet[JogadorHistoricoClube]:
+def get_jogador_historico_clubs() -> QuerySet[JogadorHistoricoClube]:
     """
-    Retorna todos os históricos de clubes de jogadores de forma otimizada.
+    Retorna todos os históricos de clubs de jogadores de forma otimizada.
     """
     return JogadorHistoricoClube.objects.select_related(
         'jogador',

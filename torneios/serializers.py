@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import Tournament, TournamentGroup
-from clubes.serializers import ClubListSerializer
-from clubes.models import Club
+from clubs.serializers import ClubListSerializer
+from clubs.models import Club
 from partidas.serializers import MatchSerializer
 import re
 

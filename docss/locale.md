@@ -17,7 +17,7 @@ export type Language = 'pt' | 'en' | 'fr';
 ```ts
 export const translations = {
   pt: {
-    nav: { dashboard: 'Dashboard', clubs: 'Clubes', players: 'Jogadores', tournaments: 'Torneios', venues: 'Estádios', reports: 'Relatórios', news: 'Notícias', ads: 'Publicidade', subscription: 'Assinatura', settings: 'Definições', sign_out: 'Sair' },
+    nav: { dashboard: 'Dashboard', clubs: 'Clubs', players: 'Jogadores', tournaments: 'Torneios', venues: 'Estádios', reports: 'Relatórios', news: 'Notícias', ads: 'Publicidade', subscription: 'Assinatura', settings: 'Definições', sign_out: 'Sair' },
     public: { home: 'Início', news: 'Notícias', orgs: 'Organizações', tournaments: 'Campeonatos', features: 'Funcionalidades', pricing: 'Preços', support: 'Suporte', login: 'Entrar', create_league: 'Criar Liga', dashboard: 'Dashboard' },
     settings: { title: 'Definições', subtitle: 'Gerencie as suas preferências e segurança da conta.', profile: 'Perfil', organization: 'Organização', security: 'Segurança', notifications: 'Notificações', users: 'Utilizadores', language: 'Idioma', save: 'Guardar Alterações', saving: 'A guardar...' }
   },

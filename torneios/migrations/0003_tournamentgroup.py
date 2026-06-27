@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clubes', '0002_clubhistory'),
+        ('clubs', '0002_clubhistory'),
         ('core', '0001_initial'),
         ('torneios', '0002_alter_tournament_type'),
     ]
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('name', models.CharField(max_length=50)),
-                ('clubs', models.ManyToManyField(blank=True, related_name='tournament_groups', to='clubes.club')),
+                ('clubs', models.ManyToManyField(blank=True, related_name='tournament_groups', to='clubs.club')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tournament_groups', to='core.tenant')),
                 ('tournament', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='groups', to='torneios.tournament')),
             ],

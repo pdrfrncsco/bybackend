@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('clubes', '0002_clubhistory'),
+        ('clubs', '0002_clubhistory'),
         ('core', '0001_initial'),
     ]
 
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                 ('logo', models.ImageField(blank=True, null=True, upload_to='tournaments/')),
                 ('max_teams', models.IntegerField(default=16)),
                 ('type', models.CharField(choices=[('League', 'Liga (Pontos corridos)'), ('Knockout', 'Eliminatória'), ('Groups', 'Fase de Grupos + Eliminatória')], default='League', max_length=50)),
-                ('clubs', models.ManyToManyField(blank=True, related_name='tournaments', to='clubes.club')),
+                ('clubs', models.ManyToManyField(blank=True, related_name='tournaments', to='clubs.club')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tournaments', to='core.tenant')),
             ],
             options={

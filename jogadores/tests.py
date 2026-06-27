@@ -6,7 +6,7 @@ from PIL import Image
 from rest_framework.test import APIClient
 
 from core.models import Tenant
-from clubes.models import Club
+from clubs.models import Club
 from .models import Player, PlayerHistory
 
 

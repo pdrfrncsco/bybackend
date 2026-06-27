@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from core.models import BaseModel, Tenant
-from clubes.models import Club
+from clubs.models import Club
 
 
 class Treinador(BaseModel):

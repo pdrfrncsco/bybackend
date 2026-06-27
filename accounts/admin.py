@@ -37,4 +37,4 @@ class AdeptoProfileAdmin(admin.ModelAdmin):
     search_fields = ('nome', 'cidade', 'pais', 'user__username', 'user__email')
     list_filter = ('cidade', 'pais', 'created_at')
     raw_id_fields = ('user',)
-    filter_horizontal = ('clubes_favoritos', 'jogadores_favoritos')
+    filter_horizontal = ('clubs_favoritos', 'jogadores_favoritos')

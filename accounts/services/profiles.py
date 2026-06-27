@@ -80,7 +80,7 @@ def create_adepto_profile(user, **data) -> AdeptoProfile:
         user.save(update_fields=['role'])
     
     # Many-to-many fields should not be in defaults during get_or_create
-    clubes_favoritos = data.pop('clubes_favoritos', [])
+    clubs_favoritos = data.pop('clubs_favoritos', [])
     jogadores_favoritos = data.pop('jogadores_favoritos', [])
 
     profile, created = AdeptoProfile.objects.get_or_create(
@@ -92,8 +92,8 @@ def create_adepto_profile(user, **data) -> AdeptoProfile:
             setattr(profile, key, value)
         profile.save()
     
-    if clubes_favoritos:
-        profile.clubes_favoritos.set(clubes_favoritos)
+    if clubs_favoritos:
+        profile.clubs_favoritos.set(clubs_favoritos)
     if jogadores_favoritos:
         profile.jogadores_favoritos.set(jogadores_favoritos)
         

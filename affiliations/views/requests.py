@@ -18,7 +18,7 @@ from affiliations.serializers import (
 from affiliations.selectors import (
     get_clube_organizacao_requests,
     get_jogador_clube_requests,
-    get_jogador_historico_clubes,
+    get_jogador_historico_clubs,
 )
 from affiliations.services import (
     create_clube_organizacao_request,
@@ -173,7 +173,7 @@ class JogadorClubeRequestViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema_view(
-    list=extend_schema(tags=["Afiliações - Histórico de Jogador"], description="Lista todo o histórico de afiliações de clubes de jogadores."),
+    list=extend_schema(tags=["Afiliações - Histórico de Jogador"], description="Lista todo o histórico de afiliações de clubs de jogadores."),
     retrieve=extend_schema(tags=["Afiliações - Histórico de Jogador"], description="Retorna os detalhes de um histórico específico."),
 )
 class JogadorHistoricoClubeViewSet(viewsets.ReadOnlyModelViewSet):
@@ -186,4 +186,4 @@ class JogadorHistoricoClubeViewSet(viewsets.ReadOnlyModelViewSet):
     ordering = ['-data_inicio']
 
     def get_queryset(self):
-        return get_jogador_historico_clubes()
+        return get_jogador_historico_clubs()

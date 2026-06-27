@@ -14,7 +14,7 @@ from core.permissions import IsManager
 from classificacoes.models import Standing
 from jogadores.models import Player, PlayerHistory
 from partidas.models import Match
-from clubes.models import Club
+from clubs.models import Club
 from torneios.models import Tournament
 from assinaturas.models import Subscription
 

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from django.db.models import Q
 from .models import Match
-from clubes.serializers import ClubBasicSerializer
+from clubs.serializers import ClubBasicSerializer
 from estadios.serializers import StadiumSerializer
 from treinadores.models import HistoricoTreinador
 

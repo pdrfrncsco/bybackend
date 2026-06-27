@@ -5,7 +5,7 @@ from rest_framework import status
 
 from core.models import Tenant
 from usuarios.models import User
-from clubes.models import Club
+from clubs.models import Club
 from torneios.models import Tournament, TournamentGroup
 from partidas.models import Match
 from classificacoes.models import Standing

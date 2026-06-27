@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 
 from core.models import Tenant
-from clubes.models import Club
+from clubs.models import Club
 from jogadores.models import Player, PlayerHistory
 from torneios.models import Tournament
 from partidas.models import Match

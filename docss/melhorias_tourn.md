@@ -176,8 +176,8 @@ Foco: nova aba de estatísticas com subtabs.
   - Dentro da aba “Estatísticas”, criar subtabs:
     - “Melhores Marcadores”
     - “Golos por Jornadas”
-    - “Clubes com Mais Golos”
-    - “Clubes com Menos Golos”
+    - “Clubs com Mais Golos”
+    - “Clubs com Menos Golos”
   - Implementação front:
     - Subestado local, ex.: `statsSubtab` com valores `'scorers' | 'goalsByRound' | 'clubsMostGoals' | 'clubsLeastGoals'`.
 
@@ -190,9 +190,9 @@ Foco: nova aba de estatísticas com subtabs.
       - Golos por jornadas:
         - Agrupar golos por `match.round` ou campo equivalente (ex.: “jornada”).
         - Somar golos por jornada.
-      - Clubes com mais/menos golos:
+      - Clubs com mais/menos golos:
         - Para cada jogo, somar golos marcados por `homeTeamId` e `awayTeamId` (usando scoreboard final ou eventos).
-        - Produzir ranking de clubes.
+        - Produzir ranking de clubs.
   - Opção B (mais robusta, se a API expõe estatísticas prontas):
     - Criar/usar endpoints dedicados de estatísticas do torneio.
     - TournamentDetails.tsx apenas consome e renderiza dados já agregados, o que simplifica o frontend.

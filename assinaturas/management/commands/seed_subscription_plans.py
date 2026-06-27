@@ -77,7 +77,7 @@ class Command(BaseCommand):
             {
                 "code": "FAN_FREEMIUM",
                 "name": "Adepto Free",
-                "description": "Plano gratuito para adeptos acompanharem competições e clubes.",
+                "description": "Plano gratuito para adeptos acompanharem competições e clubs.",
                 "target_type": "fan",
                 "plan_type": "freemium",
                 "price_amount": Decimal("0.00"),

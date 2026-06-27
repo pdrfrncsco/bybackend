@@ -106,12 +106,14 @@ class PlayerViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         tenant = getattr(self.request, 'tenant', None) or getattr(self.request.user, 'tenant', None)
         service = PlayerService(user=self.request.user, tenant=tenant)
-        service.create_player(data=serializer.validated_data)
+        player = service.create_player(data=serializer.validated_data.copy())
+        serializer.instance = player
 
     def perform_update(self, serializer):
         tenant = getattr(self.request, 'tenant', None) or getattr(self.request.user, 'tenant', None)
         service = PlayerService(user=self.request.user, tenant=tenant)
-        service.update_player(player=serializer.instance, data=serializer.validated_data)
+        player = service.update_player(player=serializer.instance, data=serializer.validated_data.copy())
+        serializer.instance = player
 
     def perform_destroy(self, instance):
         tenant = getattr(self.request, 'tenant', None) or getattr(self.request.user, 'tenant', None)

@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('clubes', '0006_club_short_fields'),
+        ('clubs', '0006_club_short_fields'),
         ('core', '0003_alter_tenant_type'),
     ]
 
@@ -64,7 +64,7 @@ class Migration(migrations.Migration):
                 ('empates', models.PositiveIntegerField(default=0)),
                 ('derrotas', models.PositiveIntegerField(default=0)),
                 ('conquistas', models.TextField(blank=True, default='')),
-                ('clube', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='historico_treinadores', to='clubes.club')),
+                ('clube', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='historico_treinadores', to='clubs.club')),
                 ('treinador', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='historico', to='treinadores.treinador')),
             ],
             options={

@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.utils import timezone
 from core.models import Tenant
-from clubes.models import Club
+from clubs.models import Club
 from estadios.models import Stadium
 from treinadores.models import Treinador, HistoricoTreinador
 from .models import Match

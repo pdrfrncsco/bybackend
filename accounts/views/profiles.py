@@ -95,12 +95,12 @@ class OrganizacaoProfileViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema_view(
-    list=extend_schema(tags=["Perfis - Clubes"], description="Lista todos os perfis de clubes."),
-    retrieve=extend_schema(tags=["Perfis - Clubes"], description="Retorna os detalhes de um perfil de clube específico."),
-    create=extend_schema(tags=["Perfis - Clubes"], description="Cria um perfil de clube para o utilizador autenticado."),
-    update=extend_schema(tags=["Perfis - Clubes"], description="Atualiza um perfil de clube."),
-    partial_update=extend_schema(tags=["Perfis - Clubes"], description="Atualiza parcialmente um perfil de clube."),
-    destroy=extend_schema(tags=["Perfis - Clubes"], description="Remove um perfil de clube."),
+    list=extend_schema(tags=["Perfis - Clubs"], description="Lista todos os perfis de clubs."),
+    retrieve=extend_schema(tags=["Perfis - Clubs"], description="Retorna os detalhes de um perfil de clube específico."),
+    create=extend_schema(tags=["Perfis - Clubs"], description="Cria um perfil de clube para o utilizador autenticado."),
+    update=extend_schema(tags=["Perfis - Clubs"], description="Atualiza um perfil de clube."),
+    partial_update=extend_schema(tags=["Perfis - Clubs"], description="Atualiza parcialmente um perfil de clube."),
+    destroy=extend_schema(tags=["Perfis - Clubs"], description="Remove um perfil de clube."),
 )
 class ClubeProfileViewSet(viewsets.ModelViewSet):
     serializer_class = ClubeProfileSerializer

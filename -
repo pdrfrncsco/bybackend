@@ -317,7 +317,7 @@ paths:
   /api/clubs/:
     get:
       operationId: clubs_list
-      description: ViewSet para gerir clubes.
+      description: ViewSet para gerir clubs.
       parameters:
       - name: ordering
         required: false
@@ -346,7 +346,7 @@ paths:
           description: ''
     post:
       operationId: clubs_create
-      description: ViewSet para gerir clubes.
+      description: ViewSet para gerir clubs.
       tags:
       - clubs
       requestBody:
@@ -373,7 +373,7 @@ paths:
   /api/clubs/{id}/:
     get:
       operationId: clubs_retrieve
-      description: ViewSet para gerir clubes.
+      description: ViewSet para gerir clubs.
       parameters:
       - in: path
         name: id
@@ -393,7 +393,7 @@ paths:
           description: ''
     put:
       operationId: clubs_update
-      description: ViewSet para gerir clubes.
+      description: ViewSet para gerir clubs.
       parameters:
       - in: path
         name: id
@@ -425,7 +425,7 @@ paths:
           description: ''
     patch:
       operationId: clubs_partial_update
-      description: ViewSet para gerir clubes.
+      description: ViewSet para gerir clubs.
       parameters:
       - in: path
         name: id
@@ -456,7 +456,7 @@ paths:
           description: ''
     delete:
       operationId: clubs_destroy
-      description: ViewSet para gerir clubes.
+      description: ViewSet para gerir clubs.
       parameters:
       - in: path
         name: id
@@ -473,7 +473,7 @@ paths:
   /api/clubs/history/:
     get:
       operationId: clubs_history_list
-      description: ViewSet para visualizar o histórico de clubes.
+      description: ViewSet para visualizar o histórico de clubs.
       parameters:
       - name: ordering
         required: false
@@ -503,7 +503,7 @@ paths:
   /api/clubs/history/{id}/:
     get:
       operationId: clubs_history_retrieve
-      description: ViewSet para visualizar o histórico de clubes.
+      description: ViewSet para visualizar o histórico de clubs.
       parameters:
       - in: path
         name: id

@@ -22,15 +22,24 @@ class PlayerService(BaseService):
         """
         self._assert_tenant()
         
+        # Extract nested history data
+        history_data = data.pop('history', [])
+        
         player = Player(tenant=self.tenant)
         
+        allowed_fields = {f.name for f in player._meta.fields} - {'id', 'tenant', 'created_at', 'updated_at'}
         for field, value in data.items():
-            if hasattr(player, field) and field not in ['id', 'tenant', 'created_at', 'updated_at']:
+            if field in allowed_fields:
                 setattr(player, field, value)
 
         try:
             player.full_clean()
             player.save()
+            
+            if history_data:
+                PlayerHistory.objects.bulk_create(
+                    [PlayerHistory(player=player, **row) for row in history_data]
+                )
         except IntegrityError:
             raise ValidationError({"number": "Já existe um jogador com este número neste clube."})
             
@@ -46,13 +55,24 @@ class PlayerService(BaseService):
             from common.exceptions import PermissionDeniedException
             raise PermissionDeniedException("You cannot edit a player belonging to another tenant.")
 
+        # Extract nested history data
+        history_data = data.pop('history', None)
+
+        allowed_fields = {f.name for f in player._meta.fields} - {'id', 'tenant', 'created_at', 'updated_at'}
         for field, value in data.items():
-            if hasattr(player, field) and field not in ['id', 'tenant', 'created_at', 'updated_at']:
+            if field in allowed_fields:
                 setattr(player, field, value)
 
         try:
             player.full_clean()
             player.save()
+            
+            if history_data is not None:
+                player.history.all().delete()
+                if history_data:
+                    PlayerHistory.objects.bulk_create(
+                        [PlayerHistory(player=player, **row) for row in history_data]
+                    )
         except IntegrityError:
             raise ValidationError({"number": "Já existe um jogador com este número neste clube."})
             

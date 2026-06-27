@@ -9,7 +9,7 @@ urlpatterns = [
     path('api/auth/', include('usuarios.urls')),
     path('api/accounts/', include('accounts.urls')),
     path('api/affiliations/', include('affiliations.urls')),
-    path('api/clubs/', include('clubes.urls')),
+    path('api/clubs/', include('clubs.urls')),
     path('api/players/', include('jogadores.urls')),
     path('api/referees/', include('arbitros.urls')),
     path('api/matches/', include('partidas.urls')),
@@ -21,7 +21,8 @@ urlpatterns = [
     path('api/stadiums/', include('estadios.urls')),
     path('api/dashboard/', include('dashboard.urls')),
     path('api/notifications/', include('notifications.urls')),
-    path('api/organizations/', include('organizacoes.urls')),
+    path('api/organizations/', include('organizations.urls')),
+
     path('api/fanportal/', include('fanportal.urls')),
     path('api/news/', include('news.urls')),
     path('api/ads/', include('ads.urls')),

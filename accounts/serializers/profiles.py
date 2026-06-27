@@ -98,7 +98,7 @@ class JogadorProfileSerializer(serializers.ModelSerializer):
 
 class AdeptoProfileSerializer(serializers.ModelSerializer):
     user_details = UserMiniSerializer(source='user', read_only=True)
-    clubes_favoritos_details = serializers.SerializerMethodField(read_only=True)
+    clubs_favoritos_details = serializers.SerializerMethodField(read_only=True)
     jogadores_favoritos_details = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
@@ -111,8 +111,8 @@ class AdeptoProfileSerializer(serializers.ModelSerializer):
             'foto',
             'cidade',
             'pais',
-            'clubes_favoritos',
-            'clubes_favoritos_details',
+            'clubs_favoritos',
+            'clubs_favoritos_details',
             'jogadores_favoritos',
             'jogadores_favoritos_details',
             'created_at',
@@ -120,7 +120,7 @@ class AdeptoProfileSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'created_at', 'updated_at')
 
-    def get_clubes_favoritos_details(self, obj):
+    def get_clubs_favoritos_details(self, obj):
         return [
             {
                 'id': str(c.id),
@@ -128,7 +128,7 @@ class AdeptoProfileSerializer(serializers.ModelSerializer):
                 'sigla': c.sigla,
                 'logo': c.logo.url if c.logo else None
             }
-            for c in obj.clubes_favoritos.all()
+            for c in obj.clubs_favoritos.all()
         ]
 
     def get_jogadores_favoritos_details(self, obj):

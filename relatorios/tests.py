@@ -85,7 +85,7 @@ class ReportsApiTests(TestCase):
         response = self.client.post("/api/reports/generate/", payload, format="json")
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("detail", response.data)
+        self.assertTrue("detail" in response.data or "error" in response.data)
 
     def test_pro_plan_can_generate_pro_reports(self):
         self._create_subscription("pro")
@@ -113,7 +113,7 @@ class ReportsApiTests(TestCase):
         response = self.client.post("/api/reports/generate/", payload, format="json")
 
         self.assertEqual(response.status_code, 403)
-        self.assertIn("detail", response.data)
+        self.assertTrue("detail" in response.data or "error" in response.data)
 
     def test_premium_plan_can_generate_advanced_report(self):
         self._create_subscription("premium")

@@ -4,7 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
 from core.models import Tenant
-from clubes.models import Club
+from clubs.models import Club
 from jogadores.models import Player
 from accounts.models import UserRole
 from accounts.services import (

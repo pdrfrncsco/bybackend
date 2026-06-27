@@ -16,7 +16,7 @@ def get_organizacao_profiles() -> QuerySet[OrganizacaoProfile]:
 
 def get_clube_profiles() -> QuerySet[ClubeProfile]:
     """
-    Retorna todos os perfis de clubes com carregamento otimizado do user.
+    Retorna todos os perfis de clubs com carregamento otimizado do user.
     """
     return ClubeProfile.objects.select_related('user').all()
 
@@ -30,9 +30,9 @@ def get_jogador_profiles() -> QuerySet[JogadorProfile]:
 
 def get_adepto_profiles() -> QuerySet[AdeptoProfile]:
     """
-    Retorna todos os perfis de adeptos com carregamento otimizado de user, clubes e jogadores favoritos.
+    Retorna todos os perfis de adeptos com carregamento otimizado de user, clubs e jogadores favoritos.
     """
     return AdeptoProfile.objects.select_related('user').prefetch_related(
-        'clubes_favoritos',
+        'clubs_favoritos',
         'jogadores_favoritos'
     ).all()

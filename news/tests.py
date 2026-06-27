@@ -45,7 +45,7 @@ class NewsArticleTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Admin sees all (draft and published) for their tenant
-        self.assertEqual(len(response.data), 2)
+        self.assertEqual(len(response.data['results']), 2)
 
     def test_create_news(self):
         url = reverse('news-article-list')
@@ -69,7 +69,7 @@ class NewsArticleTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Public only sees published
-        results = response.data
+        results = response.data['results']
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['title'], 'News 1')
 

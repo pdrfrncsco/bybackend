@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clubes', '0002_clubhistory'),
+        ('clubs', '0002_clubhistory'),
         ('jogadores', '0002_player_date_of_birth_player_foot_player_height_and_more'),
     ]
 
@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='player',
             name='last_club',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='last_players', to='clubes.club'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='last_players', to='clubs.club'),
         ),
         migrations.AddField(
             model_name='playerhistory',
@@ -35,6 +35,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='playerhistory',
             name='club',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='player_history', to='clubes.club'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='player_history', to='clubs.club'),
         ),
     ]

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clubes', '0006_club_short_fields'),
+        ('clubs', '0006_club_short_fields'),
         ('core', '0003_alter_tenant_type'),
         ('jogadores', '0007_player_shirt_name'),
     ]

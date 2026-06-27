@@ -8,7 +8,7 @@ from rest_framework.exceptions import ValidationError
 
 from common.base import BaseService
 from .models import Tournament, TournamentGroup
-from clubes.models import Club, ClubHistory
+from clubs.models import Club, ClubHistory
 from partidas.models import Match
 
 
@@ -217,12 +217,12 @@ class TournamentService(BaseService):
             else:
                 clubs = list(tournament.clubs.all())
                 if len(clubs) < 2:
-                    raise ValidationError("São necessários pelo menos 2 clubes para gerar o calendário.")
+                    raise ValidationError("São necessários pelo menos 2 clubs para gerar o calendário.")
                 matches_created.extend(self._generate_round_robin(clubs, start_date, interval_days, tournament))
         else:
             clubs = list(tournament.clubs.all())
             if len(clubs) < 2:
-                raise ValidationError("São necessários pelo menos 2 clubes para gerar o calendário.")
+                raise ValidationError("São necessários pelo menos 2 clubs para gerar o calendário.")
             matches_created.extend(self._generate_round_robin(clubs, start_date, interval_days, tournament))
 
         return matches_created

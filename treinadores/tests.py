@@ -4,7 +4,7 @@ from django.db import IntegrityError
 from django.test import TestCase
 
 from core.models import Tenant
-from clubes.models import Club
+from clubs.models import Club
 from .models import Treinador, HistoricoTreinador
 from .reporting import generate_treinador_report
 

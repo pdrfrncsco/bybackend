@@ -155,7 +155,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 "verbose_name": "Histórico de Clube de Jogador",
-                "verbose_name_plural": "Históricos de Clubes de Jogadores",
+                "verbose_name_plural": "Históricos de Clubs de Jogadores",
                 "ordering": ["-data_inicio"],
             },
         ),

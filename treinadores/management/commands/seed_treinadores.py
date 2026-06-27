@@ -3,7 +3,7 @@ from datetime import date
 from django.core.management.base import BaseCommand, CommandError
 
 from core.models import Tenant
-from clubes.models import Club
+from clubs.models import Club
 from treinadores.models import Treinador, HistoricoTreinador, LicencaTreinador
 
 
@@ -66,7 +66,7 @@ class Command(BaseCommand):
 
         for i in range(1, count + 1):
             first_name = first_names[(i - 1) % len(first_names)]
-            last_name = last_names[(i - 1) % len(last_names)]
+            last_name = last_names[((i - 1) // len(first_names)) % len(last_names)]
             nacionalidade = nacionalidades[(i - 1) % len(nacionalidades)]
             estilo_jogo = estilos[(i - 1) % len(estilos)]
 

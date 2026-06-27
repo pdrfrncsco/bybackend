@@ -8,7 +8,7 @@ from accounts.views import (
 
 router = DefaultRouter()
 router.register('organizacoes', OrganizacaoProfileViewSet, basename='organizacao-profile')
-router.register('clubes', ClubeProfileViewSet, basename='clube-profile')
+router.register('clubs', ClubeProfileViewSet, basename='clube-profile')
 router.register('jogadores', JogadorProfileViewSet, basename='jogador-profile')
 router.register('adeptos', AdeptoProfileViewSet, basename='adepto-profile')
 

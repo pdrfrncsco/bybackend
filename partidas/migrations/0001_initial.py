@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('clubes', '0002_clubhistory'),
+        ('clubs', '0002_clubhistory'),
         ('core', '0001_initial'),
     ]
 
@@ -27,8 +27,8 @@ class Migration(migrations.Migration):
                 ('stadium', models.CharField(blank=True, max_length=255)),
                 ('status', models.CharField(choices=[('scheduled', 'Agendado'), ('live', 'Ao Vivo'), ('finished', 'Terminado'), ('postponed', 'Adiado')], default='scheduled', max_length=20)),
                 ('round', models.CharField(blank=True, max_length=100)),
-                ('away_team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='away_matches', to='clubes.club')),
-                ('home_team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='home_matches', to='clubes.club')),
+                ('away_team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='away_matches', to='clubs.club')),
+                ('home_team', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='home_matches', to='clubs.club')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='matches', to='core.tenant')),
             ],
             options={

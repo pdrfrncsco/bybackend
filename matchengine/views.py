@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 
 from partidas.models import Match
-from clubes.models import Club
+from clubs.models import Club
 from jogadores.models import Player
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, inline_serializer

@@ -25,7 +25,7 @@ Exemplo de URLs em produção:
 - Autenticação (login): `https://api-bolayetu-manager.ndeas.cloud/api/auth/login/`
 - Perfis de utilizador: `https://api-bolayetu-manager.ndeas.cloud/api/auth/me/`
 - Torneios: `https://api-bolayetu-manager.ndeas.cloud/api/tournaments/`
-- Clubes: `https://api-bolayetu-manager.ndeas.cloud/api/clubs/`
+- Clubs: `https://api-bolayetu-manager.ndeas.cloud/api/clubs/`
 - Jogadores: `https://api-bolayetu-manager.ndeas.cloud/api/players/`
 - Match Engine: `https://api-bolayetu-manager.ndeas.cloud/api/matchengine/`
 
@@ -144,7 +144,7 @@ const api = axios.create({
 Os grupos principais de endpoints são definidos em [config/urls.py](file:///c:/Project/bolayetu/backend/config/urls.py#L7-L31):
 
 - `/api/auth/` – autenticação e gestão de utilizadores (`usuarios`).
-- `/api/clubs/` – gestão de clubes (`clubes`).
+- `/api/clubs/` – gestão de clubs (`clubs`).
 - `/api/players/` – gestão de jogadores (`jogadores`).
 - `/api/matches/` – agendamento e dados de jogos (`partidas`).
 - `/api/onboarding/` – fluxo de onboarding e configuração inicial (`onboarding`).
@@ -207,7 +207,7 @@ Os valores possíveis para o campo `role` de utilizador são:
 - `superadmin` – acesso de plataforma. Tem acesso total a todas as permissões.
 - `ads_manager` – vocacionado para gestão de campanhas de publicidade.
 - `admin` – administrador do tenant (organização).
-- `manager` – gestor operacional do tenant (clubes, jogadores, torneios, etc.).
+- `manager` – gestor operacional do tenant (clubs, jogadores, torneios, etc.).
 - `viewer` – utilizador de leitura, com acesso limitado.
 
 Estes papéis são usados pelas permission classes:
@@ -229,7 +229,7 @@ O método `User.has_permission(code, tenant=None)`:
 - Retorna `True` se o utilizador for `superuser` ou tiver `role = 'superadmin'`.
 - Caso contrário, verifica se algum dos roles associados ao utilizador (para o tenant actual ou global) possui a permissão com o `code` indicado.
 
-Alguns endpoints usam apenas `IsManager`/`IsAdmin`; outros combinam `IsManager` com `HasPermission` para exigir permissões adicionais associadas ao tenant (por exemplo, gestão de jogadores, clubes, relatórios ou anúncios).
+Alguns endpoints usam apenas `IsManager`/`IsAdmin`; outros combinam `IsManager` com `HasPermission` para exigir permissões adicionais associadas ao tenant (por exemplo, gestão de jogadores, clubs, relatórios ou anúncios).
 
 ### 8.3. Exemplos de códigos de permissão
 
@@ -239,7 +239,7 @@ Alguns códigos de permissão típicos (campo `Permission.code`) usados em roles
 |---------------------------|----------------|---------------------------------------------------------|
 | `manage_platform`         | Plataforma     | Gestão global da plataforma (superadmin).              |
 | `manage_tenant_settings`  | Definições     | Gestão de definições e configurações de tenant.        |
-| `manage_team`             | Clubes         | Gestão de plantel e equipas do tenant.                 |
+| `manage_team`             | Clubs         | Gestão de plantel e equipas do tenant.                 |
 | `manage_players`          | Jogadores      | Gestão de jogadores (criar/editar/remover).            |
 | `manage_tournaments`      | Torneios       | Gestão de torneios, calendário e classificações.       |
 | `manage_reports`          | Relatórios     | Geração e acesso a relatórios administrativos.         |

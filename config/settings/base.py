@@ -72,7 +72,7 @@ LOCAL_APPS = [
     'estatisticas',
 
     # Club & Squad Management (Bounded Context 4)
-    'clubes',
+    'clubs',
     'treinadores',
     'arbitros',
     'estadios',
@@ -86,7 +86,7 @@ LOCAL_APPS = [
     'news',
 
     # Platform
-    'organizacoes',
+    'organizations',
     'dashboard',
     'definicoes',
     'relatorios',

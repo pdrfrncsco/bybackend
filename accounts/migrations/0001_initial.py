@@ -38,12 +38,12 @@ class Migration(migrations.Migration):
                 ("website", models.URLField(blank=True)),
                 (
                     "logo",
-                    models.ImageField(blank=True, null=True, upload_to="clubes/logos/"),
+                    models.ImageField(blank=True, null=True, upload_to="clubs/logos/"),
                 ),
                 (
                     "banner",
                     models.ImageField(
-                        blank=True, null=True, upload_to="clubes/banners/"
+                        blank=True, null=True, upload_to="clubs/banners/"
                     ),
                 ),
                 ("estadio", models.CharField(blank=True, max_length=255)),
@@ -59,7 +59,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 "verbose_name": "Perfil de Clube",
-                "verbose_name_plural": "Perfis de Clubes",
+                "verbose_name_plural": "Perfis de Clubs",
             },
         ),
         migrations.CreateModel(
@@ -148,7 +148,7 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "clubes_favoritos",
+                    "clubs_favoritos",
                     models.ManyToManyField(
                         blank=True,
                         related_name="seguidores",

@@ -4,7 +4,7 @@ from accounts.models import UserRole
 
 class CanManageClubeOrganizacaoRequest(permissions.BasePermission):
     """
-    Permite criação apenas para Clubes.
+    Permite criação apenas para Clubs.
     Permite atualização/decisão apenas para a Organização destino ou Administradores.
     """
     def has_permission(self, request, view):
@@ -12,7 +12,7 @@ class CanManageClubeOrganizacaoRequest(permissions.BasePermission):
             return False
             
         if view.action == 'create':
-            # Apenas clubes podem solicitar afiliação
+            # Apenas clubs podem solicitar afiliação
             return request.user.role in [
                 UserRole.CLUBE,
                 UserRole.ADMIN,

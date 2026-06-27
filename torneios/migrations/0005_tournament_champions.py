@@ -5,7 +5,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('clubes', '0004_alter_club_stadium_name'),
+        ('clubs', '0004_alter_club_stadium_name'),
         ('torneios', '0004_alter_tournament_type'),
     ]
 
@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
                 null=True,
                 on_delete=django.db.models.deletion.SET_NULL,
                 related_name='tournaments_won',
-                to='clubes.club',
+                to='clubs.club',
             ),
         ),
         migrations.AddField(
@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
                 null=True,
                 on_delete=django.db.models.deletion.SET_NULL,
                 related_name='tournaments_runner_up',
-                to='clubes.club',
+                to='clubs.club',
             ),
         ),
     ]

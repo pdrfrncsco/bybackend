@@ -104,7 +104,7 @@ class IsClube(permissions.BasePermission):
 class IsJogador(permissions.BasePermission):
     """
     Permite acesso apenas a utilizadores com perfil de Jogador.
-    Clubes e Administradores também são aceites.
+    Clubs e Administradores também são aceites.
     """
     def has_permission(self, request, view):
         user = request.user

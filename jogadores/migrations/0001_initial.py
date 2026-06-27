@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('clubes', '0002_clubhistory'),
+        ('clubs', '0002_clubhistory'),
         ('core', '0001_initial'),
     ]
 
@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
                 ('avatar', models.ImageField(blank=True, null=True, upload_to='players/')),
                 ('is_captain', models.BooleanField(default=False)),
                 ('is_starter', models.BooleanField(default=False)),
-                ('club', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='players', to='clubes.club')),
+                ('club', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='players', to='clubs.club')),
                 ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='players', to='core.tenant')),
             ],
             options={

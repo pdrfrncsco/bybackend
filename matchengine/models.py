@@ -1,7 +1,7 @@
 from django.db import models
 from core.models import BaseModel, Tenant
 from partidas.models import Match
-from clubes.models import Club
+from clubs.models import Club
 from jogadores.models import Player
 
 
