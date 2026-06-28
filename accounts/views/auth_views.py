@@ -5,7 +5,6 @@ Authentication and Token Management
 
 from rest_framework import serializers, status
 from rest_framework.views import APIView
-from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
@@ -15,19 +14,17 @@ from accounts.serializers.auth import (
     LoginSerializer,
     LogoutSerializer,
     TokenResponseSerializer,
+    ForgotPasswordSerializer,
+    ResetPasswordSerializer,
 )
 from accounts.serializers.user import UserSerializer
-from common.responses import success_response, created_response, error_response
-
+from common.responses import success_response, created_response
 
 
 class RegisterView(APIView):
-    """
-    Register a new user account.
-    Returns access and refresh JWT tokens upon successful registration.
-    """
+    """Register a new user account. Returns access and refresh JWT tokens."""
+
     permission_classes = [AllowAny]
-    serializer_class = RegisterSerializer
 
     @extend_schema(
         tags=["auth"],
@@ -35,7 +32,7 @@ class RegisterView(APIView):
         responses={201: TokenResponseSerializer},
     )
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user, tokens = AuthService.register(
@@ -47,25 +44,20 @@ class RegisterView(APIView):
             phone=serializer.validated_data.get("phone"),
         )
 
-        response_data = {
-            "access": tokens["access"],
-            "refresh": tokens["refresh"],
-            "user": UserSerializer(user).data,
-        }
-
         return created_response(
-            data=response_data,
-            message="User registered successfully."
+            data={
+                "access": tokens["access"],
+                "refresh": tokens["refresh"],
+                "user": UserSerializer(user).data,
+            },
+            message="User registered successfully.",
         )
 
 
 class LoginView(APIView):
-    """
-    Authenticate a user with email and password.
-    Returns access and refresh JWT tokens.
-    """
+    """Authenticate a user with email and password. Returns JWT tokens."""
+
     permission_classes = [AllowAny]
-    serializer_class = LoginSerializer
 
     @extend_schema(
         tags=["auth"],
@@ -73,7 +65,7 @@ class LoginView(APIView):
         responses={200: TokenResponseSerializer},
     )
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         user, tokens = AuthService.login(
@@ -81,34 +73,74 @@ class LoginView(APIView):
             password=serializer.validated_data["password"],
         )
 
-        response_data = {
-            "access": tokens["access"],
-            "refresh": tokens["refresh"],
-            "user": UserSerializer(user).data,
-        }
-
         return success_response(
-            data=response_data,
-            message="Login successful."
+            data={
+                "access": tokens["access"],
+                "refresh": tokens["refresh"],
+                "user": UserSerializer(user).data,
+            },
+            message="Login successful.",
         )
 
 
 class LogoutView(APIView):
-    """
-    Blacklist the provided refresh token to logout the user.
-    """
-    permission_classes = [IsAuthenticated]
-    serializer_class = LogoutSerializer
+    """Blacklist the provided refresh token to logout the user."""
 
-    @extend_schema(
-        tags=["auth"],
-        request=LogoutSerializer,
-        responses={200: serializers.Serializer},  # Empty on success
-    )
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["auth"], request=LogoutSerializer)
     def post(self, request):
-        serializer = self.serializer_class(data=request.data)
+        serializer = LogoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         AuthService.logout(refresh_token=serializer.validated_data["refresh"])
 
         return success_response(message="Logout successful.")
+
+
+class ForgotPasswordView(APIView):
+    """
+    Request a password reset email.
+
+    Always returns 200 regardless of whether the email exists,
+    to prevent user enumeration attacks.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["auth"], request=ForgotPasswordSerializer)
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        # Silently handles unknown emails — no enumeration
+        AuthService.request_password_reset(
+            email=serializer.validated_data["email"]
+        )
+
+        return success_response(
+            message="If an account with that email exists, a reset link has been sent."
+        )
+
+
+class ResetPasswordView(APIView):
+    """
+    Confirm a password reset using the token received by email.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["auth"], request=ResetPasswordSerializer)
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        AuthService.confirm_password_reset(
+            token=str(serializer.validated_data["token"]),
+            new_password=serializer.validated_data["new_password"],
+            new_password_confirm=serializer.validated_data["new_password_confirm"],
+        )
+
+        return success_response(
+            message="Password reset successfully. You can now log in with your new password."
+        )

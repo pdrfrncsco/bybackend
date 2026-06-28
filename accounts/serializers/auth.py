@@ -123,3 +123,53 @@ class TokenResponseSerializer(serializers.Serializer):
 
     access = serializers.CharField()
     refresh = serializers.CharField()
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    """
+    Validates forgot password request.
+
+    Used for: POST /api/v1/auth/forgot-password/
+    """
+
+    email = serializers.EmailField(
+        help_text="Email address associated with the account."
+    )
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    """
+    Validates password reset with token.
+
+    Used for: POST /api/v1/auth/reset-password/
+    """
+
+    token = serializers.UUIDField(
+        help_text="Reset token received by email."
+    )
+    new_password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+        style={"input_type": "password"},
+    )
+    new_password_confirm = serializers.CharField(
+        write_only=True,
+        style={"input_type": "password"},
+    )
+
+    def validate_new_password(self, value: str) -> str:
+        """Apply domain password strength rules."""
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        try:
+            validate_password_strength(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        return value
+
+    def validate(self, attrs: dict) -> dict:
+        """Verify new password and confirmation match."""
+        if attrs["new_password"] != attrs["new_password_confirm"]:
+            raise serializers.ValidationError(
+                {"new_password_confirm": "Passwords do not match."}
+            )
+        return attrs
