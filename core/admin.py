@@ -1,10 +1,16 @@
+"""
+BOLAYETU — Core Admin Configuration
+"""
+
 from django.contrib import admin
-from .models import Tenant
+
+from core.models import Tenant
 
 
 @admin.register(Tenant)
 class TenantAdmin(admin.ModelAdmin):
-    list_display = ['name', 'slug', 'type', 'is_public', 'is_active', 'verified']
-    list_filter = ['type', 'is_public', 'is_active', 'verified']
-    search_fields = ['name', 'slug', 'email']
-    prepopulated_fields = {'slug': ('name',)}
+    list_display = ["name", "subdomain", "type", "status", "is_public", "is_verified", "created_at"]
+    list_filter = ["type", "status", "is_public", "is_verified", "created_at"]
+    search_fields = ["name", "slug", "email", "subdomain"]
+    prepopulated_fields = {"slug": ("name",)}
+    ordering = ["name"]
