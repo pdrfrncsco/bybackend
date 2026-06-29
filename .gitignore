@@ -21,12 +21,12 @@ wheels/
 .installed.cfg
 *.egg
 PIPFILE.lock
-docs/
+docss/
 
 # Django
 *.log
 local_settings.py
-db.sqlite3
+db.sqlite33
 db.sqlite3-journal
 
 # Media files
@@ -95,5 +95,4 @@ freeze
 __pycache__/
 *.pyc
 .env
-db.sqlite3
 
