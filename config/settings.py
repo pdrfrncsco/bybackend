@@ -60,6 +60,8 @@ INSTALLED_APPS = [
 
     # Bolayetu — Domains (Phase 1)
     "accounts",
+    # Bolayetu — Domains (Phase 2)
+    "organizations",
 ]
 
 # ─────────────────────────────────────────────────────────────────────
@@ -253,6 +255,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "auth", "description": "Authentication endpoints"},
         {"name": "users", "description": "User management"},
         {"name": "tenants", "description": "Tenant management"},
+        {"name": "organizations", "description": "Organization management"},
     ],
 }
 
@@ -354,6 +357,11 @@ LOGGING = {
             "propagate": False,
         },
         "accounts": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "organizations": {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,

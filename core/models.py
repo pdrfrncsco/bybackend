@@ -65,6 +65,13 @@ class Tenant(BaseModel):
     )
 
     # Branding
+    logo = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        verbose_name="Logo URL",
+        help_text="Cloudflare R2 URL for the organization logo.",
+    )
     primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
     secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")
 
