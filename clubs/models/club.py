@@ -33,7 +33,7 @@ class Club(BaseModel):
 
     # Identity
     name = models.CharField(max_length=255, verbose_name="Name")
-    slug = models.SlugField(max_length=255, unique=True, blank=True, verbose_name="Slug")
+    slug = models.SlugField(max_length=255, blank=True, verbose_name="Slug")
     short_name = models.CharField(
         max_length=50,
         null=True,
@@ -139,7 +139,7 @@ class Club(BaseModel):
             base = slugify(self.name)
             slug = base
             counter = 1
-            while Club.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+            while Club.objects.filter(tenant=self.tenant, slug=slug).exclude(pk=self.pk).exists():
                 slug = f"{base}-{counter}"
                 counter += 1
             self.slug = slug

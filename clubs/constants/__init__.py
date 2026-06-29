@@ -88,7 +88,7 @@ class PlayerPosition:
         GOALKEEPER: "Guarda-Redes",
         DEFENDER: "Defesa",
         MIDFIELDER: "Médio",
-        FORWARD: "Avaçado",
+    FORWARD: "Avançado",
     }
 
 
