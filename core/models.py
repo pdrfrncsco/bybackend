@@ -1,142 +1,120 @@
 """
 BOLAYETU — Core Models
-Skills: BOLAYETU_ARCHITECTURE, BOLAYETU_MULTITENANT_SKILL
 
-BaseModel:  UUID PK, timestamps — inherited by all Bolayetu models
-Tenant:     Root aggregate — the primary multi-tenant unit
+Defines the Tenant model — the foundation of the multi-tenant architecture.
+
+Every organization that uses the Bolayetu platform is a Tenant.
+All tenant-scoped data (competitions, clubs, matches) references this model.
+
+Architecture note:
+    Tenant is a TENANT-domain entity.
+    User and Player are GLOBAL-domain entities and do NOT belong to a Tenant.
+    See: 06A_GLOBAL_AND_TENANT_DOMAIN.md
 """
 
-import uuid
 from django.db import models
-from django.utils.translation import gettext_lazy as _
+from django.utils.text import slugify
 
-
-class BaseModel(models.Model):
-    """
-    Abstract base model for all Bolayetu entities.
-
-    Provides:
-    - UUID primary key (no sequential IDs exposed)
-    - created_at / updated_at timestamps (auto-managed)
-    """
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        verbose_name=_('ID'),
-    )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('Created at'))
-    updated_at = models.DateTimeField(auto_now=True, verbose_name=_('Updated at'))
-
-    class Meta:
-        abstract = True
-        ordering = ['-created_at']
-
-    def __repr__(self):
-        return f'<{self.__class__.__name__} id={self.id}>'
+from common.models import BaseModel
 
 
 class Tenant(BaseModel):
     """
-    Tenant — the primary multi-tenant unit in Bolayetu.
+    Represents an independent organization within the Bolayetu platform.
 
-    Every Tenant is a Football Organization (federation, league, association, etc.)
-    All data in the platform is scoped to a Tenant.
+    Each Tenant has isolated data, independent branding, and its own
+    configurations. Tenants are identified by their subdomain.
 
-    URL pattern: {slug}.bolayetu.com
     Examples:
-        faf.bolayetu.com        → FAF (Federação Angolana de Futebol)
-        girabola.bolayetu.com   → Girabola
-        apf-luanda.bolayetu.com → APF Luanda
-
-    Rules (BOLAYETU_MULTITENANT_SKILL):
-    - Every entity must belong to a tenant.
-    - Never return records from another tenant.
-    - All queries must be tenant-scoped via selectors.
+        - Federação Angolana de Futebol (FAF) → faf.bolayetu.com
+        - Associação Provincial de Futebol de Luanda → apfl.bolayetu.com
+        - Girabola → girabola.bolayetu.com
     """
 
-    class OrgType(models.TextChoices):
-        FEDERATION = 'federation', _('Federation')
-        LEAGUE = 'league', _('League')
-        ASSOCIATION = 'association', _('Association')
-        TOURNAMENT = 'tournament', _('Tournament organiser')
-        SCHOOL = 'school', _('Football School')
-        AMATEUR = 'amateur', _('Amateur Organisation')
+    class TenantType(models.TextChoices):
+        FEDERATION = "federation", "Federação"
+        ASSOCIATION = "association", "Associação"
+        LEAGUE = "league", "Liga"
+        ORGANIZER = "organizer", "Organizador"
+        ACADEMY = "academy", "Academia"
 
-    # ─── Identity ────────────────────────────────────────────────
-    name = models.CharField(max_length=255, verbose_name=_('Name'))
-    slug = models.SlugField(
-        unique=True,
-        verbose_name=_('Slug'),
-        help_text=_('Used as subdomain: slug.bolayetu.com'),
-    )
+    class TenantStatus(models.TextChoices):
+        PENDING = "pending", "Pendente"
+        ACTIVE = "active", "Ativa"
+        SUSPENDED = "suspended", "Suspensa"
+        CLOSED = "closed", "Encerrada"
+
+    # Identity
+    name = models.CharField(max_length=255, unique=True, verbose_name="Name")
+    slug = models.SlugField(max_length=255, unique=True, blank=True, verbose_name="Slug")
     type = models.CharField(
         max_length=20,
-        choices=OrgType.choices,
-        default=OrgType.LEAGUE,
-        verbose_name=_('Type'),
+        choices=TenantType.choices,
+        default=TenantType.FEDERATION,
+        verbose_name="Type",
     )
 
-    # ─── Branding ────────────────────────────────────────────────
-    primary_color = models.CharField(max_length=7, default='#1B4D3E', verbose_name=_('Primary colour'))
-    secondary_color = models.CharField(max_length=7, default='#D4AF37', verbose_name=_('Secondary colour'))
-    accent_color = models.CharField(max_length=7, default='#E63946', verbose_name=_('Accent colour'))
-
-    # Logo stored in Cloudflare R2 via infrastructure.storage.r2_storage
-    logo = models.ImageField(
-        upload_to='tenants/logos/',
+    # Multi-tenant routing
+    subdomain = models.CharField(
+        max_length=63,
+        unique=True,
         null=True,
         blank=True,
-        verbose_name=_('Logo'),
+        verbose_name="Subdomain",
+        help_text="e.g. 'faf' for faf.bolayetu.com",
     )
 
-    # ─── Contact ─────────────────────────────────────────────────
-    country = models.CharField(max_length=100, blank=True, default='Angola', verbose_name=_('Country'))
-    location = models.CharField(max_length=255, blank=True, default='', verbose_name=_('Location'))
-    email = models.EmailField(blank=True, default='', verbose_name=_('Email'))
-    phone = models.CharField(max_length=50, blank=True, default='', verbose_name=_('Phone'))
-    website = models.URLField(blank=True, default='', verbose_name=_('Website'))
-    description = models.TextField(blank=True, default='', verbose_name=_('Description'))
+    # Branding
+    primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
+    secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")
 
-    # ─── Status ──────────────────────────────────────────────────
-    is_active = models.BooleanField(
-        default=True,
-        verbose_name=_('Is active'),
-        help_text=_('Inactive tenants are not resolved by TenantMiddleware'),
+    # Contact
+    email = models.EmailField(null=True, blank=True, verbose_name="Email")
+    phone = models.CharField(max_length=20, null=True, blank=True, verbose_name="Phone")
+    website = models.URLField(null=True, blank=True, verbose_name="Website")
+
+    # Location
+    country = models.CharField(max_length=100, default="Angola", verbose_name="Country")
+    city = models.CharField(max_length=255, null=True, blank=True, verbose_name="City")
+
+    # Description
+    description = models.TextField(null=True, blank=True, verbose_name="Description")
+
+    # Settings
+    language = models.CharField(max_length=5, default="pt", verbose_name="Language")
+    timezone = models.CharField(max_length=50, default="Africa/Luanda", verbose_name="Timezone")
+
+    # Status
+    status = models.CharField(
+        max_length=20,
+        choices=TenantStatus.choices,
+        default=TenantStatus.PENDING,
+        verbose_name="Status",
     )
-    is_public = models.BooleanField(
-        default=True,
-        verbose_name=_('Is public'),
-        help_text=_('Public tenants appear on the platform directory'),
-    )
-    verified = models.BooleanField(
-        default=False,
-        verbose_name=_('Verified'),
-        help_text=_('Verified by Bolayetu platform administrators'),
-    )
+    is_public = models.BooleanField(default=True, verbose_name="Is Public")
+    is_verified = models.BooleanField(default=False, verbose_name="Is Verified")
 
     class Meta:
-        verbose_name = _('Tenant')
-        verbose_name_plural = _('Tenants')
-        ordering = ['name']
-        indexes = [
-            models.Index(fields=['slug'], name='tenant_slug_idx'),
-            models.Index(fields=['is_active', 'is_public'], name='tenant_status_idx'),
-        ]
+        ordering = ["name"]
+        verbose_name = "Tenant"
+        verbose_name_plural = "Tenants"
 
-    def __str__(self):
-        return f'{self.name} ({self.slug})'
+    def __str__(self) -> str:
+        return self.name
 
-    @property
-    def subdomain_url(self) -> str:
-        """Return the full subdomain URL for this tenant."""
-        from django.conf import settings
-        domain = getattr(settings, 'BOLAYETU_DOMAIN', 'bolayetu.com')
-        return f'https://{self.slug}.{domain}'
+    def save(self, *args, **kwargs) -> None:
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
 
     @property
-    def logo_url(self) -> str | None:
-        """Return CDN URL for the tenant logo."""
-        if self.logo:
-            return self.logo.url
+    def is_active(self) -> bool:
+        """Returns True if the tenant is currently active."""
+        return self.status == self.TenantStatus.ACTIVE
+
+    @property
+    def domain(self) -> str | None:
+        """Returns the full subdomain URL for this tenant."""
+        if self.subdomain:
+            return f"{self.subdomain}.bolayetu.com"
         return None

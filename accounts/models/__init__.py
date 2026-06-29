@@ -1,15 +1,13 @@
-from .user_role import UserRole
-from .profiles import (
-    OrganizacaoProfile,
-    ClubeProfile,
-    JogadorProfile,
-    AdeptoProfile,
-)
+"""
+BOLAYETU — Accounts Models Package
+"""
+
+from accounts.models.user import User
+from accounts.models.membership import TenantMembership
+from accounts.models.password_reset import PasswordResetToken
 
 __all__ = [
-    "UserRole",
-    "OrganizacaoProfile",
-    "ClubeProfile",
-    "JogadorProfile",
-    "AdeptoProfile",
+    "User",
+    "TenantMembership",
+    "PasswordResetToken",
 ]

@@ -1,13 +1,8 @@
-from .profiles import (
-    create_organizacao_profile,
-    create_clube_profile,
-    create_jogador_profile,
-    create_adepto_profile,
-)
+"""
+BOLAYETU — Accounts Services Package
+"""
 
-__all__ = [
-    "create_organizacao_profile",
-    "create_clube_profile",
-    "create_jogador_profile",
-    "create_adepto_profile",
-]
+from accounts.services.auth_service import AuthService
+from accounts.services.user_service import UserService
+
+__all__ = ["AuthService", "UserService"]

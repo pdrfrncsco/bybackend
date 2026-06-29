@@ -1,1 +1,0 @@
-# Affiliations application initialization
