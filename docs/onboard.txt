@@ -1,0 +1,21 @@
+● Pronto — Implementei o passo Branding do onboarding e integrei a rota.
+
+  O que foi feito:
+
+   - OnboardingLayout: navegação entre passos ligada a rotas reais (/onboarding, /onboarding/branding, /onboarding/competition, /onboarding/review).
+   - OrganizationStep (passo 1) já criado (autosave).
+   - BrandingStep (passo 2) criado: - Upload de logo (usa useUploadLogo).
+   - Upload de banner (placeholder; backend não tem endpoint específico ainda — salva via update placeholder).
+   - Paleta de cores com color pickers e autosave (primary_color, secondary_color).
+   - Pré-visualização em tempo real.
+   - Registrei rota protegida /onboarding/branding no App.tsx.
+   - TypeScript check passou.
+
+  Próximos passos sugeridos (escolha um):
+
+   1. Implementar /onboarding/competition (passo 3) com criação de competição e persistência.
+   2. Implementar /onboarding/review (passo 4) com summary e “Lançar Portal” action (call backend launch endpoint or mock).
+   3. Improve banner upload: add real backend endpoint & file upload service (requires backend change).
+   4. Add navigation buttons between steps (Next/Back) with route transitions and validation.
+
+  Qual seguir?
