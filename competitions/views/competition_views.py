@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from accounts.permissions import IsActiveAccount
-from common.responses import success_response, created_response, not_found_response
+from common.responses import success_response, created_response, not_found_response, error_response
 from organizations.permissions import IsOrganizationAdmin
 from organizations.services import OrganizationService
 from competitions.exceptions import CompetitionNotFound, DuplicateCompetition
@@ -55,7 +55,7 @@ class CompetitionListCreateView(APIView):
                 **serializer.validated_data,
             )
         except DuplicateCompetition:
-            return success_response(
+            return error_response(
                 message="A competition with this name and season already exists.",
                 status_code=400,
             )

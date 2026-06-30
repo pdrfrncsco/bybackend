@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "django_filters",
     "corsheaders",
     "drf_spectacular",
+    "django_celery_beat",
 
     # Bolayetu — Infrastructure
     "common",
@@ -259,8 +260,22 @@ SPECTACULAR_SETTINGS = {
         {"name": "users", "description": "User management"},
         {"name": "tenants", "description": "Tenant management"},
         {"name": "organizations", "description": "Organization management"},
+        {"name": "clubs", "description": "Club management"},
+        {"name": "competitions", "description": "Competitions"},
     ],
 }
+
+# Cloudflare R2 / django-storages (optional)
+USE_CLOUDFLARE_R2 = os.environ.get("USE_CLOUDFLARE_R2", "False").lower() in ("true", "1", "yes")
+if USE_CLOUDFLARE_R2:
+    # Requires `django-storages[boto3]` installed and credentials set in environment
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_S3_ENDPOINT_URL = os.environ.get("CLOUDFLARE_R2_ENDPOINT")
+    AWS_ACCESS_KEY_ID = os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.environ.get("CLOUDFLARE_R2_BUCKET")
+    AWS_S3_REGION_NAME = os.environ.get("CLOUDFLARE_R2_REGION", "auto")
+    AWS_S3_ADDRESSING_STYLE = "virtual"
 
 # ─────────────────────────────────────────────────────────────────────
 # MULTI-TENANT

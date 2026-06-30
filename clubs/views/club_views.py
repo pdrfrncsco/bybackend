@@ -31,7 +31,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from accounts.permissions import IsActiveAccount
-from common.responses import success_response, created_response
+from common.responses import success_response, created_response, error_response
+from clubs.models import Club
 from clubs.exceptions import (
     ClubNotFound,
     NoClubMembership,
@@ -122,7 +123,7 @@ class ClubLogoView(APIView):
 
         file = request.FILES.get("logo")
         if not file:
-            return success_response(
+            return error_response(
                 message="No logo file provided.",
                 status_code=400,
             )
@@ -348,9 +349,17 @@ class ClubPublicDetailView(APIView):
         responses={200: PublicClubSerializer},
     )
     def get(self, request, slug: str):
-        club = ClubSelector.get_by_slug(slug=slug)
-        if club is None:
-            raise ClubNotFound()
+        # Prefer tenant resolved by subdomain when available
+        tenant = getattr(request, "tenant", None)
+        if tenant:
+            try:
+                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+            except Club.DoesNotExist:
+                raise ClubNotFound()
+        else:
+            club = ClubSelector.get_by_slug(slug=slug)
+            if club is None:
+                raise ClubNotFound()
 
         serializer = PublicClubSerializer(club)
         return success_response(
@@ -366,9 +375,16 @@ class ClubKpisView(APIView):
 
     @extend_schema(tags=["clubs"], responses={200: ClubKpisSerializer})
     def get(self, request, slug: str):
-        club = ClubSelector.get_by_slug(slug=slug)
-        if club is None:
-            raise ClubNotFound()
+        tenant = getattr(request, "tenant", None)
+        if tenant:
+            try:
+                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+            except Club.DoesNotExist:
+                raise ClubNotFound()
+        else:
+            club = ClubSelector.get_by_slug(slug=slug)
+            if club is None:
+                raise ClubNotFound()
 
         kpis = ClubSelector.get_kpis(club=club)
         serializer = ClubKpisSerializer(kpis)
@@ -385,9 +401,16 @@ class ClubSquadView(APIView):
 
     @extend_schema(tags=["clubs"], responses={200: ClubSquadMemberSerializer(many=True)})
     def get(self, request, slug: str):
-        club = ClubSelector.get_by_slug(slug=slug)
-        if club is None:
-            raise ClubNotFound()
+        tenant = getattr(request, "tenant", None)
+        if tenant:
+            try:
+                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+            except Club.DoesNotExist:
+                raise ClubNotFound()
+        else:
+            club = ClubSelector.get_by_slug(slug=slug)
+            if club is None:
+                raise ClubNotFound()
 
         squad = ClubSelector.get_squad(club=club)
         serializer = ClubSquadMemberSerializer(squad, many=True)
@@ -404,9 +427,16 @@ class ClubStaffView(APIView):
 
     @extend_schema(tags=["clubs"], responses={200: ClubStaffSerializer(many=True)})
     def get(self, request, slug: str):
-        club = ClubSelector.get_by_slug(slug=slug)
-        if club is None:
-            raise ClubNotFound()
+        tenant = getattr(request, "tenant", None)
+        if tenant:
+            try:
+                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+            except Club.DoesNotExist:
+                raise ClubNotFound()
+        else:
+            club = ClubSelector.get_by_slug(slug=slug)
+            if club is None:
+                raise ClubNotFound()
 
         staff = ClubSelector.get_staff(club=club)
         serializer = ClubStaffSerializer(staff, many=True)
