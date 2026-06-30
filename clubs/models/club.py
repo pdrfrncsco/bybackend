@@ -51,12 +51,13 @@ class Club(BaseModel):
     )
 
     # Branding
-    logo = models.URLField(
+    logo = models.ImageField(
+        upload_to="club-logos/",
         max_length=500,
         null=True,
         blank=True,
-        verbose_name="Logo URL",
-        help_text="Cloudflare R2 URL for the club logo.",
+        verbose_name="Logo",
+        help_text="Club logo file (stored in configured DEFAULT_FILE_STORAGE).",
     )
     primary_color = models.CharField(
         max_length=7, default="#014D40", verbose_name="Primary Color"

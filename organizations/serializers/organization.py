@@ -64,10 +64,22 @@ class OrganizationSerializer(serializers.ModelSerializer):
 
     def get_logo_url(self, obj: Tenant) -> str:
         """Return the full logo URL or empty string."""
-        return obj.logo or ""
+        try:
+            # If ImageField/FieldFile is used, .url provides the public URL
+            if getattr(obj, "logo"):
+                return obj.logo.url
+        except Exception:
+            pass
+        # Fallback to attribute (string) or empty
+        return getattr(obj, "logo", "") or ""
 
     def get_banner_url(self, obj: Tenant) -> str:
         """Return the full banner URL or empty string."""
+        try:
+            if getattr(obj, "banner"):
+                return obj.banner.url
+        except Exception:
+            pass
         return getattr(obj, "banner", "") or ""
 
     def get_location(self, obj: Tenant) -> str:
@@ -157,9 +169,19 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_logo_url(self, obj: Tenant) -> str:
-        return obj.logo or ""
+        try:
+            if getattr(obj, "logo"):
+                return obj.logo.url
+        except Exception:
+            pass
+        return getattr(obj, "logo", "") or ""
 
     def get_banner_url(self, obj: Tenant) -> str:
+        try:
+            if getattr(obj, "banner"):
+                return obj.banner.url
+        except Exception:
+            pass
         return getattr(obj, "banner", "") or ""
 
     def get_location(self, obj: Tenant) -> str:

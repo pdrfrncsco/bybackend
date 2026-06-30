@@ -37,6 +37,8 @@ class Tenant(BaseModel):
         LEAGUE = "league", "Liga"
         ORGANIZER = "organizer", "Organizador"
         ACADEMY = "academy", "Academia"
+        CLUB = "club", "Clube"
+        PLAYER = "player", "Jogador"
 
     class TenantStatus(models.TextChoices):
         PENDING = "pending", "Pendente"
@@ -65,19 +67,21 @@ class Tenant(BaseModel):
     )
 
     # Branding
-    logo = models.URLField(
+    logo = models.ImageField(
+        upload_to="logos/",
         max_length=500,
         null=True,
         blank=True,
-        verbose_name="Logo URL",
-        help_text="Cloudflare R2 URL for the organization logo.",
+        verbose_name="Logo",
+        help_text="Organization logo file (stored in configured DEFAULT_FILE_STORAGE).",
     )
-    banner = models.URLField(
+    banner = models.ImageField(
+        upload_to="banners/",
         max_length=500,
         null=True,
         blank=True,
-        verbose_name="Banner URL",
-        help_text="Cloudflare R2 URL for the organization banner image.",
+        verbose_name="Banner",
+        help_text="Organization banner file (stored in configured DEFAULT_FILE_STORAGE).",
     )
     primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
     secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")

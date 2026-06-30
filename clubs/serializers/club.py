@@ -60,7 +60,12 @@ class ClubSerializer(serializers.ModelSerializer):
         ]
 
     def get_logo_url(self, obj: Club) -> str:
-        return obj.logo or ""
+        try:
+            if getattr(obj, "logo"):
+                return obj.logo.url
+        except Exception:
+            pass
+        return getattr(obj, "logo", "") or ""
 
     def get_location(self, obj: Club) -> str:
         return obj.location
@@ -168,7 +173,12 @@ class PublicClubSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_logo_url(self, obj: Club) -> str:
-        return obj.logo or ""
+        try:
+            if getattr(obj, "logo"):
+                return obj.logo.url
+        except Exception:
+            pass
+        return getattr(obj, "logo", "") or ""
 
     def get_location(self, obj: Club) -> str:
         return obj.location

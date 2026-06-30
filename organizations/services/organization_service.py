@@ -119,16 +119,12 @@ class OrganizationService:
         # In development: save to MEDIA_ROOT and store the URL
         # In production: upload to Cloudflare R2 and store the CDN URL
         # For now, we use Django's default storage
-        from django.core.files.storage import default_storage
-
+        # Use the model's FileField to save the file so Django handles storage and naming.
         ext = os.path.splitext(file.name)[1]
-        filename = f"logos/{tenant.id}{ext}"
+        filename = f"{tenant.id}{ext}"
 
-        # Save the file
-        saved_path = default_storage.save(filename, file)
-        logo_url = default_storage.url(saved_path)
-
-        tenant.logo = logo_url
+        # tenant.logo is an ImageField (FieldFile) — use its save() method
+        tenant.logo.save(filename, file, save=False)
         tenant.save(update_fields=["logo", "updated_at"])
 
         logger.info("Logo uploaded for organization: %s", tenant.name)
@@ -149,15 +145,10 @@ class OrganizationService:
         except DjangoValidationError as exc:
             raise InvalidLogoFile(detail=str(exc.messages[0]) if exc.messages else None)
 
-        from django.core.files.storage import default_storage
-
         ext = os.path.splitext(file.name)[1]
-        filename = f"banners/{tenant.id}{ext}"
+        filename = f"{tenant.id}{ext}"
 
-        saved_path = default_storage.save(filename, file)
-        banner_url = default_storage.url(saved_path)
-
-        tenant.banner = banner_url
+        tenant.banner.save(filename, file, save=False)
         tenant.save(update_fields=["banner", "updated_at"])
 
         logger.info("Banner uploaded for organization: %s", tenant.name)

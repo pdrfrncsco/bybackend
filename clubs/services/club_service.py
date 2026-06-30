@@ -122,16 +122,13 @@ class ClubService:
         except DjangoValidationError as exc:
             raise InvalidLogoFile(detail=str(exc.messages[0]) if exc.messages else None)
 
-        from django.core.files.storage import default_storage
         import os
 
         ext = os.path.splitext(file.name)[1]
-        filename = f"club-logos/{club.slug}{ext}"
+        filename = f"{club.slug}{ext}"
 
-        saved_path = default_storage.save(filename, file)
-        logo_url = default_storage.url(saved_path)
-
-        club.logo = logo_url
+        # Save using the model's ImageField so Django handles storage and naming
+        club.logo.save(filename, file, save=False)
         club.save(update_fields=["logo", "updated_at"])
 
         logger.info("Logo uploaded for club: %s", club.name)
