@@ -50,6 +50,28 @@ class RegisterSerializer(serializers.Serializer):
         return attrs
 
 
+class RegisterOrganizationSerializer(RegisterSerializer):
+    """
+    Validates organization owner registration input.
+
+    Used for: POST /api/v1/auth/register/organization/
+    """
+
+    organization_name = serializers.CharField(max_length=255)
+    organization_type = serializers.ChoiceField(
+        choices=[
+            ("federation", "Federação"),
+            ("association", "Associação"),
+            ("league", "Liga"),
+            ("organizer", "Organizador"),
+            ("academy", "Academia"),
+        ],
+        default="federation",
+    )
+    country = serializers.CharField(max_length=100, default="Angola", required=False)
+    city = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
+
+
 class LoginSerializer(serializers.Serializer):
     """
     Validates login credentials.

@@ -9,6 +9,7 @@ Endpoints:
         PATCH  /api/v1/organizations/me/              — Update own organization
         POST   /api/v1/organizations/me/logo/         — Upload logo
         POST   /api/v1/organizations/me/launch/       — Launch portal after onboarding
+        GET    /api/v1/organizations/me/onboarding-status/ — Onboarding gate status
 
     Public (anyone):
         GET    /api/v1/organizations/public/           — List public organizations
@@ -50,6 +51,7 @@ from organizations.serializers import (
     OrganizationKpisSerializer,
     OrganizationHistoryEntrySerializer,
     SubscriptionResponseSerializer,
+    OnboardingStatusSerializer,
 )
 
 logger = logging.getLogger(__name__)
@@ -155,6 +157,58 @@ class OrganizationLaunchView(APIView):
                 "portal_url": result["portal_url"],
             },
             message="Portal launched successfully.",
+        )
+
+
+class OrganizationOnboardingStatusView(APIView):
+    """
+    Return onboarding gate status for the authenticated user's organization.
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(tags=["organizations"], responses={200: OnboardingStatusSerializer})
+    def get(self, request):
+        from competitions.selectors import CompetitionSelector
+
+        tenant = OrganizationSelector.get_for_user(user=request.user)
+
+        if tenant is None:
+            return success_response(
+                data={
+                    "onboarding_required": False,
+                    "has_organization": False,
+                    "is_organization_admin": False,
+                    "competitions_count": 0,
+                    "organization": None,
+                },
+                message="Onboarding status retrieved successfully.",
+            )
+
+        is_admin = False
+        try:
+            OrganizationService.assert_is_organization_admin(
+                user=request.user,
+                tenant=tenant,
+            )
+            is_admin = True
+        except NotOrganizationAdmin:
+            is_admin = False
+
+        competitions = CompetitionSelector.list_for_tenant(tenant=tenant)
+        onboarding_required = (
+            tenant.status == Tenant.TenantStatus.PENDING and is_admin
+        )
+
+        return success_response(
+            data={
+                "onboarding_required": onboarding_required,
+                "has_organization": True,
+                "is_organization_admin": is_admin,
+                "competitions_count": len(competitions),
+                "organization": OrganizationSerializer(tenant).data,
+            },
+            message="Onboarding status retrieved successfully.",
         )
 
 

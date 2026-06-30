@@ -11,6 +11,7 @@ from drf_spectacular.utils import extend_schema
 from accounts.services.auth_service import AuthService
 from accounts.serializers.auth import (
     RegisterSerializer,
+    RegisterOrganizationSerializer,
     LoginSerializer,
     LogoutSerializer,
     TokenResponseSerializer,
@@ -18,6 +19,7 @@ from accounts.serializers.auth import (
     ResetPasswordSerializer,
 )
 from accounts.serializers.user import UserSerializer
+from organizations.serializers import OrganizationSerializer
 from common.responses import success_response, created_response
 
 
@@ -51,6 +53,44 @@ class RegisterView(APIView):
                 "user": UserSerializer(user).data,
             },
             message="User registered successfully.",
+        )
+
+
+class RegisterOrganizationView(APIView):
+    """Register a new organization owner. Creates user, tenant and owner membership."""
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["auth"],
+        request=RegisterOrganizationSerializer,
+        responses={201: TokenResponseSerializer},
+    )
+    def post(self, request):
+        serializer = RegisterOrganizationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user, tokens, tenant = AuthService.register_organization_owner(
+            email=serializer.validated_data["email"],
+            password=serializer.validated_data["password"],
+            password_confirm=serializer.validated_data["password_confirm"],
+            first_name=serializer.validated_data.get("first_name", ""),
+            last_name=serializer.validated_data.get("last_name", ""),
+            phone=serializer.validated_data.get("phone"),
+            organization_name=serializer.validated_data["organization_name"],
+            organization_type=serializer.validated_data["organization_type"],
+            country=serializer.validated_data.get("country", "Angola"),
+            city=serializer.validated_data.get("city", ""),
+        )
+
+        return created_response(
+            data={
+                "access": tokens["access"],
+                "refresh": tokens["refresh"],
+                "user": UserSerializer(user).data,
+                "organization": OrganizationSerializer(tenant).data,
+            },
+            message="Organization owner registered successfully.",
         )
 
 

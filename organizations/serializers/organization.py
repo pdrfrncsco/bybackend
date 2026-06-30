@@ -214,3 +214,13 @@ class SubscriptionResponseSerializer(serializers.Serializer):
 
     subscribed = serializers.BooleanField()
     organization_id = serializers.UUIDField()
+
+
+class OnboardingStatusSerializer(serializers.Serializer):
+    """Onboarding gate status for the authenticated user's organization."""
+
+    onboarding_required = serializers.BooleanField()
+    has_organization = serializers.BooleanField()
+    is_organization_admin = serializers.BooleanField()
+    competitions_count = serializers.IntegerField()
+    organization = OrganizationSerializer(allow_null=True)

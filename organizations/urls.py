@@ -10,6 +10,7 @@ from organizations.views import (
     OrganizationMeView,
     OrganizationLogoView,
     OrganizationLaunchView,
+    OrganizationOnboardingStatusView,
     OrganizationPublicListView,
     OrganizationPublicDetailView,
     OrganizationKpisView,
@@ -25,6 +26,7 @@ urlpatterns = [
     path("me/", OrganizationMeView.as_view(), name="organization-me"),
     path("me/logo/", OrganizationLogoView.as_view(), name="organization-logo"),
     path("me/launch/", OrganizationLaunchView.as_view(), name="organization-launch"),
+    path("me/onboarding-status/", OrganizationOnboardingStatusView.as_view(), name="organization-onboarding-status"),
 
     # Public — Organization Discovery
     path("public/", OrganizationPublicListView.as_view(), name="organization-public-list"),

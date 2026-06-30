@@ -19,6 +19,7 @@ from accounts.models import User, TenantMembership
 from core.models import Tenant
 from organizations.exceptions import (
     OrganizationNotFound,
+    OrganizationAlreadyExists,
     OrganizationSuspended,
     NotOrganizationAdmin,
     NoOrganizationMembership,
@@ -240,6 +241,48 @@ class OrganizationService:
         if tenant is None:
             raise NoOrganizationMembership()
 
+        return tenant
+
+    @staticmethod
+    @transaction.atomic
+    def create_organization_with_owner(
+        *,
+        user: User,
+        name: str,
+        org_type: str,
+        country: str = "Angola",
+        city: str | None = None,
+    ) -> Tenant:
+        """
+        Create a pending organization and assign the user as owner.
+
+        Used during organization owner registration / onboarding bootstrap.
+        """
+        if Tenant.objects.filter(name__iexact=name).exists():
+            raise OrganizationAlreadyExists()
+
+        tenant = Tenant.objects.create(
+            name=name,
+            type=org_type,
+            country=country,
+            city=city,
+            status=Tenant.TenantStatus.PENDING,
+            is_public=False,
+        )
+
+        TenantMembership.objects.create(
+            user=user,
+            tenant=tenant,
+            role=MembershipRole.OWNER,
+            is_active=True,
+        )
+
+        logger.info(
+            "Organization created with owner: %s (%s) → %s",
+            tenant.name,
+            tenant.id,
+            user.email,
+        )
         return tenant
 
     @staticmethod

@@ -19,3 +19,89 @@
    4. Add navigation buttons between steps (Next/Back) with route transitions and validation.
 
   Qual seguir?
+
+
+
+
+  Implementei o fluxo completo de onboarding de
+  ponta a ponta. Resumo:
+
+  Fluxo do utilizador
+
+  mermaid flowchart
+
+  flowchart TD
+      A[/register/organization] --> B[POST
+  /auth/register/organization/]
+      B --> C[Cria User + Tenant pending +
+  Membership owner]
+      C --> D[/onboarding - passo 1→4]
+      D --> E[POST /organizations/me/launch/]
+      E --> F[Org active + competições ativas]
+      F --> G[/dashboard]
+      H[/login] --> I{GET
+  /organizations/me/onboarding-status/}
+      I -->|onboarding_required| D
+      I -->|false| G
+      J[/dashboard] --> K{PendingOnboardingRedirect}    
+      K -->|pending admin| D
+
+  Backend
+
+  ┌─────────────────────┬──────────────────────────┐    
+  │ Endpoint            │ Função                   │    
+  ├─────────────────────┼──────────────────────────┤    
+  │ POST                │ Registo de owner: user + │    
+  │ /api/v1/auth/regist │ org pending + membership │    
+  │ er/organization/    │ owner                    │    
+  ├─────────────────────┼──────────────────────────┤    
+  │ GET                 │ Gate:                    │    
+  │ /api/v1/organizatio │ onboarding_required,     │    
+  │ ns/me/onboarding-st │ has_organization, etc.   │    
+  │ atus/               │                          │    
+  ├─────────────────────┼──────────────────────────┤    
+  │ POST                │ (já existia) Ativa       │    
+  │ /api/v1/organizatio │ portal                   │    
+  │ ns/me/launch/       │                          │    
+  └─────────────────────┴──────────────────────────┘    
+
+  Frontend                                              
+                                                        
+  ┌─────────────┬──────────────────────────────────┐    
+  │ Peça        │ Função                           │    
+  ├─────────────┼──────────────────────────────────┤    
+  │ /register/o │ Página de registo de organização │    
+  │ rganization │                                  │    
+  ├─────────────┼──────────────────────────────────┤    
+  │ OnboardingG │ Protege /onboarding/* — exige    │    
+  │ uard        │ org + status pending             │    
+  ├─────────────┼──────────────────────────────────┤    
+  │ PendingOnbo │ No dashboard, redireciona admins │    
+  │ ardingRedir │ pendentes para onboarding        │    
+  │ ect         │                                  │    
+  ├─────────────┼──────────────────────────────────┤    
+  │ Login       │ Após auth, usa                   │    
+  │             │ resolvePostAuthRedirect() →      │    
+  │             │ /onboarding ou /dashboard        │    
+  ├─────────────┼──────────────────────────────────┤    
+  │ Link no     │ "Registar federação / liga" →    │    
+  │ login       │ /register/organization           │    
+  └─────────────┴──────────────────────────────────┘    
+
+  Como testar
+
+  1. Ir a /register/organization e criar uma
+     organização
+  2. É redirecionado automaticamente para
+     /onboarding
+  3. Completar os 4 passos e Lançar Portal
+  4. Vai para /dashboard — tentar aceder a
+     /onboarding redireciona de volta ao dashboard      
+
+
+  Utilizador com org já ativa que faz login vai
+  direto para /dashboard. Admin com org pending que     
+  tenta ir ao dashboard é enviado para o wizard.        
+
+  npm run type-check e python manage.py check
+  passaram.

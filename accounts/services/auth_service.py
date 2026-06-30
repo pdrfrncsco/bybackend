@@ -96,6 +96,46 @@ class AuthService:
         return user, tokens
 
     @staticmethod
+    @transaction.atomic
+    def register_organization_owner(
+        *,
+        email: str,
+        password: str,
+        password_confirm: str,
+        organization_name: str,
+        organization_type: str,
+        first_name: str = "",
+        last_name: str = "",
+        phone: str | None = None,
+        country: str = "Angola",
+        city: str = "",
+    ) -> tuple[User, dict, "Tenant"]:
+        """
+        Register a user and bootstrap a pending organization with owner membership.
+        """
+        from core.models import Tenant
+        from organizations.services import OrganizationService
+
+        user, tokens = AuthService.register(
+            email=email,
+            password=password,
+            password_confirm=password_confirm,
+            first_name=first_name,
+            last_name=last_name,
+            phone=phone,
+        )
+
+        tenant = OrganizationService.create_organization_with_owner(
+            user=user,
+            name=organization_name,
+            org_type=organization_type,
+            country=country,
+            city=city or None,
+        )
+
+        return user, tokens, tenant
+
+    @staticmethod
     def login(*, email: str, password: str) -> tuple[User, dict]:
         """
         Authenticate a user and return JWT tokens.

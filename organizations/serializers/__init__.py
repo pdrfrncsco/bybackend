@@ -9,6 +9,7 @@ from organizations.serializers.organization import (
     OrganizationKpisSerializer,
     OrganizationHistoryEntrySerializer,
     SubscriptionResponseSerializer,
+    OnboardingStatusSerializer,
 )
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "OrganizationKpisSerializer",
     "OrganizationHistoryEntrySerializer",
     "SubscriptionResponseSerializer",
+    "OnboardingStatusSerializer",
 ]
