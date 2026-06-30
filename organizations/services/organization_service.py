@@ -136,6 +136,35 @@ class OrganizationService:
 
     @staticmethod
     @transaction.atomic
+    def upload_banner(*, tenant: Tenant, file) -> Tenant:
+        """
+        Upload a banner image for an organization.
+
+        Uses the same validation rules as logos for now.
+        """
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        try:
+            validate_logo_file(file)
+        except DjangoValidationError as exc:
+            raise InvalidLogoFile(detail=str(exc.messages[0]) if exc.messages else None)
+
+        from django.core.files.storage import default_storage
+
+        ext = os.path.splitext(file.name)[1]
+        filename = f"banners/{tenant.id}{ext}"
+
+        saved_path = default_storage.save(filename, file)
+        banner_url = default_storage.url(saved_path)
+
+        tenant.banner = banner_url
+        tenant.save(update_fields=["banner", "updated_at"])
+
+        logger.info("Banner uploaded for organization: %s", tenant.name)
+        return tenant
+
+    @staticmethod
+    @transaction.atomic
     def subscribe(*, user: User, tenant: Tenant) -> OrganizationSubscription:
         """
         Subscribe a user to an organization.

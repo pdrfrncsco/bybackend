@@ -35,6 +35,8 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "type_label",
             "logo",
             "logo_url",
+            "banner",
+            "banner_url",
             "primary_color",
             "secondary_color",
             "country",
@@ -56,13 +58,17 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
-            "id", "slug", "logo_url", "location", "verified",
+            "id", "slug", "logo_url", "banner_url", "location", "verified",
             "type_label", "status_label", "created_at", "updated_at",
         ]
 
     def get_logo_url(self, obj: Tenant) -> str:
         """Return the full logo URL or empty string."""
         return obj.logo or ""
+
+    def get_banner_url(self, obj: Tenant) -> str:
+        """Return the full banner URL or empty string."""
+        return getattr(obj, "banner", "") or ""
 
     def get_location(self, obj: Tenant) -> str:
         """Return a combined location string."""
@@ -152,6 +158,9 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
 
     def get_logo_url(self, obj: Tenant) -> str:
         return obj.logo or ""
+
+    def get_banner_url(self, obj: Tenant) -> str:
+        return getattr(obj, "banner", "") or ""
 
     def get_location(self, obj: Tenant) -> str:
         parts = [p for p in [obj.city, obj.country] if p]

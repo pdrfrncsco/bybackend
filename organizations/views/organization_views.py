@@ -52,6 +52,10 @@ from organizations.serializers import (
     SubscriptionResponseSerializer,
     OnboardingStatusSerializer,
 )
+# Additional imports for member management
+from accounts.models import TenantMembership, User
+from accounts.serializers.user import TenantMembershipSerializer
+from django.db import IntegrityError
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +137,130 @@ class OrganizationLogoView(APIView):
             data=OrganizationSerializer(tenant).data,
             message="Logo uploaded successfully.",
         )
+
+
+class OrganizationBannerView(APIView):
+    """
+    Upload a banner for the authenticated user's organization.
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    @extend_schema(
+        tags=["organizations"],
+        request={"multipart/form-data": None},
+        responses={200: OrganizationSerializer},
+    )
+    def post(self, request):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+
+        file = request.FILES.get("banner")
+        if not file:
+            return error_response(
+                message="No banner file provided.",
+                status_code=400,
+            )
+
+        tenant = OrganizationService.upload_banner(tenant=tenant, file=file)
+
+        return success_response(
+            data=OrganizationSerializer(tenant).data,
+            message="Banner uploaded successfully.",
+        )
+
+
+class OrganizationMembersView(APIView):
+    """
+    CRUD for tenant members (admin-only): list members and invite/add members.
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    @extend_schema(tags=["organizations"], responses={200: TenantMembershipSerializer(many=True)})
+    def get(self, request):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        memberships = TenantMembership.objects.filter(tenant=tenant).select_related("user")
+        serializer = TenantMembershipSerializer(memberships, many=True)
+        return success_response(data=serializer.data, message="Members retrieved successfully.")
+
+    @extend_schema(tags=["organizations"], request={"application/json": None}, responses={201: TenantMembershipSerializer})
+    def post(self, request):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        email = request.data.get("email")
+        role = request.data.get("role")
+
+        if not email:
+            return error_response(message="Email is required.", status_code=400)
+
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
+            return error_response(message="User not found.", status_code=404)
+
+        try:
+            membership = TenantMembership.objects.create(
+                user=user,
+                tenant=tenant,
+                role=role or TenantMembership.role.field.default,
+                invited_by=request.user,
+                is_active=True,
+            )
+        except IntegrityError:
+            return error_response(message="User is already a member of this organization.", status_code=400)
+
+        serializer = TenantMembershipSerializer(membership)
+        return created_response(data=serializer.data, message="Member added successfully.")
+
+
+class OrganizationMemberDetailView(APIView):
+    """
+    Retrieve, update or deactivate a specific tenant membership.
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    def get_membership(self, tenant, membership_id):
+        try:
+            return TenantMembership.objects.select_related("user").get(id=membership_id, tenant=tenant)
+        except TenantMembership.DoesNotExist:
+            return None
+
+    @extend_schema(tags=["organizations"], responses={200: TenantMembershipSerializer})
+    def patch(self, request, membership_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        membership = self.get_membership(tenant, membership_id)
+        if membership is None:
+            return error_response(message="Membership not found.", status_code=404)
+
+        role = request.data.get("role")
+        is_active = request.data.get("is_active")
+
+        if role is not None:
+            membership.role = role
+        if is_active is not None:
+            membership.is_active = bool(is_active)
+
+        membership.save()
+        serializer = TenantMembershipSerializer(membership)
+        return success_response(data=serializer.data, message="Member updated successfully.")
+
+    def delete(self, request, membership_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        membership = self.get_membership(tenant, membership_id)
+        if membership is None:
+            return error_response(message="Membership not found.", status_code=404)
+
+        membership.deactivate()
+        serializer = TenantMembershipSerializer(membership)
+        return success_response(data=serializer.data, message="Member deactivated.")
 
 
 class OrganizationLaunchView(APIView):
@@ -242,11 +370,12 @@ class OrganizationPublicListView(APIView):
             )
         )
 
-        serializer = PublicOrganizationSerializer(queryset, many=True)
-        return success_response(
-            data=serializer.data,
-            message="Public organizations retrieved successfully.",
-        )
+        # Use standard pagination envelope
+        from common.pagination import StandardPagination
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = PublicOrganizationSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class OrganizationPublicDetailView(APIView):
