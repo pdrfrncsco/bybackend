@@ -31,7 +31,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
 
 from accounts.permissions import IsActiveAccount
-from common.responses import success_response, created_response
+from common.responses import success_response, created_response, error_response
 from core.models import Tenant
 from organizations.exceptions import (
     OrganizationNotFound,
@@ -40,7 +40,6 @@ from organizations.exceptions import (
 )
 from organizations.permissions import (
     IsOrganizationAdmin,
-    CanViewPublicOrganization,
 )
 from organizations.selectors import OrganizationSelector
 from organizations.services import OrganizationService
@@ -123,7 +122,7 @@ class OrganizationLogoView(APIView):
 
         file = request.FILES.get("logo")
         if not file:
-            return success_response(
+            return error_response(
                 message="No logo file provided.",
                 status_code=400,
             )
@@ -259,7 +258,7 @@ class OrganizationPublicDetailView(APIView):
 
     @extend_schema(
         tags=["organizations"],
-        responses={200: OrganizationSerializer},
+        responses={200: PublicOrganizationSerializer},
     )
     def get(self, request, slug: str):
         tenant = OrganizationSelector.get_by_slug(slug=slug)
@@ -267,7 +266,7 @@ class OrganizationPublicDetailView(APIView):
         if tenant is None:
             raise OrganizationNotFound()
 
-        serializer = OrganizationSerializer(tenant)
+        serializer = PublicOrganizationSerializer(tenant)
         return success_response(
             data=serializer.data,
             message="Organization retrieved successfully.",

@@ -105,3 +105,176 @@
 
   npm run type-check e python manage.py check
   passaram.
+
+
+
+
+
+
+  Diagnóstico — Módulo Organização/Tenant
+
+  Auditei o módulo contra bybackend/docs
+  (arquitetura multi-tenant, API guidelines,
+  frontend guide, roadmap v2.1). Resumo:
+
+  Estado geral
+
+  ┌──────────────────────┬──────────┬──────────────┐    
+  │ Área                 │ Antes    │ Agora        │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ Backend API shell    │ Bom      │ Melhorado    │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ Selectors            │ Stubs    │ Ligados a    │    
+  │ (KPIs/clubes/competi │ vazios   │ dados reais  │    
+  │ ções)                │          │              │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ Segurança pública    │ Inconsis │ Alinhado     │    
+  │                      │ tente    │              │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ Frontend API         │ Bom      │ API_ROUTES   │    
+  │ contract             │          │ centralizado │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ TenantProvider       │ Quebrado │ Corrigido    │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ Onboarding payloads  │ Campos   │ Alinhados ao │    
+  │                      │ inválido │ backend      │    
+  │                      │ s        │              │    
+  ├──────────────────────┼──────────┼──────────────┤    
+  │ Dashboard org admin  │ Desconec │ Integrado    │    
+  │                      │ tado     │              │    
+  └──────────────────────┴──────────┴──────────────┘    
+
+  ────────────────────────────────────────
+
+  Gaps encontrados (por prioridade)
+
+  Críticos (corrigidos agora)
+
+  Backend
+  • get_by_slug não filtrava status=active → org        
+    suspensa acessível por URL direta
+  • Detalhe público usava OrganizationSerializer        
+    (expunha status, subdomain, etc.)
+  • Upload de logo sem ficheiro devolvia success:       
+    true com HTTP 400
+  • update_organization não atualizava slug ao
+    mudar o nome
+  • Selectors get_kpis, get_tournaments, get_clubs      
+    retornavam placeholders
+  • Registo de org não era atómico (user podia
+    ficar órfão)
+  • Subscribe não bloqueava orgs closed
+
+  Frontend
+  • TenantProvider usava URL/env errados e não
+    desembrulhava ApiResponse
+  • OrganizationStep enviava short_name, province,      
+    banner_url (inexistentes no backend)
+  • KPIs do dashboard usavam active_competitions,       
+    squad_size (campos inexistentes)
+  • Tipos com club e campos fantasma
+    (activeTournaments, totalClubs)
+  • API_ROUTES.ORGANIZATIONS desalinhado com
+    endpoints reais
+
+  Médios (parcialmente endereçados)
+
+  • Dashboard de org admin agora aparece para
+    roles owner/admin
+  • Rotas e constantes (ORGANIZATION_SETTINGS,
+    DASHBOARD_ORGANIZATION)
+  • Permissões duplicadas removidas (mantido
+    IsActiveAccount só em accounts)
+
+  Pendentes (backlog documentado)
+
+  ┌──────────────────────┬───────────┬─────────────┐    
+  │ Item                 │ Doc       │ Estado      │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Tenant middleware +  │ 06_MULTIT │ Não         │    
+  │ request.tenant       │ ENANT     │ implementad │    
+  │                      │           │ o           │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Upload de banner /   │ Branding  │ Pendente    │    
+  │ favicon              │ §10       │             │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Paginação em GET     │ API       │ Pendente    │    
+  │ /organizations/publi │ Guideline │             │    
+  │ c/                   │ s         │             │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Gestão de membros    │ Roadmap   │ Pendente    │    
+  │ (/me/members/)       │ v2.1      │             │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Subdomain claim no   │ Multitena │ Campo       │    
+  │ onboarding           │ nt        │ existe,     │    
+  │                      │           │ fluxo não   │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Billing/plan no      │ Multitena │ Pendente    │    
+  │ Tenant               │ nt        │             │    
+  │                      │ §22       │             │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Testes               │ Coding    │ Zero        │    
+  │ organizations/tests/ │ Standards │ cobertura   │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Eventos              │ Events    │ Pendente    │    
+  │ OrganizationCreated  │ doc       │             │    
+  ├──────────────────────┼───────────┼─────────────┤    
+  │ Upload R2            │ Media     │ Dev usa     │    
+  │ tenant-scoped        │ Architect │ storage     │    
+  │                      │ ure       │ local       │    
+  └──────────────────────┴───────────┴─────────────┘    
+
+  ────────────────────────────────────────
+
+  Correções aplicadas
+
+  Backend
+
+  • Selectors ligados a Competition + ClubSelector      
+  • Visibilidade pública consistente (is_public +       
+    status=active)
+  • PublicOrganizationSerializer no detalhe
+    público
+  • error_response() no logo upload
+  • Slug sincronizado com nome
+  • Logo path com tenant.id (evita colisões)
+  • Registo org numa única transação atómica
+  • RegisterOrganizationSerializer usa
+    OrganizationType.CHOICES
+
+  Frontend
+
+  • TenantProvider via
+    organizationApi.getPublicDetail() + envelope        
+    correto
+  • organization.api.ts usa
+    API_ROUTES.ORGANIZATIONS
+  • OrganizationStep só envia campos suportados
+    (name, country, city)
+  • BrandingStep deixa de enviar banner_url falso       
+  • Dashboard com KPIs corretos
+    (active_tournaments, total_clubs,
+    active_subscribers)
+  • DashboardPageSelector roteia admins para
+    OrganizationDashboardPage
+  • Tipos e constantes limpos
+
+  python manage.py check e npm run type-check
+  passaram.
+
+  ────────────────────────────────────────
+
+  Próximos passos sugeridos (por impacto)
+
+  1. Testes backend — organizations/tests/
+     (services, selectors, API register/launch)
+  2. Banner endpoint — POST
+     /organizations/me/banner/ + campo no Tenant        
+  3. Paginação pública — envelope { count, next,        
+     previous, results }
+  4. Member management — CRUD de TenantMembership       
+     para admins
+  5. Tenant middleware — resolver subdomínio antes      
+     dos endpoints
+
+  Qual destes queres atacar a seguir?

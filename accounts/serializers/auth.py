@@ -9,6 +9,7 @@ from rest_framework import serializers
 
 from accounts.constants import LanguageCode
 from accounts.validators import validate_password_strength
+from organizations.constants import OrganizationType
 
 
 class RegisterSerializer(serializers.Serializer):
@@ -59,14 +60,8 @@ class RegisterOrganizationSerializer(RegisterSerializer):
 
     organization_name = serializers.CharField(max_length=255)
     organization_type = serializers.ChoiceField(
-        choices=[
-            ("federation", "Federação"),
-            ("association", "Associação"),
-            ("league", "Liga"),
-            ("organizer", "Organizador"),
-            ("academy", "Academia"),
-        ],
-        default="federation",
+        choices=OrganizationType.CHOICES,
+        default=OrganizationType.FEDERATION,
     )
     country = serializers.CharField(max_length=100, default="Angola", required=False)
     city = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")

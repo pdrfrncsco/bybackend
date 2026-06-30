@@ -11,8 +11,10 @@ RULES:
 """
 
 import logging
+import os
 
 from django.db import transaction
+from django.utils.text import slugify
 
 from accounts.constants import MembershipRole
 from accounts.models import User, TenantMembership
@@ -77,7 +79,12 @@ class OrganizationService:
                 setattr(tenant, field, kwargs[field])
                 updated_fields.append(field)
 
-        tenant.save(update_fields=updated_fields)
+        if "name" in kwargs and kwargs["name"] is not None:
+            tenant.slug = slugify(kwargs["name"]) or tenant.slug
+            if "slug" not in updated_fields:
+                updated_fields.append("slug")
+
+        tenant.save(update_fields=list(dict.fromkeys(updated_fields)))
 
         logger.info("Organization updated: %s (%s)", tenant.name, tenant.id)
         return tenant
@@ -113,11 +120,9 @@ class OrganizationService:
         # In production: upload to Cloudflare R2 and store the CDN URL
         # For now, we use Django's default storage
         from django.core.files.storage import default_storage
-        import os
 
-        # Generate a unique filename
         ext = os.path.splitext(file.name)[1]
-        filename = f"logos/{tenant.slug}{ext}"
+        filename = f"logos/{tenant.id}{ext}"
 
         # Save the file
         saved_path = default_storage.save(filename, file)
@@ -149,7 +154,10 @@ class OrganizationService:
             SubscriptionAlreadyExists: If the user is already actively subscribed.
             OrganizationSuspended: If the organization is suspended.
         """
-        if tenant.status == Tenant.TenantStatus.SUSPENDED:
+        if tenant.status in (
+            Tenant.TenantStatus.SUSPENDED,
+            Tenant.TenantStatus.CLOSED,
+        ):
             raise OrganizationSuspended()
 
         existing = OrganizationSelector.get_subscription(user=user, tenant=tenant)
@@ -244,7 +252,6 @@ class OrganizationService:
         return tenant
 
     @staticmethod
-    @transaction.atomic
     def create_organization_with_owner(
         *,
         user: User,

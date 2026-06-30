@@ -6,30 +6,15 @@ RBAC permission classes for the organizations domain.
 Architecture rule:
     Permissions are NEVER checked inside services.
     They are evaluated by DRF at the view level, before the service is called.
+
+Note: IsActiveAccount is imported from accounts.permissions in views.
 """
 
-from rest_framework.permissions import BasePermission, IsAuthenticated
+from rest_framework.permissions import BasePermission
 from rest_framework.request import Request
 from rest_framework.views import APIView
 
 from accounts.constants import AccountStatus, MembershipRole
-from accounts.selectors import TenantMembershipSelector
-from core.models import Tenant
-
-
-class IsActiveAccount(BasePermission):
-    """
-    Allow access only to users with an ACTIVE account status.
-    """
-
-    message = "Your account is not active. Please contact support."
-
-    def has_permission(self, request: Request, view: APIView) -> bool:
-        return bool(
-            request.user
-            and request.user.is_authenticated
-            and request.user.status == AccountStatus.ACTIVE
-        )
 
 
 class IsOrganizationAdmin(BasePermission):
@@ -49,7 +34,6 @@ class IsOrganizationAdmin(BasePermission):
         if request.user.status != AccountStatus.ACTIVE:
             return False
 
-        # Check if user has any admin/owner membership
         from accounts.models import TenantMembership
 
         return TenantMembership.objects.filter(

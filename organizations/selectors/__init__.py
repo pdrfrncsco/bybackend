@@ -49,7 +49,11 @@ class OrganizationSelector:
             Tenant instance or None if not found.
         """
         try:
-            return Tenant.objects.get(slug=slug, is_public=True)
+            return Tenant.objects.get(
+                slug=slug,
+                is_public=True,
+                status=Tenant.TenantStatus.ACTIVE,
+            )
         except Tenant.DoesNotExist:
             return None
 
@@ -159,17 +163,18 @@ class OrganizationSelector:
     def get_kpis(*, tenant: Tenant) -> dict:
         """
         Retrieve KPI statistics for an organization.
-
-        Returns placeholder data for now — will be populated when
-        competitions, matches, and statistics modules are implemented.
-
-        Args:
-            tenant: The Tenant instance.
-
-        Returns:
-            Dictionary of KPI values.
         """
+        from competitions.constants import CompetitionStatus
+        from competitions.models import Competition
+        from clubs.selectors import ClubSelector
+
         subscriber_count = OrganizationSelector.count_subscribers(tenant=tenant)
+        competitions = Competition.objects.filter(tenant=tenant)
+        total_tournaments = competitions.count()
+        active_tournaments = competitions.filter(status=CompetitionStatus.ACTIVE).count()
+        upcoming_tournaments = competitions.filter(status=CompetitionStatus.DRAFT).count()
+        completed_tournaments = competitions.filter(status=CompetitionStatus.COMPLETED).count()
+        total_clubs = ClubSelector.count_for_tenant(tenant_id=tenant.id)
 
         return {
             "total_games": 0,
@@ -178,11 +183,11 @@ class OrganizationSelector:
             "live_games": 0,
             "scheduled_games": 0,
             "active_subscribers": subscriber_count,
-            "total_tournaments": 0,
-            "active_tournaments": 0,
-            "upcoming_tournaments": 0,
-            "completed_tournaments": 0,
-            "total_clubs": 0,
+            "total_tournaments": total_tournaments,
+            "active_tournaments": active_tournaments,
+            "upcoming_tournaments": upcoming_tournaments,
+            "completed_tournaments": completed_tournaments,
+            "total_clubs": total_clubs,
         }
 
     @staticmethod
@@ -190,39 +195,48 @@ class OrganizationSelector:
         """
         Retrieve tournament history for an organization.
 
-        Returns an empty list for now — will be populated when
-        the competitions module is implemented.
-
-        Args:
-            tenant: The Tenant instance.
-
-        Returns:
-            List of history entries.
+        Returns completed competitions until match history is implemented.
         """
-        return []
+        from competitions.constants import CompetitionStatus
+        from competitions.models import Competition
+
+        competitions = Competition.objects.filter(
+            tenant=tenant,
+            status=CompetitionStatus.COMPLETED,
+        ).order_by("-season", "name")
+
+        return [
+            {
+                "season": comp.season,
+                "tournament_name": comp.name,
+                "tournament_id": str(comp.id),
+                "tournament_format": comp.competition_type,
+                "winner_club_name": "",
+                "runner_up_club_name": "",
+                "winner_club_id": "",
+                "runner_up_club_id": "",
+            }
+            for comp in competitions
+        ]
 
     @staticmethod
     def get_tournaments(*, tenant: Tenant) -> list:
         """
-        Retrieve tournaments for an organization.
-
-        Returns an empty list for now — will be populated when
-        the competitions module is implemented.
-
-        Returns:
-            List of tournament data.
+        Retrieve competitions for an organization.
         """
-        return []
+        from competitions.selectors import CompetitionSelector
+        from competitions.serializers import CompetitionSerializer
+
+        competitions = CompetitionSelector.list_for_tenant(tenant=tenant)
+        return CompetitionSerializer(competitions, many=True).data
 
     @staticmethod
     def get_clubs(*, tenant: Tenant) -> list:
         """
-        Retrieve clubs affiliated with an organization.
-
-        Returns an empty list for now — will be populated when
-        the clubs module is implemented.
-
-        Returns:
-            List of club data.
+        Retrieve public clubs affiliated with an organization.
         """
-        return []
+        from clubs.selectors import ClubSelector
+        from clubs.serializers import PublicClubSerializer
+
+        clubs = ClubSelector.list_by_tenant(tenant_id=tenant.id).filter(is_public=True)
+        return PublicClubSerializer(clubs, many=True).data

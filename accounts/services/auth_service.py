@@ -112,18 +112,29 @@ class AuthService:
     ) -> tuple[User, dict, "Tenant"]:
         """
         Register a user and bootstrap a pending organization with owner membership.
+
+        Single atomic transaction — rolls back user if organization creation fails.
         """
         from core.models import Tenant
         from organizations.services import OrganizationService
 
-        user, tokens = AuthService.register(
+        if password != password_confirm:
+            raise PasswordMismatch()
+
+        if UserSelector.email_exists(email=email):
+            raise EmailAlreadyRegistered()
+
+        user = User.objects.create_user(
             email=email,
             password=password,
-            password_confirm=password_confirm,
             first_name=first_name,
             last_name=last_name,
             phone=phone,
+            status=AccountStatus.ACTIVE,
+            is_email_verified=True,
         )
+        tokens = AuthService._generate_tokens(user=user)
+        logger.info("New user registered: %s", email)
 
         tenant = OrganizationService.create_organization_with_owner(
             user=user,
