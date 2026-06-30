@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     # Bolayetu — Domains (Phase 2)
     "organizations",
     "clubs",
+    "competitions",
 ]
 
 # ─────────────────────────────────────────────────────────────────────

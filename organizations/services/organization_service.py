@@ -241,3 +241,38 @@ class OrganizationService:
             raise NoOrganizationMembership()
 
         return tenant
+
+    @staticmethod
+    @transaction.atomic
+    def launch_portal(*, tenant: Tenant) -> dict:
+        """
+        Activate the organization portal after onboarding.
+
+        Sets the tenant to active/public and promotes draft competitions.
+        """
+        from competitions.constants import CompetitionStatus
+        from competitions.models import Competition
+
+        tenant.status = Tenant.TenantStatus.ACTIVE
+        tenant.is_public = True
+        tenant.save(update_fields=["status", "is_public", "updated_at"])
+
+        competitions_activated = Competition.objects.filter(
+            tenant=tenant,
+            status=CompetitionStatus.DRAFT,
+        ).update(status=CompetitionStatus.ACTIVE)
+
+        logger.info(
+            "Portal launched for organization: %s (%s), competitions activated: %s",
+            tenant.name,
+            tenant.id,
+            competitions_activated,
+        )
+
+        portal_url = f"/organizations/{tenant.slug}" if tenant.slug else None
+
+        return {
+            "tenant": tenant,
+            "competitions_activated": competitions_activated,
+            "portal_url": portal_url,
+        }

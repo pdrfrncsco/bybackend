@@ -8,6 +8,7 @@ Endpoints:
         GET    /api/v1/organizations/me/              — Get own organization
         PATCH  /api/v1/organizations/me/              — Update own organization
         POST   /api/v1/organizations/me/logo/         — Upload logo
+        POST   /api/v1/organizations/me/launch/       — Launch portal after onboarding
 
     Public (anyone):
         GET    /api/v1/organizations/public/           — List public organizations
@@ -130,6 +131,30 @@ class OrganizationLogoView(APIView):
         return success_response(
             data=OrganizationSerializer(tenant).data,
             message="Logo uploaded successfully.",
+        )
+
+
+class OrganizationLaunchView(APIView):
+    """
+    Launch the organization portal after onboarding is complete.
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    @extend_schema(tags=["organizations"])
+    def post(self, request):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        result = OrganizationService.launch_portal(tenant=tenant)
+
+        return success_response(
+            data={
+                "organization": OrganizationSerializer(result["tenant"]).data,
+                "competitions_activated": result["competitions_activated"],
+                "portal_url": result["portal_url"],
+            },
+            message="Portal launched successfully.",
         )
 
 

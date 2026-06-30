@@ -9,6 +9,7 @@ from django.urls import path
 from organizations.views import (
     OrganizationMeView,
     OrganizationLogoView,
+    OrganizationLaunchView,
     OrganizationPublicListView,
     OrganizationPublicDetailView,
     OrganizationKpisView,
@@ -23,6 +24,7 @@ urlpatterns = [
     # Authenticated — Organization Management
     path("me/", OrganizationMeView.as_view(), name="organization-me"),
     path("me/logo/", OrganizationLogoView.as_view(), name="organization-logo"),
+    path("me/launch/", OrganizationLaunchView.as_view(), name="organization-launch"),
 
     # Public — Organization Discovery
     path("public/", OrganizationPublicListView.as_view(), name="organization-public-list"),

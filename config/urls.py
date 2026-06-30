@@ -13,6 +13,7 @@ urlpatterns = [
     # API v1
     path('api/v1/auth/', include('accounts.urls')),
     path('api/v1/organizations/', include('organizations.urls')),
+    path('api/v1/competitions/', include('competitions.urls')),
     path('api/v1/', include('core.urls')),
     
     # API Documentation
