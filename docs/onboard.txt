@@ -278,3 +278,14 @@
      dos endpoints
 
   Qual destes queres atacar a seguir?
+
+
+
+
+
+● Creating API upload tests for logo and banner — adds an APITestCase that creates a user, tenant, membership, authenticates, uploads files as multipart/form-data, asserts fields saved, and cleans up saved files. Creating file backend/organizations/tests/test_api_uploads.py.
+
+● Create test_api_uploads.py +92
+  └ backend\organizations\tests\test_api_uploads.py
+
+● Tests added: backend/organizations/tests/test_api_uploads.py. Run python manage.py test organizations.tests.test_api_uploads to execute them locally. Need CI secrets/config if running with Cloudflare R2 storage enabled.
