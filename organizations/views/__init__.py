@@ -5,6 +5,7 @@ BOLAYETU — Organizations Views Package
 from organizations.views.organization_views import (
     OrganizationMeView,
     OrganizationLogoView,
+    OrganizationBannerView,
     OrganizationLaunchView,
     OrganizationOnboardingStatusView,
     OrganizationPublicListView,
@@ -15,11 +16,14 @@ from organizations.views.organization_views import (
     OrganizationClubsView,
     OrganizationSubscribeView,
     OrganizationUnsubscribeView,
+    OrganizationMembersView,
+    OrganizationMemberDetailView,
 )
 
 __all__ = [
     "OrganizationMeView",
     "OrganizationLogoView",
+    "OrganizationBannerView",
     "OrganizationLaunchView",
     "OrganizationOnboardingStatusView",
     "OrganizationPublicListView",
@@ -30,4 +34,6 @@ __all__ = [
     "OrganizationClubsView",
     "OrganizationSubscribeView",
     "OrganizationUnsubscribeView",
+    "OrganizationMembersView",
+    "OrganizationMemberDetailView",
 ]

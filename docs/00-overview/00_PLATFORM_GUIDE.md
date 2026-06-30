@@ -29,7 +29,7 @@ Este documento deve ser considerado a principal referência para:
 
 # 2. O que é o Bolayetu?
 
-O Bolayetu é uma plataforma digital SaaS concebida para gerir e conectar todo o ecossistema do futebol.
+O Bolayetu é uma plataforma digital SaaS concebida para gerir e conectar todo o ecossistema do futebol Angolano e africano.
 
 Não é apenas um sistema de gestão de campeonatos.
 
