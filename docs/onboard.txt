@@ -289,3 +289,50 @@
   └ backend\organizations\tests\test_api_uploads.py
 
 ● Tests added: backend/organizations/tests/test_api_uploads.py. Run python manage.py test organizations.tests.test_api_uploads to execute them locally. Need CI secrets/config if running with Cloudflare R2 storage enabled.
+
+
+
+
+
+ ### O que foi feito:
+
+  1. Backend — Django Admin ( admin.py ):
+  Atualizei o  competitions/admin.py  para registar e criar
+  vistas completas para os seguintes modelos:
+
+  •  Competition
+  •  CompetitionRegistration  (inscrições de clubes)
+  •  Match  (jogos e resultados)
+  •  MatchEvent  (súmula detalhada: golos, cartões, penálties,      
+  substituições)
+  •  Standing  (tabela classificativa)
+  Isso permite ao administrador gerir todo o fluxo via painel de    
+  administração em  /admin , não ficando dependente só da API.      
+
+  2. Frontend — Súmula Digital & Estatísticas:
+
+  •  MatchEventsPanel.tsx : Criei um novo componente para exibir    
+  e gerir a súmula em tempo real. Cada evento (golo, cartão,        
+  substituição) tem ícone associado. Administradores podem
+  adicionar novos eventos pelo formulário ou remover existentes,    
+  o que irá automaticamente recalcular o resultado do jogo e        
+  atualizar a tabela classificativa em backend.
+  •  PlayerStatsTable.tsx : Adicionado o ecrã com a tabela de       
+  estatísticas agregadas por jogador (Golos, Autogolos, Cartões     
+  Amarelos, Cartões Vermelhos, Total de Jogos), ordenado do
+  melhor marcador para o menor.
+  •  CompetitionDetailPage.tsx :
+      • Integrei o painel da Súmula expandível dentro da linha (    
+      MatchRow ) de cada partida, facilitando muito o uso quer no   
+      ecrã inteiro quer no telemóvel.
+      • Adicionei um novo separador "Estatísticas" para exibir a    
+      tabela dos artilheiros/infractores do torneio.
+  • React Query ( useMatchCenter.ts ): Hooks ligados, lidando já    
+  com Invalidação de Cache ( invalidateQueries ) para garantir      
+  que sempre que um golo for registado, o resultado da partida e    
+  a tabela geral reajam instantaneamente no ecrã.
+
+  Para prosseguir, deseja que façamos o deploy local disto,
+  testes no browser ou avançamos para a próxima fase do
+  diagnóstico original (Notificações, Match Center Analytics,       
+  etc)?
