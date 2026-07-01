@@ -91,68 +91,98 @@ class OrganizationService:
 
     @staticmethod
     @transaction.atomic
-    def upload_logo(*, tenant: Tenant, file) -> Tenant:
+    def upload_logo(*, tenant: Tenant, file, uploaded_by=None) -> Tenant:
         """
-        Upload a logo for an organization.
+        Upload a logo for an organization using the DAM (Digital Asset Management) system.
 
-        In production, this would upload to Cloudflare R2 and store the URL.
-        In development, we store the file URL from Django's media system
-        or accept a URL directly.
+        Creates a MediaAsset record and links it to the Tenant via MediaUsage.
+        Also updates the legacy `tenant.logo` ImageField for backwards compatibility
+        with serializers/views that still read it directly.
 
         Args:
             tenant: The Tenant instance to update.
             file: The uploaded file object.
+            uploaded_by: The User performing the upload (optional).
 
         Returns:
-            Updated Tenant instance with logo URL.
+            Updated Tenant instance with logo_url populated.
 
         Raises:
             InvalidLogoFile: If the file is too large or has an invalid type.
         """
-        from django.core.exceptions import ValidationError as DjangoValidationError
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.services import MediaAssetService
+        from media_assets.exceptions import (
+            InvalidMediaFile,
+            MediaAssetTooLarge,
+            UnsupportedMediaType,
+        )
 
         try:
-            validate_logo_file(file)
-        except DjangoValidationError as exc:
-            raise InvalidLogoFile(detail=str(exc.messages[0]) if exc.messages else None)
+            asset = MediaAssetService.upload_for_owner(
+                file=file,
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=tenant.id,
+                role=AssetCategory.LOGO,
+                name=f"{tenant.name} Logo",
+                tenant=tenant,
+                uploaded_by=uploaded_by,
+                images_only=True,
+            )
+        except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
+            raise InvalidLogoFile(detail=str(exc.detail)) from exc
 
-        # In development: save to MEDIA_ROOT and store the URL
-        # In production: upload to Cloudflare R2 and store the CDN URL
-        # For now, we use Django's default storage
-        # Use the model's FileField to save the file so Django handles storage and naming.
-        ext = os.path.splitext(file.name)[1]
+        # Keep the legacy ImageField populated for backwards compatibility
+        # TODO: Phase 2 — remove legacy ImageField from Tenant once all consumers use DAM
+        import os as _os
+        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
         filename = f"{tenant.id}{ext}"
-
-        # tenant.logo is an ImageField (FieldFile) — use its save() method
+        file.seek(0)
         tenant.logo.save(filename, file, save=False)
         tenant.save(update_fields=["logo", "updated_at"])
 
-        logger.info("Logo uploaded for organization: %s", tenant.name)
+        logger.info("Logo uploaded via DAM for organization: %s (asset=%s)", tenant.name, asset.id)
         return tenant
 
     @staticmethod
     @transaction.atomic
-    def upload_banner(*, tenant: Tenant, file) -> Tenant:
+    def upload_banner(*, tenant: Tenant, file, uploaded_by=None) -> Tenant:
         """
-        Upload a banner image for an organization.
-
-        Uses the same validation rules as logos for now.
+        Upload a banner image for an organization using the DAM system.
         """
-        from django.core.exceptions import ValidationError as DjangoValidationError
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.services import MediaAssetService
+        from media_assets.exceptions import (
+            InvalidMediaFile,
+            MediaAssetTooLarge,
+            UnsupportedMediaType,
+        )
 
         try:
-            validate_logo_file(file)
-        except DjangoValidationError as exc:
-            raise InvalidLogoFile(detail=str(exc.messages[0]) if exc.messages else None)
+            asset = MediaAssetService.upload_for_owner(
+                file=file,
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=tenant.id,
+                role=AssetCategory.BANNER,
+                name=f"{tenant.name} Banner",
+                tenant=tenant,
+                uploaded_by=uploaded_by,
+                images_only=True,
+            )
+        except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
+            raise InvalidLogoFile(detail=str(exc.detail)) from exc
 
-        ext = os.path.splitext(file.name)[1]
+        # Legacy ImageField backwards compatibility
+        import os as _os
+        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
         filename = f"{tenant.id}{ext}"
-
+        file.seek(0)
         tenant.banner.save(filename, file, save=False)
         tenant.save(update_fields=["banner", "updated_at"])
 
-        logger.info("Banner uploaded for organization: %s", tenant.name)
+        logger.info("Banner uploaded via DAM for organization: %s (asset=%s)", tenant.name, asset.id)
         return tenant
+
 
     @staticmethod
     @transaction.atomic

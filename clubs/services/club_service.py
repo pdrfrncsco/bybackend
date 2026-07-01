@@ -111,28 +111,47 @@ class ClubService:
 
     @staticmethod
     @transaction.atomic
-    def upload_logo(*, club: Club, file) -> Club:
+    def upload_logo(*, club: Club, file, uploaded_by=None) -> Club:
         """
-        Upload a logo for a club.
+        Upload a logo for a club using the DAM (Digital Asset Management) system.
+
+        Creates a MediaAsset record and links it to the Club via MediaUsage.
+        Also updates the legacy `club.logo` ImageField for backwards compatibility.
         """
-        from django.core.exceptions import ValidationError as DjangoValidationError
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.services import MediaAssetService
+        from media_assets.exceptions import (
+            InvalidMediaFile,
+            MediaAssetTooLarge,
+            UnsupportedMediaType,
+        )
 
         try:
-            validate_logo_file(file)
-        except DjangoValidationError as exc:
-            raise InvalidLogoFile(detail=str(exc.messages[0]) if exc.messages else None)
+            asset = MediaAssetService.upload_for_owner(
+                file=file,
+                owner_type=OwnerType.CLUB,
+                owner_id=club.id,
+                role=AssetCategory.LOGO,
+                name=f"{club.name} Logo",
+                tenant=club.tenant,
+                uploaded_by=uploaded_by,
+                images_only=True,
+            )
+        except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
+            raise InvalidLogoFile(detail=str(exc.detail)) from exc
 
-        import os
-
-        ext = os.path.splitext(file.name)[1]
+        # Keep the legacy ImageField populated for backwards compatibility
+        # TODO: Phase 2 — remove legacy ImageField from Club once all consumers use DAM
+        import os as _os
+        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
         filename = f"{club.slug}{ext}"
-
-        # Save using the model's ImageField so Django handles storage and naming
+        file.seek(0)
         club.logo.save(filename, file, save=False)
         club.save(update_fields=["logo", "updated_at"])
 
-        logger.info("Logo uploaded for club: %s", club.name)
+        logger.info("Logo uploaded via DAM for club: %s (asset=%s)", club.name, asset.id)
         return club
+
 
     @staticmethod
     @transaction.atomic

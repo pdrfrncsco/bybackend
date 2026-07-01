@@ -65,6 +65,8 @@ INSTALLED_APPS = [
     "organizations",
     "clubs",
     "competitions",
+    # Bolayetu — DAM (Phase 1 — Digital Asset Management)
+    "media_assets",
 ]
 
 # ─────────────────────────────────────────────────────────────────────
@@ -260,22 +262,37 @@ SPECTACULAR_SETTINGS = {
         {"name": "users", "description": "User management"},
         {"name": "tenants", "description": "Tenant management"},
         {"name": "organizations", "description": "Organization management"},
-        {"name": "clubs", "description": "Club management"},
-        {"name": "competitions", "description": "Competitions"},
+        {"name": "clubs", "description": "Gestão de clubes"},
+        {"name": "competitions", "description": "Competições e calendário"},
+        {"name": "media", "description": "Digital Asset Management — upload e gestão de ficheiros"},
     ],
 }
 
-# Cloudflare R2 / django-storages (optional)
+# ─────────────────────────────────────────────────────────────────────
+# CLOUDFLARE R2 — Digital Asset Management (DAM)
+# ─────────────────────────────────────────────────────────────────────
+# These settings are used by media_assets.storage.R2StorageProvider.
+# Set USE_CLOUDFLARE_R2=True + credentials in .env to activate R2.
+
 USE_CLOUDFLARE_R2 = os.environ.get("USE_CLOUDFLARE_R2", "False").lower() in ("true", "1", "yes")
+CLOUDFLARE_R2_ENDPOINT = os.environ.get("CLOUDFLARE_R2_ENDPOINT", "")
+CLOUDFLARE_R2_ACCESS_KEY_ID = os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID", "")
+CLOUDFLARE_R2_SECRET_ACCESS_KEY = os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "")
+CLOUDFLARE_R2_BUCKET = os.environ.get("CLOUDFLARE_R2_BUCKET", "bolayetu-storage")
+CLOUDFLARE_R2_REGION = os.environ.get("CLOUDFLARE_R2_REGION", "auto")
+CLOUDFLARE_R2_CDN_URL = os.environ.get("CLOUDFLARE_R2_CDN_URL", "")  # e.g. https://cdn.bolayetu.com
+
 if USE_CLOUDFLARE_R2:
-    # Requires `django-storages[boto3]` installed and credentials set in environment
+    # Also configure Django's default file storage for backwards-compat
+    # (used by legacy ImageFields on Tenant and Club — will be migrated in Phase 1)
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-    AWS_S3_ENDPOINT_URL = os.environ.get("CLOUDFLARE_R2_ENDPOINT")
-    AWS_ACCESS_KEY_ID = os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = os.environ.get("CLOUDFLARE_R2_BUCKET")
-    AWS_S3_REGION_NAME = os.environ.get("CLOUDFLARE_R2_REGION", "auto")
+    AWS_S3_ENDPOINT_URL = CLOUDFLARE_R2_ENDPOINT
+    AWS_ACCESS_KEY_ID = CLOUDFLARE_R2_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY = CLOUDFLARE_R2_SECRET_ACCESS_KEY
+    AWS_STORAGE_BUCKET_NAME = CLOUDFLARE_R2_BUCKET
+    AWS_S3_REGION_NAME = CLOUDFLARE_R2_REGION
     AWS_S3_ADDRESSING_STYLE = "virtual"
+    AWS_QUERYSTRING_AUTH = False  # Public files use CDN URLs, not signed queries
 
 # ─────────────────────────────────────────────────────────────────────
 # MULTI-TENANT
@@ -385,6 +402,11 @@ LOGGING = {
             "propagate": False,
         },
         "core": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "media_assets": {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
