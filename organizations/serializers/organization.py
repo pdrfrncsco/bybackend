@@ -20,6 +20,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
     """
 
     logo_url = serializers.SerializerMethodField()
+    banner_url = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     verified = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
@@ -33,9 +34,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "slug",
             "type",
             "type_label",
-            "logo",
             "logo_url",
-            "banner",
             "banner_url",
             "primary_color",
             "secondary_color",
@@ -149,7 +148,6 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
             "slug",
             "type",
             "type_label",
-            "logo",
             "logo_url",
             "primary_color",
             "secondary_color",
