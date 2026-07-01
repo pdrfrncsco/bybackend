@@ -19,6 +19,9 @@ urlpatterns = [
 
     # Phase 1 — Digital Asset Management (DAM)
     path('api/v1/media/', include('media_assets.urls')),
+    
+    # Phase 2 — Players (Global Domain)
+    path('api/v1/players/', include('players.urls')),
 
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

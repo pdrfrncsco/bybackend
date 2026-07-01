@@ -31,7 +31,7 @@ DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.environ.get(
     "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1",
+    "localhost,127.0.0.1,testserver",
 ).split(",")
 
 # ─────────────────────────────────────────────────────────────────────
@@ -59,6 +59,9 @@ INSTALLED_APPS = [
     "common",
     "core",
 
+    # Bolayetu — Global Domain (Phase 2)
+    "players",
+    
     # Bolayetu — Domains (Phase 1)
     "accounts",
     # Bolayetu — Domains (Phase 2)
@@ -265,6 +268,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "clubs", "description": "Gestão de clubes"},
         {"name": "competitions", "description": "Competições e calendário"},
         {"name": "media", "description": "Digital Asset Management — upload e gestão de ficheiros"},
+        {"name": "players", "description": "Jogadores — entidade global (perfil, carreira, registos de clube)"},
     ],
 }
 
