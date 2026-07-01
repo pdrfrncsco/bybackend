@@ -1,7 +1,7 @@
 import logging
 
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema
 
 from accounts.permissions import IsActiveAccount
@@ -22,15 +22,18 @@ logger = logging.getLogger(__name__)
 
 class CompetitionListCreateView(APIView):
     """
-    List or create competitions for the authenticated user's organization.
+    GET  → public: list all competitions.
+    POST → org admin only: create a competition.
     """
 
-    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated(), IsActiveAccount(), IsOrganizationAdmin()]
 
     @extend_schema(tags=["competitions"], responses={200: CompetitionSerializer(many=True)})
     def get(self, request):
-        tenant = OrganizationService.get_organization_for_user(user=request.user)
-        competitions = CompetitionSelector.list_for_tenant(tenant=tenant)
+        competitions = CompetitionSelector.list_all_active()
         serializer = CompetitionSerializer(competitions, many=True)
         return success_response(
             data=serializer.data,
@@ -68,22 +71,20 @@ class CompetitionListCreateView(APIView):
 
 class CompetitionDetailView(APIView):
     """
-    Retrieve or update a competition by ID.
+    GET   → public: retrieve a competition by ID.
+    PATCH → org admin only: update competition fields.
     """
 
-    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated(), IsActiveAccount(), IsOrganizationAdmin()]
 
     @extend_schema(tags=["competitions"], responses={200: CompetitionSerializer})
     def get(self, request, competition_id):
-        tenant = OrganizationService.get_organization_for_user(user=request.user)
-        try:
-            competition = CompetitionService.get_competition_for_tenant(
-                tenant=tenant,
-                competition_id=competition_id,
-            )
-        except CompetitionNotFound:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
-
         return success_response(
             data=CompetitionSerializer(competition).data,
             message="Competition retrieved successfully.",
