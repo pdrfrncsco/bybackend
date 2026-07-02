@@ -124,15 +124,16 @@ DATABASES = {
     }
 }
 
-# Use PostgreSQL in production
-if not DEBUG:
+# Use PostgreSQL when explicitly configured or in production
+_db_engine = os.environ.get("DB_ENGINE", "")
+if _db_engine == "postgresql" or (not DEBUG and _db_engine != "sqlite"):
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "bolayetu"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+        "NAME": os.environ.get("DB_NAME", os.environ.get("POSTGRES_DB", "bolayetu")),
+        "USER": os.environ.get("DB_USER", os.environ.get("POSTGRES_USER", "postgres")),
+        "PASSWORD": os.environ.get("DB_PASSWORD", os.environ.get("POSTGRES_PASSWORD", "")),
+        "HOST": os.environ.get("DB_HOST", os.environ.get("POSTGRES_HOST", "localhost")),
+        "PORT": os.environ.get("DB_PORT", os.environ.get("POSTGRES_PORT", "5432")),
         "OPTIONS": {
             "connect_timeout": 10,
         },

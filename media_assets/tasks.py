@@ -147,7 +147,7 @@ def generate_thumbnails(self, asset_id: str) -> dict:
                 asset_id, variant_type, cdn_url,
             )
 
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "generate_thumbnails: failed variant %s for asset %s",
                 variant_type, asset_id,

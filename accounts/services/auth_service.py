@@ -10,7 +10,10 @@ RULES:
     - All mutations are wrapped in atomic transactions.
 """
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.contrib.auth import authenticate
@@ -32,6 +35,9 @@ from accounts.exceptions import (
 )
 from accounts.models import User, PasswordResetToken
 from accounts.selectors import UserSelector
+
+if TYPE_CHECKING:
+    from core.models import Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +115,7 @@ class AuthService:
         phone: str | None = None,
         country: str = "Angola",
         city: str = "",
-    ) -> tuple[User, dict, "Tenant"]:
+    ) -> tuple[User, dict, Tenant]:
         """
         Register a user and bootstrap a pending organization with owner membership.
 

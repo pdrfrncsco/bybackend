@@ -33,6 +33,6 @@ try:
         print(f'Content: {response.content.decode()}')
     else:
         print(f'Success!')
-except Exception as e:
+except Exception:
     traceback.print_exc()
 

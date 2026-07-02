@@ -103,7 +103,7 @@ class MediaAssetUploadView(APIView):
                 uploaded_by=request.user,
                 images_only=False,
             )
-        except Exception as exc:
+        except Exception:
             logger.exception("Media upload failed")
             raise
 
