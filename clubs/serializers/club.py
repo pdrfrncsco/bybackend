@@ -281,13 +281,18 @@ class ClubMemberSerializer(serializers.ModelSerializer):
 class ClubSquadMemberSerializer(serializers.ModelSerializer):
     """
     Serializer for squad (player) listings — public view.
+    
+    NOTE: Now uses PlayerRegistration instead of ClubMember.
     """
 
     display_name = serializers.SerializerMethodField()
+    position = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
+    jersey_number = serializers.IntegerField(source="shirt_number", read_only=True)
+    joined_at = serializers.DateField(source="joined_date", read_only=True)
 
     class Meta:
-        model = ClubMember
+        model = ClubMember  # Keep for backward compatibility, but fields come from PlayerRegistration
         fields = [
             "id",
             "display_name",
@@ -298,11 +303,29 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_display_name(self, obj: ClubMember) -> str:
-        return obj.display_name
+    def get_display_name(self, obj) -> str:
+        """Returns the player's full name from the PlayerRegistration."""
+        if hasattr(obj, 'player') and obj.player:
+            return obj.player.full_name
+        # Fallback for old ClubMember records
+        return obj.display_name if hasattr(obj, 'display_name') else str(obj)
 
-    def get_position_label(self, obj: ClubMember) -> str:
-        return obj.position_label
+    def get_position(self, obj) -> str:
+        """Returns the player's position from the PlayerRegistration."""
+        if hasattr(obj, 'player') and obj.player:
+            return obj.player.primary_position
+        return getattr(obj, 'position', '') or ''
+
+    def get_position_label(self, obj) -> str:
+        """Returns the player's position label from the PlayerRegistration."""
+        if hasattr(obj, 'player') and obj.player:
+            try:
+                from players.models import Player
+                return Player.Position(obj.player.primary_position).label if obj.player.primary_position else ""
+            except ValueError:
+                return obj.player.primary_position or ""
+        # Fallback for old ClubMember records
+        return getattr(obj, 'position_label', '') or ''
 
 
 class ClubStaffSerializer(serializers.ModelSerializer):

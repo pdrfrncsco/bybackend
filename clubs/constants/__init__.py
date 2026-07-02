@@ -28,9 +28,17 @@ class ClubStatus:
 
 
 class ClubMemberRole:
-    """Defines the role a user can have within a club."""
+    """
+    Defines the role a user can have within a club.
+    
+    NOTE: The PLAYER role is DEPRECATED. 
+    Players should now be managed via PlayerRegistration (players app).
+    ClubMember should only be used for staff (non-player) roles.
+    
+    See: 06A_GLOBAL_AND_TENANT_DOMAIN.md
+    """
 
-    PLAYER = "player"
+    PLAYER = "player"  # DEPRECATED - use PlayerRegistration instead
     COACH = "coach"
     ASSISTANT_COACH = "assistant_coach"
     MANAGER = "manager"
@@ -39,7 +47,7 @@ class ClubMemberRole:
     PRESIDENT = "president"
 
     CHOICES = [
-        (PLAYER, "Jogador"),
+        (PLAYER, "Jogador"),  # DEPRECATED
         (COACH, "Treinador"),
         (ASSISTANT_COACH, "Treinador Adjunto"),
         (MANAGER, "Gestor"),

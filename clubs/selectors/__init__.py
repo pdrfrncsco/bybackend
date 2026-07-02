@@ -86,13 +86,18 @@ class ClubSelector:
     @staticmethod
     def get_squad(*, club: Club) -> QuerySet:
         """
-        Return all active players for a club, ordered by jersey number.
+        Return all active players for a club, ordered by shirt number.
+        
+        NOTE: This method now uses PlayerRegistration instead of ClubMember.
+        ClubMember with role="player" is deprecated - use PlayerRegistration instead.
         """
+        from players.models import PlayerRegistration
+        
         return (
-            ClubMember.objects
-            .filter(club=club, is_active=True, role=ClubMemberRole.PLAYER)
-            .select_related("user")
-            .order_by("jersey_number")
+            PlayerRegistration.objects
+            .filter(club=club, status__in=["registered", "loaned"])
+            .select_related("player")
+            .order_by("shirt_number")
         )
 
     @staticmethod
