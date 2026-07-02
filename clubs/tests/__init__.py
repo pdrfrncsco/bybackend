@@ -1,0 +1,1 @@
+"""BOLAYETU — Club tests module"""

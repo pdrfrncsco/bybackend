@@ -62,18 +62,45 @@ class OrganizationSerializer(serializers.ModelSerializer):
         ]
 
     def get_logo_url(self, obj: Tenant) -> str:
-        """Return the full logo URL or empty string."""
+        """Return the DAM logo URL if available, otherwise fall back to legacy field."""
         try:
-            # If ImageField/FieldFile is used, .url provides the public URL
+            from media_assets.services import MediaAssetService
+            from media_assets.constants import OwnerType, AssetCategory
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=obj.id,
+                role=AssetCategory.LOGO,
+            )
+            if url:
+                return url
+        except Exception:
+            pass
+
+        try:
+            # Legacy fallback: ImageField/FieldFile
             if getattr(obj, "logo"):
                 return obj.logo.url
         except Exception:
             pass
-        # Fallback to attribute (string) or empty
         return getattr(obj, "logo", "") or ""
 
     def get_banner_url(self, obj: Tenant) -> str:
-        """Return the full banner URL or empty string."""
+        """Return the DAM banner URL if available, otherwise fall back to legacy field."""
+        try:
+            from media_assets.services import MediaAssetService
+            from media_assets.constants import OwnerType, AssetCategory
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=obj.id,
+                role=AssetCategory.BANNER,
+            )
+            if url:
+                return url
+        except Exception:
+            pass
+
         try:
             if getattr(obj, "banner"):
                 return obj.banner.url

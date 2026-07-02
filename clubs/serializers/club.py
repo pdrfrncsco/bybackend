@@ -60,6 +60,21 @@ class ClubSerializer(serializers.ModelSerializer):
         ]
 
     def get_logo_url(self, obj: Club) -> str:
+        """Return the DAM logo URL if available, otherwise fall back to legacy field."""
+        try:
+            from media_assets.services import MediaAssetService
+            from media_assets.constants import OwnerType, AssetCategory
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.CLUB,
+                owner_id=obj.id,
+                role=AssetCategory.LOGO,
+            )
+            if url:
+                return url
+        except Exception:
+            pass
+
         try:
             if getattr(obj, "logo"):
                 return obj.logo.url
@@ -173,6 +188,21 @@ class PublicClubSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_logo_url(self, obj: Club) -> str:
+        """Return the DAM logo URL if available, otherwise fall back to legacy field."""
+        try:
+            from media_assets.services import MediaAssetService
+            from media_assets.constants import OwnerType, AssetCategory
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.CLUB,
+                owner_id=obj.id,
+                role=AssetCategory.LOGO,
+            )
+            if url:
+                return url
+        except Exception:
+            pass
+
         try:
             if getattr(obj, "logo"):
                 return obj.logo.url
