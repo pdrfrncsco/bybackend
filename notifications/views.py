@@ -10,13 +10,22 @@ from .serializers import NotificationSerializer
 
 
 class NotificationsListView(generics.ListAPIView):
-    """List notifications for the authenticated user, newest first."""
+    """List notifications for the authenticated user, newest first.
+
+    Returns a wrapped ApiResponse object with 'data' containing the list to match the frontend
+    client's expected shape.
+    """
     serializer_class = NotificationSerializer
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = None
 
     def get_queryset(self):
         return Notification.objects.filter(recipient=self.request.user).order_by('-created_at')
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        serializer = self.get_serializer(qs, many=True)
+        return Response({"success": True, "message": "", "data": serializer.data})
 
 
 class UnreadCountView(APIView):
@@ -28,7 +37,7 @@ class UnreadCountView(APIView):
                 recipient=request.user, status=Notification.STATUS_PENDING
             ).count()
         )
-        return Response({"unread_count": count})
+        return Response({"success": True, "message": "", "data": {"unread": count}})
 
 
 class MarkReadView(APIView):
@@ -39,4 +48,4 @@ class MarkReadView(APIView):
         notif.status = Notification.STATUS_SENT
         notif.delivered_at = timezone.now()
         notif.save(update_fields=["status", "delivered_at"])
-        return Response(NotificationSerializer(notif).data, status=status.HTTP_200_OK)
+        return Response({"success": True, "message": "", "data": NotificationSerializer(notif).data}, status=status.HTTP_200_OK)
