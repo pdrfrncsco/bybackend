@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     "organizations",
     "clubs",
     "competitions",
+    # Bolayetu — Transfers (Phase 7)
+    "transfers",
     # Bolayetu — DAM (Phase 1 — Digital Asset Management)
     "media_assets",
     # Bolayetu — Notifications & Subscriptions (Phase 5)
@@ -271,6 +273,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "competitions", "description": "Competições e calendário"},
         {"name": "media", "description": "Digital Asset Management — upload e gestão de ficheiros"},
         {"name": "players", "description": "Jogadores — entidade global (perfil, carreira, registos de clube)"},
+        {"name": "transfers", "description": "Transferências de jogadores entre clubes"},
     ],
 }
 

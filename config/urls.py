@@ -26,6 +26,9 @@ urlpatterns = [
     # Phase 2 — Players (Global Domain)
     path('api/v1/players/', include('players.urls')),
 
+    # Phase 7 — Transfers
+    path('api/v1/transfers/', include('transfers.urls')),
+
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
