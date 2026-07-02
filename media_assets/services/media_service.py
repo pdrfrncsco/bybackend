@@ -40,6 +40,8 @@ from media_assets.models import MediaAsset, MediaUsage
 from media_assets.storage import get_storage_provider
 from media_assets.validators import validate_image_upload, validate_upload
 
+from core.events import Event, publish_event
+
 logger = logging.getLogger(__name__)
 
 
@@ -204,25 +206,26 @@ class MediaAssetService:
             asset.id, owner_type, owner_id, role,
         )
 
-        # 7. Queue thumbnail generation (async)
-        MediaAssetService._queue_thumbnail_task(asset_id=str(asset.id))
+        # Publish domain event (will be dispatched after DB commit)
+        try:
+            evt = Event(
+                type="AssetUploaded",
+                payload={
+                    "asset_id": str(asset.id),
+                    "owner_type": owner_type,
+                    "owner_id": str(owner_id),
+                    "role": role,
+                    "cdn_url": cdn_url,
+                },
+                origin="media_assets.service",
+                tenant_id=(getattr(tenant, "id", None) if tenant else None),
+                user_id=(getattr(uploaded_by, "id", None) if uploaded_by else None),
+            )
+            publish_event(evt)
+        except Exception:
+            logger.exception("Failed to publish AssetUploaded event for asset %s", asset.id)
 
         return asset
-
-    @staticmethod
-    def _queue_thumbnail_task(*, asset_id: str) -> None:
-        """
-        Enqueue the Celery thumbnail generation task.
-        Fails silently if Celery is not available (dev environment).
-        """
-        try:
-            from media_assets.tasks import generate_thumbnails
-            generate_thumbnails.delay(asset_id)
-        except Exception:
-            logger.debug(
-                "Thumbnail task not queued (Celery may not be running): asset=%s",
-                asset_id,
-            )
 
     @staticmethod
     def get_asset(*, asset_id: str) -> MediaAsset:
