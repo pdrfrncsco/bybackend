@@ -70,6 +70,8 @@ INSTALLED_APPS = [
     "competitions",
     # Bolayetu — DAM (Phase 1 — Digital Asset Management)
     "media_assets",
+    # Bolayetu — Notifications & Subscriptions (Phase 5)
+    "notifications",
 ]
 
 # ─────────────────────────────────────────────────────────────────────

@@ -11,6 +11,11 @@ from collections import deque
 from django.db import transaction
 
 from .base import Event
+from core.metrics import (
+    events_published_total,
+    events_dispatched_total,
+    events_handlers_failed_total,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +77,12 @@ def _dispatch_sync(event: Event) -> None:
         return
 
     logger.info("Dispatching event %s to %d subscribers", event.type, len(handlers))
+    events_dispatched_total.inc()
     for handler in handlers:
         try:
             handler(event)
         except Exception as exc:
+            events_handlers_failed_total.inc()
             logger.exception("Error in event handler %s for event %s: %s", handler, event.type, exc)
 
 
@@ -88,6 +95,11 @@ def publish_event(event: Event, async_dispatch: bool = False) -> None:
 
     def _on_commit():
         try:
+            # mark published metric
+            try:
+                events_published_total.inc()
+            except Exception:
+                logger.debug("Failed to inc events_published_total")
             # For now dispatch synchronously in-process. Hook for async enqueue here.
             _dispatch_sync(event)
         except Exception:
