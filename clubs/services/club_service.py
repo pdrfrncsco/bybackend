@@ -116,7 +116,6 @@ class ClubService:
         Upload a logo for a club using the DAM (Digital Asset Management) system.
 
         Creates a MediaAsset record and links it to the Club via MediaUsage.
-        Also updates the legacy `club.logo` ImageField for backwards compatibility.
         """
         from media_assets.constants import AssetCategory, OwnerType
         from media_assets.services import MediaAssetService
@@ -139,15 +138,6 @@ class ClubService:
             )
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise InvalidLogoFile(detail=str(exc.detail)) from exc
-
-        # Keep the legacy ImageField populated for backwards compatibility
-        # TODO: Phase 2 — remove legacy ImageField from Club once all consumers use DAM
-        import os as _os
-        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
-        filename = f"{club.slug}{ext}"
-        file.seek(0)
-        club.logo.save(filename, file, save=False)
-        club.save(update_fields=["logo", "updated_at"])
 
         logger.info("Logo uploaded via DAM for club: %s (asset=%s)", club.name, asset.id)
         return club

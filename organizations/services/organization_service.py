@@ -11,8 +11,6 @@ RULES:
 """
 
 import logging
-import os
-
 from django.db import transaction
 from django.utils.text import slugify
 
@@ -96,8 +94,6 @@ class OrganizationService:
         Upload a logo for an organization using the DAM (Digital Asset Management) system.
 
         Creates a MediaAsset record and links it to the Tenant via MediaUsage.
-        Also updates the legacy `tenant.logo` ImageField for backwards compatibility
-        with serializers/views that still read it directly.
 
         Args:
             tenant: The Tenant instance to update.
@@ -132,15 +128,6 @@ class OrganizationService:
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise InvalidLogoFile(detail=str(exc.detail)) from exc
 
-        # Keep the legacy ImageField populated for backwards compatibility
-        # TODO: Phase 2 — remove legacy ImageField from Tenant once all consumers use DAM
-        import os as _os
-        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
-        filename = f"{tenant.id}{ext}"
-        file.seek(0)
-        tenant.logo.save(filename, file, save=False)
-        tenant.save(update_fields=["logo", "updated_at"])
-
         logger.info("Logo uploaded via DAM for organization: %s (asset=%s)", tenant.name, asset.id)
         return tenant
 
@@ -171,14 +158,6 @@ class OrganizationService:
             )
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise InvalidLogoFile(detail=str(exc.detail)) from exc
-
-        # Legacy ImageField backwards compatibility
-        import os as _os
-        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
-        filename = f"{tenant.id}{ext}"
-        file.seek(0)
-        tenant.banner.save(filename, file, save=False)
-        tenant.save(update_fields=["banner", "updated_at"])
 
         logger.info("Banner uploaded via DAM for organization: %s (asset=%s)", tenant.name, asset.id)
         return tenant

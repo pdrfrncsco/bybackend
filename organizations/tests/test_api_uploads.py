@@ -6,15 +6,16 @@ Tests POST /api/v1/organizations/me/logo/ and /api/v1/organizations/me/banner/
 
 import os
 from importlib import import_module
-from django.urls import reverse
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.core.files.uploadedfile import SimpleUploadedFile
 
-from accounts.models import User, TenantMembership
-from core.models import Tenant
 from accounts.constants import AccountStatus, MembershipRole
+from accounts.models import TenantMembership, User
+from core.models import Tenant
 
 
 class OrganizationUploadAPITest(APITestCase):
@@ -46,17 +47,11 @@ class OrganizationUploadAPITest(APITestCase):
         token = resp.data["data"]["access"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
 
-    def tearDown(self):
-        # Cleanup any uploaded files
-        try:
-            if self.tenant.banner:
-                self.tenant.banner.delete(save=False)
-            if self.tenant.logo:
-                self.tenant.logo.delete(save=False)
-        except Exception:
-            pass
-
     def test_upload_banner(self):
+        """Banner upload should create a MediaAsset/MediaUsage (DAM), not the legacy field."""
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.models import MediaUsage
+
         url = reverse("organization-banner")
         content = SimpleUploadedFile("banner.jpg", b"\x47\x49\x46\x38\x39\x61", content_type="image/jpeg")
         resp = self.client.post(url, {"banner": content}, format="multipart")
@@ -64,17 +59,24 @@ class OrganizationUploadAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data["success"])
 
-        # Refresh tenant
+        # Legacy ImageField must remain untouched — DAM is the single source of truth.
         self.tenant.refresh_from_db()
-        self.assertTrue(bool(self.tenant.banner), "Tenant.banner was not saved")
-        # url property should be available when storage configured
-        try:
-            _ = self.tenant.banner.url
-        except Exception:
-            # Storage may not provide URL in test environment; ignore
-            pass
+        self.assertFalse(bool(self.tenant.banner), "Legacy Tenant.banner must not be written by DAM uploads")
+
+        usage = MediaUsage.objects.get(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant.id,
+            role=AssetCategory.BANNER,
+            is_active=True,
+        )
+        self.assertTrue(usage.asset.public_url)
+        self.assertTrue(resp.data["data"]["banner_url"])
 
     def test_upload_logo(self):
+        """Logo upload should create a MediaAsset/MediaUsage (DAM), not the legacy field."""
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.models import MediaUsage
+
         url = reverse("organization-logo")
         content = SimpleUploadedFile("logo.png", b"\x89PNG\r\n\x1a\n", content_type="image/png")
         resp = self.client.post(url, {"logo": content}, format="multipart")
@@ -82,10 +84,15 @@ class OrganizationUploadAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data["success"])
 
-        # Refresh tenant
+        # Legacy ImageField must remain untouched — DAM is the single source of truth.
         self.tenant.refresh_from_db()
-        self.assertTrue(bool(self.tenant.logo), "Tenant.logo was not saved")
-        try:
-            _ = self.tenant.logo.url
-        except Exception:
-            pass
+        self.assertFalse(bool(self.tenant.logo), "Legacy Tenant.logo must not be written by DAM uploads")
+
+        usage = MediaUsage.objects.get(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant.id,
+            role=AssetCategory.LOGO,
+            is_active=True,
+        )
+        self.assertTrue(usage.asset.public_url)
+        self.assertTrue(resp.data["data"]["logo_url"])

@@ -8,8 +8,8 @@ No business logic lives here.
 
 from rest_framework import serializers
 
+from clubs.constants import ClubMemberRole, ClubStatus
 from clubs.models import Club, ClubMember
-from clubs.constants import ClubStatus, ClubMemberRole
 
 
 class ClubSerializer(serializers.ModelSerializer):
@@ -33,7 +33,6 @@ class ClubSerializer(serializers.ModelSerializer):
             "tenant",
             "tenant_name",
             "tenant_slug",
-            "logo",
             "logo_url",
             "primary_color",
             "secondary_color",
@@ -55,32 +54,33 @@ class ClubSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
-            "id", "slug", "logo_url", "location", "status_label",
-            "tenant_name", "tenant_slug", "created_at", "updated_at",
+            "id",
+            "slug",
+            "logo_url",
+            "location",
+            "status_label",
+            "tenant_name",
+            "tenant_slug",
+            "created_at",
+            "updated_at",
         ]
 
     def get_logo_url(self, obj: Club) -> str:
-        """Return the DAM logo URL if available, otherwise fall back to legacy field."""
+        """Return the DAM logo URL for this club, if any."""
         try:
+            from media_assets.constants import AssetCategory, OwnerType
             from media_assets.services import MediaAssetService
-            from media_assets.constants import OwnerType, AssetCategory
 
-            url = MediaAssetService.get_usage_url(
-                owner_type=OwnerType.CLUB,
-                owner_id=obj.id,
-                role=AssetCategory.LOGO,
+            return (
+                MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.CLUB,
+                    owner_id=obj.id,
+                    role=AssetCategory.LOGO,
+                )
+                or ""
             )
-            if url:
-                return url
         except Exception:
-            pass
-
-        try:
-            if getattr(obj, "logo"):
-                return obj.logo.url
-        except Exception:
-            pass
-        return getattr(obj, "logo", "") or ""
+            return ""
 
     def get_location(self, obj: Club) -> str:
         return obj.location
@@ -163,7 +163,6 @@ class PublicClubSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "short_name",
-            "logo",
             "logo_url",
             "primary_color",
             "secondary_color",
@@ -188,27 +187,21 @@ class PublicClubSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_logo_url(self, obj: Club) -> str:
-        """Return the DAM logo URL if available, otherwise fall back to legacy field."""
+        """Return the DAM logo URL for this club, if any."""
         try:
+            from media_assets.constants import AssetCategory, OwnerType
             from media_assets.services import MediaAssetService
-            from media_assets.constants import OwnerType, AssetCategory
 
-            url = MediaAssetService.get_usage_url(
-                owner_type=OwnerType.CLUB,
-                owner_id=obj.id,
-                role=AssetCategory.LOGO,
+            return (
+                MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.CLUB,
+                    owner_id=obj.id,
+                    role=AssetCategory.LOGO,
+                )
+                or ""
             )
-            if url:
-                return url
         except Exception:
-            pass
-
-        try:
-            if getattr(obj, "logo"):
-                return obj.logo.url
-        except Exception:
-            pass
-        return getattr(obj, "logo", "") or ""
+            return ""
 
     def get_location(self, obj: Club) -> str:
         return obj.location
@@ -281,7 +274,7 @@ class ClubMemberSerializer(serializers.ModelSerializer):
 class ClubSquadMemberSerializer(serializers.ModelSerializer):
     """
     Serializer for squad (player) listings — public view.
-    
+
     NOTE: Now uses PlayerRegistration instead of ClubMember.
     """
 
@@ -305,27 +298,28 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
 
     def get_display_name(self, obj) -> str:
         """Returns the player's full name from the PlayerRegistration."""
-        if hasattr(obj, 'player') and obj.player:
+        if hasattr(obj, "player") and obj.player:
             return obj.player.full_name
         # Fallback for old ClubMember records
-        return obj.display_name if hasattr(obj, 'display_name') else str(obj)
+        return obj.display_name if hasattr(obj, "display_name") else str(obj)
 
     def get_position(self, obj) -> str:
         """Returns the player's position from the PlayerRegistration."""
-        if hasattr(obj, 'player') and obj.player:
+        if hasattr(obj, "player") and obj.player:
             return obj.player.primary_position
-        return getattr(obj, 'position', '') or ''
+        return getattr(obj, "position", "") or ""
 
     def get_position_label(self, obj) -> str:
         """Returns the player's position label from the PlayerRegistration."""
-        if hasattr(obj, 'player') and obj.player:
+        if hasattr(obj, "player") and obj.player:
             try:
                 from players.models import Player
+
                 return Player.Position(obj.player.primary_position).label if obj.player.primary_position else ""
             except ValueError:
                 return obj.player.primary_position or ""
         # Fallback for old ClubMember records
-        return getattr(obj, 'position_label', '') or ''
+        return getattr(obj, "position_label", "") or ""
 
 
 class ClubStaffSerializer(serializers.ModelSerializer):

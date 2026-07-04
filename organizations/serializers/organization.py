@@ -9,7 +9,7 @@ No business logic lives here.
 from rest_framework import serializers
 
 from core.models import Tenant
-from organizations.constants import OrganizationType, OrganizationStatus
+from organizations.constants import OrganizationStatus, OrganizationType
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -57,56 +57,51 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
-            "id", "slug", "logo_url", "banner_url", "location", "verified",
-            "type_label", "status_label", "created_at", "updated_at",
+            "id",
+            "slug",
+            "logo_url",
+            "banner_url",
+            "location",
+            "verified",
+            "type_label",
+            "status_label",
+            "created_at",
+            "updated_at",
         ]
 
     def get_logo_url(self, obj: Tenant) -> str:
-        """Return the DAM logo URL if available, otherwise fall back to legacy field."""
+        """Return the DAM logo URL for this organization, if any."""
         try:
+            from media_assets.constants import AssetCategory, OwnerType
             from media_assets.services import MediaAssetService
-            from media_assets.constants import OwnerType, AssetCategory
 
-            url = MediaAssetService.get_usage_url(
-                owner_type=OwnerType.ORGANIZATION,
-                owner_id=obj.id,
-                role=AssetCategory.LOGO,
+            return (
+                MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.ORGANIZATION,
+                    owner_id=obj.id,
+                    role=AssetCategory.LOGO,
+                )
+                or ""
             )
-            if url:
-                return url
         except Exception:
-            pass
-
-        try:
-            # Legacy fallback: ImageField/FieldFile
-            if getattr(obj, "logo"):
-                return obj.logo.url
-        except Exception:
-            pass
-        return getattr(obj, "logo", "") or ""
+            return ""
 
     def get_banner_url(self, obj: Tenant) -> str:
-        """Return the DAM banner URL if available, otherwise fall back to legacy field."""
+        """Return the DAM banner URL for this organization, if any."""
         try:
+            from media_assets.constants import AssetCategory, OwnerType
             from media_assets.services import MediaAssetService
-            from media_assets.constants import OwnerType, AssetCategory
 
-            url = MediaAssetService.get_usage_url(
-                owner_type=OwnerType.ORGANIZATION,
-                owner_id=obj.id,
-                role=AssetCategory.BANNER,
+            return (
+                MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.ORGANIZATION,
+                    owner_id=obj.id,
+                    role=AssetCategory.BANNER,
+                )
+                or ""
             )
-            if url:
-                return url
         except Exception:
-            pass
-
-        try:
-            if getattr(obj, "banner"):
-                return obj.banner.url
-        except Exception:
-            pass
-        return getattr(obj, "banner", "") or ""
+            return ""
 
     def get_location(self, obj: Tenant) -> str:
         """Return a combined location string."""
@@ -162,6 +157,7 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
     """
 
     logo_url = serializers.SerializerMethodField()
+    banner_url = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     verified = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
@@ -176,6 +172,7 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
             "type",
             "type_label",
             "logo_url",
+            "banner_url",
             "primary_color",
             "secondary_color",
             "country",
@@ -194,20 +191,38 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_logo_url(self, obj: Tenant) -> str:
+        """Return the DAM logo URL. No legacy field fallback for public data."""
         try:
-            if getattr(obj, "logo"):
-                return obj.logo.url
+            from media_assets.constants import AssetCategory, OwnerType
+            from media_assets.services import MediaAssetService
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=obj.id,
+                role=AssetCategory.LOGO,
+            )
+            if url:
+                return url
         except Exception:
             pass
-        return getattr(obj, "logo", "") or ""
+        return ""
 
     def get_banner_url(self, obj: Tenant) -> str:
+        """Return the DAM banner URL. No legacy field fallback for public data."""
         try:
-            if getattr(obj, "banner"):
-                return obj.banner.url
+            from media_assets.constants import AssetCategory, OwnerType
+            from media_assets.services import MediaAssetService
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=obj.id,
+                role=AssetCategory.BANNER,
+            )
+            if url:
+                return url
         except Exception:
             pass
-        return getattr(obj, "banner", "") or ""
+        return ""
 
     def get_location(self, obj: Tenant) -> str:
         parts = [p for p in [obj.city, obj.country] if p]

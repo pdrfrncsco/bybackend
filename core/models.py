@@ -67,21 +67,26 @@ class Tenant(BaseModel):
     )
 
     # Branding
+    # DEPRECATED (08A_DIGITAL_ASSET_MANAGEMENT.md): superseded by MediaAsset/MediaUsage
+    # (owner_type=organization, role=logo/banner). Kept only for historical data /
+    # backward-compatible migrations; never written or read by the application anymore.
     logo = models.ImageField(
         upload_to="logos/",
         max_length=500,
         null=True,
         blank=True,
-        verbose_name="Logo",
-        help_text="Organization logo file (stored in configured DEFAULT_FILE_STORAGE).",
+        editable=False,
+        verbose_name="Logo (deprecated)",
+        help_text="Deprecated legacy field. Use MediaAsset/MediaUsage (role=logo) instead.",
     )
     banner = models.ImageField(
         upload_to="banners/",
         max_length=500,
         null=True,
         blank=True,
-        verbose_name="Banner",
-        help_text="Organization banner file (stored in configured DEFAULT_FILE_STORAGE).",
+        editable=False,
+        verbose_name="Banner (deprecated)",
+        help_text="Deprecated legacy field. Use MediaAsset/MediaUsage (role=banner) instead.",
     )
     primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
     secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")
