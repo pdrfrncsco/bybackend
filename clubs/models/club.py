@@ -50,19 +50,8 @@ class Club(BaseModel):
         verbose_name="Organization",
     )
 
-    # Branding
-    # DEPRECATED (08A_DIGITAL_ASSET_MANAGEMENT.md): superseded by MediaAsset/MediaUsage
-    # (owner_type=club, role=logo). Kept only for historical data / backward-compatible
-    # migrations; never written or read by the application anymore.
-    logo = models.ImageField(
-        upload_to="club-logos/",
-        max_length=500,
-        null=True,
-        blank=True,
-        editable=False,
-        verbose_name="Logo (deprecated)",
-        help_text="Deprecated legacy field. Use MediaAsset/MediaUsage (role=logo) instead.",
-    )
+    # Branding: logo is served exclusively via MediaAsset/MediaUsage
+    # (owner_type=club, role=logo). See 08A_DIGITAL_ASSET_MANAGEMENT.md.
     primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
     secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")
 

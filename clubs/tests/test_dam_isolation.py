@@ -26,11 +26,14 @@ class ClubLogoDamIsolationTest(TestCase):
     def _fake_image(self, name="logo.png"):
         return SimpleUploadedFile(name, b"\x89PNG\r\n\x1a\n", content_type="image/png")
 
-    def test_logo_upload_never_writes_legacy_field(self):
+    def test_logo_upload_creates_media_asset_only(self):
+        from media_assets.models import MediaAsset
+
         ClubService.upload_logo(club=self.club_a, file=self._fake_image())
 
         self.club_a.refresh_from_db()
-        self.assertFalse(bool(self.club_a.logo))
+        self.assertFalse(hasattr(self.club_a, "logo"))
+        self.assertTrue(MediaAsset.objects.filter(owner_id=self.club_a.id).exists())
 
     def test_logo_is_isolated_between_clubs(self):
         ClubService.upload_logo(club=self.club_a, file=self._fake_image())

@@ -59,9 +59,9 @@ class OrganizationUploadAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data["success"])
 
-        # Legacy ImageField must remain untouched — DAM is the single source of truth.
+        # Legacy ImageField no longer exists — DAM is the single source of truth.
         self.tenant.refresh_from_db()
-        self.assertFalse(bool(self.tenant.banner), "Legacy Tenant.banner must not be written by DAM uploads")
+        self.assertFalse(hasattr(self.tenant, "banner"))
 
         usage = MediaUsage.objects.get(
             owner_type=OwnerType.ORGANIZATION,
@@ -84,9 +84,9 @@ class OrganizationUploadAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertTrue(resp.data["success"])
 
-        # Legacy ImageField must remain untouched — DAM is the single source of truth.
+        # Legacy ImageField no longer exists — DAM is the single source of truth.
         self.tenant.refresh_from_db()
-        self.assertFalse(bool(self.tenant.logo), "Legacy Tenant.logo must not be written by DAM uploads")
+        self.assertFalse(hasattr(self.tenant, "logo"))
 
         usage = MediaUsage.objects.get(
             owner_type=OwnerType.ORGANIZATION,
