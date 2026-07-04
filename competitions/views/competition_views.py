@@ -1,21 +1,22 @@
 import logging
 
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 
 from accounts.permissions import IsActiveAccount
-from common.responses import success_response, created_response, not_found_response, error_response
-from organizations.permissions import IsOrganizationAdmin
-from organizations.services import OrganizationService
+from common.pagination import StandardPagination
+from common.responses import created_response, error_response, not_found_response, success_response
 from competitions.exceptions import CompetitionNotFound, DuplicateCompetition
 from competitions.selectors import CompetitionSelector
-from competitions.services import CompetitionService
 from competitions.serializers import (
-    CompetitionSerializer,
     CompetitionCreateSerializer,
+    CompetitionSerializer,
     CompetitionUpdateSerializer,
 )
+from competitions.services import CompetitionService
+from organizations.permissions import IsOrganizationAdmin
+from organizations.services import OrganizationService
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,11 @@ class CompetitionListCreateView(APIView):
         competitions = CompetitionSelector.list_all_active(
             tenant=getattr(request, "tenant", None),
         )
-        serializer = CompetitionSerializer(competitions, many=True)
-        return success_response(
-            data=serializer.data,
-            message="Competitions retrieved successfully.",
-        )
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(competitions, request)
+        serializer = CompetitionSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
     @extend_schema(
         tags=["competitions"],

@@ -149,6 +149,18 @@ class OrganizationUpdateSerializer(serializers.ModelSerializer):
         ]
 
 
+class OrganizationLogoUploadSerializer(serializers.Serializer):
+    """Serializer describing the multipart payload for organization logo uploads."""
+
+    logo = serializers.ImageField(help_text="Image file (JPEG, PNG, WebP or SVG, max 5MB).")
+
+
+class OrganizationBannerUploadSerializer(serializers.Serializer):
+    """Serializer describing the multipart payload for organization banner uploads."""
+
+    banner = serializers.ImageField(help_text="Image file (JPEG, PNG, WebP or SVG, max 5MB).")
+
+
 class PublicOrganizationSerializer(serializers.ModelSerializer):
     """
     Serializer for public organization listing.

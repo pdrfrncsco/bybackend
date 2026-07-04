@@ -26,34 +26,36 @@ Endpoints:
 
 import logging
 
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 
 from accounts.permissions import IsActiveAccount
-from common.responses import success_response, created_response, error_response
-from clubs.models import Club
 from clubs.exceptions import (
+    ClubMemberNotFound,
     ClubNotFound,
     NoClubMembership,
-    ClubMemberNotFound,
 )
+from clubs.models import Club
 from clubs.permissions import (
-    IsClubAdmin,
     CanViewPublicClub,
+    IsClubAdmin,
 )
 from clubs.selectors import ClubSelector
-from clubs.services import ClubService
 from clubs.serializers import (
-    ClubSerializer,
     ClubCreateSerializer,
-    ClubUpdateSerializer,
-    PublicClubSerializer,
     ClubKpisSerializer,
+    ClubLogoUploadSerializer,
     ClubMemberSerializer,
+    ClubSerializer,
     ClubSquadMemberSerializer,
     ClubStaffSerializer,
+    ClubUpdateSerializer,
+    PublicClubSerializer,
 )
+from clubs.services import ClubService
+from common.pagination import StandardPagination
+from common.responses import created_response, error_response, success_response
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +117,7 @@ class ClubLogoView(APIView):
 
     @extend_schema(
         tags=["clubs"],
-        request={"multipart/form-data": None},
+        request=ClubLogoUploadSerializer,
         responses={200: ClubSerializer},
     )
     def post(self, request):
@@ -330,11 +332,11 @@ class ClubPublicListView(APIView):
         tenant_slug = request.query_params.get("organization")
 
         queryset = ClubSelector.list_public(search=search, tenant_slug=tenant_slug)
-        serializer = PublicClubSerializer(queryset, many=True)
-        return success_response(
-            data=serializer.data,
-            message="Public clubs retrieved successfully.",
-        )
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(queryset, request)
+        serializer = PublicClubSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class ClubPublicDetailView(APIView):

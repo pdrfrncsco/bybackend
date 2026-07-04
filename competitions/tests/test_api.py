@@ -1,16 +1,17 @@
-from django.test import TestCase, override_settings
-from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
-from rest_framework import status
 from datetime import date, datetime
 
-from core.models import Tenant
+from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
+from rest_framework import status
+from rest_framework.test import APIClient
+
 from accounts.models import TenantMembership
 from clubs.models import Club
 from competitions.models import Competition, CompetitionRegistration, Match, Standing
 from competitions.services import CompetitionService
 from competitions.services.competition_registration_service import CompetitionRegistrationService
 from competitions.services.match_service import MatchService
+from core.models import Tenant
 
 User = get_user_model()
 
@@ -20,11 +21,7 @@ class CompetitionAPITestCase(TestCase):
         self.client = APIClient()
 
         # Create user & tenant
-        self.user = User.objects.create_user(
-            email="admin@bolayetu.com",
-            password="SecurePass123!",
-            status="active"
-        )
+        self.user = User.objects.create_user(email="admin@bolayetu.com", password="SecurePass123!", status="active")
         self.tenant = Tenant.objects.create(
             name="Angolan Football Association",
             slug="faf",
@@ -71,16 +68,14 @@ class CompetitionAPITestCase(TestCase):
         CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club2)
 
         url = f"/api/v1/competitions/{self.competition.id}/generate-schedule/"
-        payload = {
-            "start_date": "2026-08-01",
-            "rounds_interval_days": 7,
-            "double_round": True
-        }
+        payload = {"start_date": "2026-08-01", "rounds_interval_days": 7, "double_round": True}
         response = self.client.post(url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["success"], True)
-        self.assertEqual(Match.objects.filter(competition=self.competition).count(), 2)  # 2 teams: 1 round * 2 legs = 2 matches
+        self.assertEqual(
+            Match.objects.filter(competition=self.competition).count(), 2
+        )  # 2 teams: 1 round * 2 legs = 2 matches
 
     def test_list_matches_api(self):
         """Test public GET list matches endpoint."""
@@ -97,7 +92,7 @@ class CompetitionAPITestCase(TestCase):
 
         # AllowAny - unauthenticate for this test
         self.client.force_authenticate(user=None)
-        
+
         url = f"/api/v1/competitions/{self.competition.id}/matches/"
         response = self.client.get(url)
 
@@ -124,16 +119,12 @@ class CompetitionAPITestCase(TestCase):
         )
 
         url = f"/api/v1/competitions/matches/{match.id}/"
-        payload = {
-            "home_score": 3,
-            "away_score": 2,
-            "status": "finished"
-        }
+        payload = {"home_score": 3, "away_score": 2, "status": "finished"}
         response = self.client.patch(url, payload, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["success"], True)
-        
+
         # Check standing of club1
         standing = Standing.objects.get(competition=self.competition, club=self.club1)
         self.assertEqual(standing.points, 3)
@@ -180,8 +171,8 @@ class CompetitionAPITestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["success"], True)
-        self.assertEqual(len(response.data["data"]), 1)
-        self.assertEqual(response.data["data"][0]["id"], str(self.competition.id))
+        self.assertEqual(len(response.data["data"]["results"]), 1)
+        self.assertEqual(response.data["data"]["results"][0]["id"], str(self.competition.id))
 
     @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
     def test_competition_detail_returns_404_for_other_subdomain_tenant(self):

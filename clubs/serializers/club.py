@@ -216,6 +216,12 @@ class PublicClubSerializer(serializers.ModelSerializer):
         return obj.tenant.slug if obj.tenant else ""
 
 
+class ClubLogoUploadSerializer(serializers.Serializer):
+    """Serializer describing the multipart payload for club logo uploads."""
+
+    logo = serializers.ImageField(help_text="Image file (JPEG, PNG, WebP or SVG, max 5MB).")
+
+
 class ClubKpisSerializer(serializers.Serializer):
     """Serializer for club KPI statistics."""
 

@@ -24,10 +24,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from accounts.models import TenantMembership
+from common.pagination import StandardPagination
 from common.responses import (
     created_response,
     error_response,
-    no_content_response,
     success_response,
 )
 from media_assets.constants import AssetCategory, AssetVisibility, OwnerType
@@ -100,14 +100,17 @@ def _owner_belongs_to_tenant(*, owner_type: str, owner_id, tenant) -> bool:
 
     if owner_type == OwnerType.CLUB:
         from clubs.models import Club
+
         return Club.objects.filter(id=owner_id, tenant=tenant).exists()
 
     if owner_type == OwnerType.COMPETITION:
         from competitions.models import Competition
+
         return Competition.objects.filter(id=owner_id, tenant=tenant).exists()
 
     if owner_type == OwnerType.MATCH:
         from competitions.models import Match
+
         return Match.objects.filter(id=owner_id, tenant=tenant).exists()
 
     if owner_type == OwnerType.SYSTEM:
@@ -218,12 +221,12 @@ class MediaAssetListView(APIView):
     )
     def get(self, request):
         # Get the user's tenant
-        membership = TenantMembership.objects.filter(
-            user=request.user, is_active=True
-        ).select_related("tenant").first()
+        membership = TenantMembership.objects.filter(user=request.user, is_active=True).select_related("tenant").first()
 
         if not membership:
-            return success_response(data=[], message="Sem organização.")
+            paginator = StandardPagination()
+            page = paginator.paginate_queryset(MediaAsset.objects.none(), request)
+            return paginator.get_paginated_response(MediaAssetListSerializer(page, many=True).data)
 
         tenant_id = membership.tenant_id
 
@@ -234,9 +237,9 @@ class MediaAssetListView(APIView):
             query=request.query_params.get("q"),
         )
 
-        return success_response(
-            data=MediaAssetListSerializer(assets, many=True).data,
-        )
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(assets, request)
+        return paginator.get_paginated_response(MediaAssetListSerializer(page, many=True).data)
 
 
 class MediaAssetDetailView(APIView):
@@ -264,7 +267,7 @@ class MediaAssetDetailView(APIView):
         except MediaAssetNotFound:
             raise
 
-        return no_content_response()
+        return success_response(message="Asset deleted successfully.")
 
 
 class MediaAssetSignedUrlView(APIView):
@@ -290,6 +293,7 @@ class MediaAssetSignedUrlView(APIView):
             )
 
         from media_assets.storage import get_storage_provider
+
         provider = get_storage_provider()
         expires_in = int(request.query_params.get("expires_in", 3600))
         signed_url = provider.generate_signed_url(
