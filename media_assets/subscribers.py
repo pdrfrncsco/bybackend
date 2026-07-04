@@ -1,12 +1,12 @@
 import logging
 from typing import Any
 
-from core.events import subscribe, Event
+from core.events import Event, EventType, subscribe
 
 logger = logging.getLogger(__name__)
 
 
-@subscribe("AssetUploaded")
+@subscribe(EventType.ASSET_UPLOADED)
 def handle_asset_uploaded(event: Event) -> None:
     """Subscriber reacting to AssetUploaded events.
 
@@ -22,12 +22,14 @@ def handle_asset_uploaded(event: Event) -> None:
         # Try to enqueue Celery task
         try:
             from media_assets.tasks import generate_thumbnails
+
             generate_thumbnails.delay(asset_id)
             logger.info("Enqueued generate_thumbnails for asset %s via subscriber", asset_id)
         except Exception:
             # Fallback: call synchronous generation if available
             try:
                 from media_assets.tasks import generate_thumbnails_sync
+
                 generate_thumbnails_sync(asset_id)
                 logger.info("Ran generate_thumbnails_sync for asset %s via subscriber", asset_id)
             except Exception:

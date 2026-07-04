@@ -730,3 +730,51 @@ Adotar uma arquitetura orientada por eventos de domínio, com processamento sín
 * Simplifica futuras integrações externas e evolução para arquiteturas distribuídas.
 
 Todos os novos workflows deverão utilizar este modelo sempre que houver comunicação entre domínios da plataforma.
+
+---
+
+# 28. Estado de Implementação (2026-07-04)
+
+Esta secção regista o estado real da implementação e a política aplicada de persistência/retry, mantendo o restante documento como referência de arquitetura-alvo.
+
+## 28.1 Componentes implementados
+
+* `core/events/base.py` — `Event` (dataclass imutável: id, type, payload, origin, tenant_id, user_id, created_at).
+* `core/events/dispatcher.py` — dispatcher em memória, com deduplicação por `event.id`, métricas (`events_published_total`, `events_dispatched_total`, `events_handlers_failed_total`) e publicação após `transaction.on_commit`.
+* `core/events/types.py` — `EventType`, registo central dos nomes de eventos (evita strings mágicas espalhadas pelos módulos).
+* Subscribers por módulo (`media_assets/subscribers.py`, `notifications/subscribers.py`), registados via `AppConfig.ready()`/import no `__init__.py` do módulo.
+* Tarefas assíncronas (Celery) chamadas pelos subscribers, nunca pelo Service diretamente.
+
+## 28.2 Eventos publicados atualmente
+
+| Evento | Publicador | Subscriber(s) | Tarefa assíncrona |
+|---|---|---|---|
+| `AssetUploaded` | `media_assets.services.MediaAssetService.upload_for_owner` | `media_assets.subscribers.handle_asset_uploaded` | `media_assets.tasks.generate_thumbnails` |
+| `ClubApproved` | `clubs.services.ClubService.activate` | `notifications.subscribers.handle_club_approved` | `notifications.tasks.send_notification_email` / `send_notification_push` |
+| `ClubSuspended` | `clubs.services.ClubService.suspend` | `notifications.subscribers.handle_club_suspended` | `notifications.tasks.send_notification_email` / `send_notification_push` |
+
+Outros eventos descritos nas secções 9 a 19 (ex.: `PlayerTransferred`, `CompetitionStarted`, `MatchFinished`) ainda não têm publicador real — ficam registados como trabalho futuro (Fase 4+), a implementar apenas quando o módulo correspondente precisar de reagir a eles, evitando eventos "mortos" sem subscriber nem publicador.
+
+## 28.3 Política de persistência/retry por categoria
+
+Decisão aplicada (ADR-010, complementar):
+
+* **Entrega de notificações ao utilizador** (`notifications.tasks.send_notification_email`, `send_notification_push`): **persistência + retry**.
+  * Persistência: o resultado é sempre gravado em `Notification.status` (`pending` → `sent`/`failed`), independentemente do resultado do Celery.
+  * Retry: falhas transitórias (`NotificationDeliveryError` — timeout, exceção de rede, resposta não-2xx) são repetidas até 3 vezes com backoff (`max_retries=3, default_retry_delay=30`).
+  * Sem retry: condições permanentes (sem destinatário, sem endpoint de push configurado) marcam o estado final imediatamente — repetir não resolveria.
+* **Geração de variantes de imagem** (`media_assets.tasks.generate_thumbnails`, `delete_asset_from_storage`): **persistência + retry**.
+  * Persistência: variantes gravadas em `MediaVariant`; o `MediaAsset` original nunca é bloqueado pela falha de geração de thumbnails.
+  * Retry: até 3 tentativas (`max_retries=3`) para falhas de leitura/gravação em storage.
+* **Dispatcher de eventos em memória** (`core/events/dispatcher.py`): **in-process, sem persistência do próprio evento**.
+  * O evento em si não é gravado em base de dados nem em fila persistente — existe apenas durante o ciclo de vida do processo, entre o `transaction.on_commit` e a execução síncrona dos subscribers.
+  * Falha de um handler é isolada (capturada e contabilizada em `events_handlers_failed_total`) e não interrompe os restantes subscribers nem a operação de negócio já confirmada em BD.
+  * Aceitável para o volume atual da plataforma; se um evento crítico precisar de garantia de entrega mesmo em caso de crash do processo entre commit e dispatch, deve migrar para uma fila persistente (Celery/broker) em vez do dispatcher em memória — ver secção 25.
+
+## 28.4 Testes sem broker real
+
+Os testes automatizados nunca dependem de Redis ou de um broker real:
+
+* `config/settings.py` força, de forma incondicional quando `TESTING=True` (não sobreponível por variável de ambiente), `CELERY_BROKER_URL="memory://"`, `CELERY_RESULT_BACKEND="cache+memory://"` e `CELERY_TASK_ALWAYS_EAGER=True`.
+* `notifications/tests/test_tasks_retry.py` valida a política de retry/persistência acima (falha transitória repete e recupera, falha permanente não repete) sem qualquer chamada de rede real (SMTP/HTTP são mockados).
+* `clubs/tests/test_events.py` e `notifications/tests/test_integration_events.py` validam o fluxo evento → subscriber → notificação de ponta a ponta, usando `TransactionTestCase` (necessário para que `transaction.on_commit` seja executado).

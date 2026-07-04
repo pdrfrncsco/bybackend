@@ -24,6 +24,7 @@ import uuid
 from django.conf import settings
 from django.db import transaction
 
+from core.events import Event, EventType, publish_event
 from media_assets.constants import (
     AssetCategory,
     AssetStatus,
@@ -39,8 +40,6 @@ from media_assets.exceptions import (
 from media_assets.models import MediaAsset, MediaUsage
 from media_assets.storage import get_storage_provider
 from media_assets.validators import validate_image_upload, validate_upload
-
-from core.events import Event, publish_event
 
 logger = logging.getLogger(__name__)
 
@@ -203,13 +202,16 @@ class MediaAssetService:
 
         logger.info(
             "Asset uploaded: %s (owner=%s/%s, role=%s)",
-            asset.id, owner_type, owner_id, role,
+            asset.id,
+            owner_type,
+            owner_id,
+            role,
         )
 
         # Publish domain event (will be dispatched after DB commit)
         try:
             evt = Event(
-                type="AssetUploaded",
+                type=EventType.ASSET_UPLOADED,
                 payload={
                     "asset_id": str(asset.id),
                     "owner_type": owner_type,
@@ -269,6 +271,7 @@ class MediaAssetService:
         # Queue physical deletion
         try:
             from media_assets.tasks import delete_asset_from_storage
+
             delete_asset_from_storage.delay(asset_id, asset.object_key)
         except Exception:
             logger.debug("Physical deletion task not queued: asset=%s", asset_id)

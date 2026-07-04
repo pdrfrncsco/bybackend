@@ -7,11 +7,11 @@ Environment variables are loaded from .env in development.
 All secrets must be provided via environment variables in production.
 """
 
-import os
 import logging.config
+import os
 import sys
-from pathlib import Path
 from datetime import timedelta
+from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -49,7 +49,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
@@ -58,14 +57,11 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     "django_celery_beat",
-
     # Bolayetu — Infrastructure
     "common",
     "core",
-
     # Bolayetu — Global Domain (Phase 2)
     "players",
-    
     # Bolayetu — Domains (Phase 1)
     "accounts",
     # Bolayetu — Domains (Phase 2)
@@ -220,21 +216,15 @@ REST_FRAMEWORK = {
 
 # Browsable API only in DEBUG mode
 if DEBUG:
-    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append(
-        "rest_framework.renderers.BrowsableAPIRenderer"
-    )
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append("rest_framework.renderers.BrowsableAPIRenderer")
 
 # ─────────────────────────────────────────────────────────────────────
 # JWT
 # ─────────────────────────────────────────────────────────────────────
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=int(os.environ.get("JWT_ACCESS_LIFETIME_MINUTES", "60"))
-    ),
-    "REFRESH_TOKEN_LIFETIME": timedelta(
-        days=int(os.environ.get("JWT_REFRESH_LIFETIME_DAYS", "7"))
-    ),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get("JWT_ACCESS_LIFETIME_MINUTES", "60"))),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_LIFETIME_DAYS", "7"))),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -319,9 +309,7 @@ if USE_CLOUDFLARE_R2:
         if not value
     ]
     if _missing_r2:
-        raise ImproperlyConfigured(
-            "USE_CLOUDFLARE_R2=True requires: " + ", ".join(_missing_r2)
-        )
+        raise ImproperlyConfigured("USE_CLOUDFLARE_R2=True requires: " + ", ".join(_missing_r2))
 
     # Also configure Django's default file storage for backwards-compat
     # (used by legacy ImageFields on Tenant and Club — will be migrated in Phase 1)
@@ -367,28 +355,31 @@ if not DEBUG:
 # CELERY
 # ─────────────────────────────────────────────────────────────────────
 
-CELERY_BROKER_URL = os.environ.get(
-    "CELERY_BROKER_URL",
-    "memory://" if TESTING else "redis://localhost:6379/0",
-)
-CELERY_RESULT_BACKEND = os.environ.get(
-    "CELERY_RESULT_BACKEND",
-    "cache+memory://" if TESTING else "redis://localhost:6379/0",
-)
+if TESTING:
+    # Tests must never depend on a real broker/result backend. This is
+    # enforced unconditionally (not overridable via env vars) so a stray
+    # CI/dev environment variable can't reintroduce a Redis dependency and
+    # cause slow/flaky tests (see docs/AUDITORIA_CONFORMIDADE_BACKEND_2026-07-04.md).
+    CELERY_BROKER_URL = "memory://"
+    CELERY_RESULT_BACKEND = "cache+memory://"
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+else:
+    CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+    CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "False").lower() in ("true", "1", "yes")
+    CELERY_TASK_EAGER_PROPAGATES = os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "False").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
-CELERY_TASK_ALWAYS_EAGER = os.environ.get(
-    "CELERY_TASK_ALWAYS_EAGER",
-    "True" if TESTING else "False",
-).lower() in ("true", "1", "yes")
-CELERY_TASK_EAGER_PROPAGATES = os.environ.get(
-    "CELERY_TASK_EAGER_PROPAGATES",
-    "True" if TESTING else "False",
-).lower() in ("true", "1", "yes")
 
 # ─────────────────────────────────────────────────────────────────────
 # EMAIL
