@@ -9,8 +9,11 @@ All secrets must be provided via environment variables in production.
 
 import os
 import logging.config
+import sys
 from pathlib import Path
 from datetime import timedelta
+
+from django.core.exceptions import ImproperlyConfigured
 
 # ─────────────────────────────────────────────────────────────────────
 # PATHS
@@ -28,6 +31,7 @@ SECRET_KEY = os.environ.get(
 )
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
+TESTING = "test" in sys.argv
 
 ALLOWED_HOSTS = os.environ.get(
     "DJANGO_ALLOWED_HOSTS",
@@ -124,9 +128,11 @@ DATABASES = {
     }
 }
 
-# Use PostgreSQL when explicitly configured or in production
-_db_engine = os.environ.get("DB_ENGINE", "")
-if _db_engine == "postgresql" or (not DEBUG and _db_engine != "sqlite"):
+# Use PostgreSQL when explicitly configured or in production.
+_db_engine = os.environ.get("DB_ENGINE", "").strip().lower()
+_sqlite_engines = {"sqlite", "sqlite3", "django.db.backends.sqlite3"}
+_postgres_engines = {"postgres", "postgresql", "django.db.backends.postgresql"}
+if _db_engine in _postgres_engines or (not DEBUG and _db_engine not in _sqlite_engines):
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("DB_NAME", os.environ.get("POSTGRES_DB", "bolayetu")),
@@ -286,13 +292,37 @@ SPECTACULAR_SETTINGS = {
 
 USE_CLOUDFLARE_R2 = os.environ.get("USE_CLOUDFLARE_R2", "False").lower() in ("true", "1", "yes")
 CLOUDFLARE_R2_ENDPOINT = os.environ.get("CLOUDFLARE_R2_ENDPOINT", "")
-CLOUDFLARE_R2_ACCESS_KEY_ID = os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID", "")
-CLOUDFLARE_R2_SECRET_ACCESS_KEY = os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "")
+CLOUDFLARE_R2_ACCESS_KEY_ID = os.environ.get(
+    "CLOUDFLARE_R2_ACCESS_KEY_ID",
+    os.environ.get("CLOUDFLARE_R2_ACCESS_KEY", ""),
+)
+CLOUDFLARE_R2_SECRET_ACCESS_KEY = os.environ.get(
+    "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+    os.environ.get("CLOUDFLARE_R2_SECRET_KEY", ""),
+)
 CLOUDFLARE_R2_BUCKET = os.environ.get("CLOUDFLARE_R2_BUCKET", "bolayetu-storage")
 CLOUDFLARE_R2_REGION = os.environ.get("CLOUDFLARE_R2_REGION", "auto")
-CLOUDFLARE_R2_CDN_URL = os.environ.get("CLOUDFLARE_R2_CDN_URL", "")  # e.g. https://cdn.bolayetu.com
+CLOUDFLARE_R2_CDN_URL = os.environ.get(
+    "CLOUDFLARE_R2_CDN_URL",
+    os.environ.get("CLOUDFLARE_CDN_DOMAIN", ""),
+).rstrip("/")  # e.g. https://cdn.bolayetu.com
 
 if USE_CLOUDFLARE_R2:
+    _missing_r2 = [
+        name
+        for name, value in {
+            "CLOUDFLARE_R2_ENDPOINT": CLOUDFLARE_R2_ENDPOINT,
+            "CLOUDFLARE_R2_ACCESS_KEY_ID": CLOUDFLARE_R2_ACCESS_KEY_ID,
+            "CLOUDFLARE_R2_SECRET_ACCESS_KEY": CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+            "CLOUDFLARE_R2_BUCKET": CLOUDFLARE_R2_BUCKET,
+        }.items()
+        if not value
+    ]
+    if _missing_r2:
+        raise ImproperlyConfigured(
+            "USE_CLOUDFLARE_R2=True requires: " + ", ".join(_missing_r2)
+        )
+
     # Also configure Django's default file storage for backwards-compat
     # (used by legacy ImageFields on Tenant and Club — will be migrated in Phase 1)
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
@@ -337,14 +367,28 @@ if not DEBUG:
 # CELERY
 # ─────────────────────────────────────────────────────────────────────
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+CELERY_BROKER_URL = os.environ.get(
+    "CELERY_BROKER_URL",
+    "memory://" if TESTING else "redis://localhost:6379/0",
+)
+CELERY_RESULT_BACKEND = os.environ.get(
+    "CELERY_RESULT_BACKEND",
+    "cache+memory://" if TESTING else "redis://localhost:6379/0",
+)
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
+CELERY_TASK_ALWAYS_EAGER = os.environ.get(
+    "CELERY_TASK_ALWAYS_EAGER",
+    "True" if TESTING else "False",
+).lower() in ("true", "1", "yes")
+CELERY_TASK_EAGER_PROPAGATES = os.environ.get(
+    "CELERY_TASK_EAGER_PROPAGATES",
+    "True" if TESTING else "False",
+).lower() in ("true", "1", "yes")
 
 # ─────────────────────────────────────────────────────────────────────
 # EMAIL

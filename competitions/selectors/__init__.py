@@ -11,11 +11,12 @@ class CompetitionSelector:
         )
 
     @staticmethod
-    def list_all_active() -> list[Competition]:
-        """Public selector: all competitions, ordered by most recent."""
-        return list(
-            Competition.objects.select_related("tenant").order_by("-created_at")
-        )
+    def list_all_active(*, tenant: Tenant | None = None) -> list[Competition]:
+        """Public selector: competitions ordered by most recent."""
+        queryset = Competition.objects.select_related("tenant")
+        if tenant is not None:
+            queryset = queryset.filter(tenant=tenant)
+        return list(queryset.order_by("-created_at"))
 
     @staticmethod
     def get_by_id(*, tenant: Tenant, competition_id) -> Competition | None:
@@ -25,10 +26,13 @@ class CompetitionSelector:
             return None
 
     @staticmethod
-    def get_by_id_public(*, competition_id) -> Competition | None:
-        """Public selector: get a competition by ID without tenant guard."""
+    def get_by_id_public(*, competition_id, tenant: Tenant | None = None) -> Competition | None:
+        """Public selector: get a competition by ID, scoped by tenant when provided."""
         try:
-            return Competition.objects.select_related("tenant").get(id=competition_id)
+            queryset = Competition.objects.select_related("tenant")
+            if tenant is not None:
+                queryset = queryset.filter(tenant=tenant)
+            return queryset.get(id=competition_id)
         except Competition.DoesNotExist:
             return None
 

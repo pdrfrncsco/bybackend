@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIClient
 from rest_framework import status
@@ -25,7 +25,11 @@ class CompetitionAPITestCase(TestCase):
             password="SecurePass123!",
             status="active"
         )
-        self.tenant = Tenant.objects.create(name="Angolan Football Association", slug="faf")
+        self.tenant = Tenant.objects.create(
+            name="Angolan Football Association",
+            slug="faf",
+            subdomain="faf",
+        )
 
         # Make user organization admin/owner
         TenantMembership.objects.create(
@@ -151,3 +155,54 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(response.data["success"], True)
         self.assertEqual(len(response.data["data"]), 1)
         self.assertEqual(response.data["data"][0]["club_name"], "Petro de Luanda")
+
+    @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
+    def test_list_competitions_filters_by_subdomain_tenant(self):
+        """Public competition list should use request.tenant when subdomain is present."""
+        other_tenant = Tenant.objects.create(
+            name="Luanda League",
+            slug="luanda",
+            subdomain="luanda",
+        )
+        CompetitionService.create_competition(
+            tenant=other_tenant,
+            name="Liga Luanda",
+            competition_type="league",
+            season="2025/26",
+        )
+
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            "/api/v1/competitions/",
+            HTTP_HOST="faf.bolayetu.com",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success"], True)
+        self.assertEqual(len(response.data["data"]), 1)
+        self.assertEqual(response.data["data"][0]["id"], str(self.competition.id))
+
+    @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
+    def test_competition_detail_returns_404_for_other_subdomain_tenant(self):
+        """Public detail should not expose a competition from another tenant on subdomain routes."""
+        other_tenant = Tenant.objects.create(
+            name="Luanda League",
+            slug="luanda",
+            subdomain="luanda",
+        )
+        other_competition = CompetitionService.create_competition(
+            tenant=other_tenant,
+            name="Liga Luanda",
+            competition_type="league",
+            season="2025/26",
+        )
+
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            f"/api/v1/competitions/{other_competition.id}/",
+            HTTP_HOST="faf.bolayetu.com",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

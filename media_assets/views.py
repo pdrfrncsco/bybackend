@@ -23,6 +23,7 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from accounts.models import TenantMembership
 from common.responses import (
     created_response,
     error_response,
@@ -41,6 +42,78 @@ from media_assets.serializers import (
 from media_assets.services import MediaAssetService
 
 logger = logging.getLogger(__name__)
+
+
+def _get_user_membership(*, user, tenant_id=None) -> TenantMembership | None:
+    memberships = TenantMembership.objects.filter(
+        user=user,
+        is_active=True,
+    ).select_related("tenant")
+
+    if tenant_id:
+        memberships = memberships.filter(tenant_id=tenant_id)
+
+    return memberships.first()
+
+
+def _get_upload_tenant(request, tenant_id=None):
+    if tenant_id:
+        membership = _get_user_membership(user=request.user, tenant_id=tenant_id)
+        return membership.tenant if membership else None
+
+    request_tenant = getattr(request, "tenant", None)
+    if request_tenant:
+        membership = _get_user_membership(
+            user=request.user,
+            tenant_id=request_tenant.id,
+        )
+        if membership:
+            return membership.tenant
+
+    membership = _get_user_membership(user=request.user)
+    return membership.tenant if membership else None
+
+
+def _asset_visible_to_user(*, asset: MediaAsset, user) -> bool:
+    if asset.tenant_id is None:
+        return user.is_staff or asset.uploaded_by_id == user.id
+
+    return TenantMembership.objects.filter(
+        user=user,
+        tenant_id=asset.tenant_id,
+        is_active=True,
+    ).exists()
+
+
+def _get_user_scoped_asset(*, user, asset_id: str) -> MediaAsset:
+    asset = MediaAssetSelector.get_by_id(asset_id=asset_id)
+
+    if not asset or not _asset_visible_to_user(asset=asset, user=user):
+        raise MediaAssetNotFound()
+
+    return asset
+
+
+def _owner_belongs_to_tenant(*, owner_type: str, owner_id, tenant) -> bool:
+    if owner_type == OwnerType.ORGANIZATION:
+        return str(owner_id) == str(tenant.id)
+
+    if owner_type == OwnerType.CLUB:
+        from clubs.models import Club
+        return Club.objects.filter(id=owner_id, tenant=tenant).exists()
+
+    if owner_type == OwnerType.COMPETITION:
+        from competitions.models import Competition
+        return Competition.objects.filter(id=owner_id, tenant=tenant).exists()
+
+    if owner_type == OwnerType.MATCH:
+        from competitions.models import Match
+        return Match.objects.filter(id=owner_id, tenant=tenant).exists()
+
+    if owner_type == OwnerType.SYSTEM:
+        return False
+
+    return True
 
 
 class MediaAssetUploadView(APIView):
@@ -86,11 +159,22 @@ class MediaAssetUploadView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Resolve tenant
-        tenant = None
-        if tenant_id:
-            from core.models import Tenant
-            tenant = Tenant.objects.filter(id=tenant_id).first()
+        tenant = _get_upload_tenant(request, tenant_id=tenant_id)
+        if not tenant:
+            return error_response(
+                message="Sem permissão para carregar ficheiros neste tenant.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not _owner_belongs_to_tenant(
+            owner_type=owner_type,
+            owner_id=owner_id,
+            tenant=tenant,
+        ):
+            return error_response(
+                message="Owner não pertence ao tenant autenticado.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         try:
             asset = MediaAssetService.upload_for_owner(
@@ -133,8 +217,6 @@ class MediaAssetListView(APIView):
         ],
     )
     def get(self, request):
-        from accounts.models import TenantMembership
-
         # Get the user's tenant
         membership = TenantMembership.objects.filter(
             user=request.user, is_active=True
@@ -167,10 +249,7 @@ class MediaAssetDetailView(APIView):
 
     @extend_schema(tags=["media"], summary="Retrieve a media asset")
     def get(self, request, asset_id: str):
-        asset = MediaAssetSelector.get_by_id(asset_id=asset_id)
-
-        if not asset:
-            raise MediaAssetNotFound()
+        asset = _get_user_scoped_asset(user=request.user, asset_id=asset_id)
 
         return success_response(
             data=MediaAssetSerializer(asset).data,
@@ -178,6 +257,8 @@ class MediaAssetDetailView(APIView):
 
     @extend_schema(tags=["media"], summary="Delete a media asset")
     def delete(self, request, asset_id: str):
+        _get_user_scoped_asset(user=request.user, asset_id=asset_id)
+
         try:
             MediaAssetService.delete_asset(asset_id=asset_id)
         except MediaAssetNotFound:
@@ -201,10 +282,7 @@ class MediaAssetSignedUrlView(APIView):
         summary="Get a signed URL for a private media asset",
     )
     def get(self, request, asset_id: str):
-        asset = MediaAssetSelector.get_by_id(asset_id=asset_id)
-
-        if not asset:
-            raise MediaAssetNotFound()
+        asset = _get_user_scoped_asset(user=request.user, asset_id=asset_id)
 
         if asset.visibility == AssetVisibility.PUBLIC:
             return success_response(

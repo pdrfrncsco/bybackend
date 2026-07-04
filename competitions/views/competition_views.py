@@ -33,7 +33,9 @@ class CompetitionListCreateView(APIView):
 
     @extend_schema(tags=["competitions"], responses={200: CompetitionSerializer(many=True)})
     def get(self, request):
-        competitions = CompetitionSelector.list_all_active()
+        competitions = CompetitionSelector.list_all_active(
+            tenant=getattr(request, "tenant", None),
+        )
         serializer = CompetitionSerializer(competitions, many=True)
         return success_response(
             data=serializer.data,
@@ -82,7 +84,10 @@ class CompetitionDetailView(APIView):
 
     @extend_schema(tags=["competitions"], responses={200: CompetitionSerializer})
     def get(self, request, competition_id):
-        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        competition = CompetitionSelector.get_by_id_public(
+            competition_id=competition_id,
+            tenant=getattr(request, "tenant", None),
+        )
         if competition is None:
             return not_found_response(message="Competition not found.")
         return success_response(
