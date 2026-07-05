@@ -21,6 +21,18 @@ from competitions.serializers.fair_play_serializers import (
     FairPlayRankingSerializer,
     TopScorerSerializer,
 )
+from competitions.serializers.lineup_serializers import (
+    LineupSubmissionSerializer,
+    LineupSubmissionInputSerializer,
+    LineupSubmissionDetailSerializer,
+    MatchLineupPlayerSerializer,
+    MatchReportSerializer,
+    MatchReportInputSerializer,
+    GoalInputSerializer,
+    GoalSerializer,
+    MatchStatsSerializer,
+    PlayerBasicSerializer,
+)
 
 __all__ = [
     "CompetitionSerializer",
@@ -38,4 +50,14 @@ __all__ = [
     "PlayerEligibilitySerializer",
     "FairPlayRankingSerializer",
     "TopScorerSerializer",
+    "LineupSubmissionSerializer",
+    "LineupSubmissionInputSerializer",
+    "LineupSubmissionDetailSerializer",
+    "MatchLineupPlayerSerializer",
+    "MatchReportSerializer",
+    "MatchReportInputSerializer",
+    "GoalInputSerializer",
+    "GoalSerializer",
+    "MatchStatsSerializer",
+    "PlayerBasicSerializer",
 ]

@@ -13,6 +13,10 @@ from competitions.views.regulation_views import (
     CompetitionRegulationListCreateView,
     CompetitionRegulationDetailView,
 )
+from competitions.views.lineup_views import (
+    LineupSubmissionViewSet,
+    MatchReportViewSet,
+)
 
 __all__ = [
     "CompetitionListCreateView",
@@ -24,4 +28,6 @@ __all__ = [
     "CompetitionStandingListView",
     "CompetitionRegulationListCreateView",
     "CompetitionRegulationDetailView",
+    "LineupSubmissionViewSet",
+    "MatchReportViewSet",
 ]

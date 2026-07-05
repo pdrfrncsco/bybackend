@@ -336,3 +336,484 @@
   testes no browser ou avançamos para a próxima fase do
   diagnóstico original (Notificações, Match Center Analytics,       
   etc)?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  Agora vou criar a migration para os novos modelos:
+● Shell cd backend && python manage.py makemigrations competitions --name
+  add_match_lineup_and_report
+● Shell cd backend && python manage.py migrate competitions
+● Tasks updated
+
+  Agora vou criar o LineupService (Tarefa 2):
+● Write D:\ndeascloud\boayetu\backend\competitions\services\lineup_service.py     
+     1   """
+     2   BOLAYETU — LineupService
+     3
+     4   Business logic for match lineups management.
+     5
+     6   Key features:
+     7       - Submit and validate lineups (min/max players, position
+  requirements)
+     8       - Check player eligibility (suspensions, registrations)
+     9       - Track lineup submission status
+    10       - Handle formation validation
+    11   """
+    12
+    13   from django.db import models, transaction
+    14   from django.utils import timezone
+    15   from typing import Optional, List
+    16   from datetime import date
+    17
+    18   from core.models import Tenant
+    19   from players.models import Player
+    20   from clubs.models import Club
+    21   from competitions.models import Match, MatchLineup, LineupSubmission     
+    22   from competitions.services.fair_play_service import FairPlayService      
+    23
+    24
+    25   class LineupConfig:
+    26       """Configuration for lineup rules."""
+    27
+    28       MIN_STARTERS = 11
+    29       MAX_STARTERS = 11
+    30       MIN_SUBSTITUTES = 3
+    31       MAX_SUBSTITUTES = 12
+    32       MAX_TOTAL_PLAYERS = 23
+    33
+    34       # Football rules
+    35       MIN_GOALKEEPERS = 1
+    36       MAX_GOALKEEPERS = 2
+    37
+    38
+    39   class LineupValidationError(Exception):
+    40       """Raised when lineup validation fails."""
+    41       pass
+    42
+    43
+    44   class PlayerNotEligible(Exception):
+    45       """Raised when a player is not eligible to play."""
+    46       pass
+    47
+    48
+    49   class LineupAlreadySubmitted(Exception):
+    50       """Raised when trying to submit a lineup that's already locked."""   
+    51       pass
+    52
+    53
+    54   class LineupService:
+    55       """
+    56       Handles match lineup operations.
+    57       """
+    58
+    59       # ─── Lineup Submission
+  ────────────────────────────────────────────────────
+    60
+    61       @staticmethod
+    62       @transaction.atomic
+    63       def submit_lineup(
+    64           *,
+    65           tenant: Tenant,
+    66           match: Match,
+    67           club: Club,
+    68           players: List[dict],
+    69           formation: str = "",
+    70           submitted_by=None,
+    71       ) -> LineupSubmission:
+    72           """
+    73           Submit a complete lineup for a club in a match.
+    74
+    75           Args:
+    76               tenant: Organization
+    77               match: Match instance
+    78               club: Club instance
+    79               players: List of player entries, each with:
+    80                   - player_id: Player UUID
+    81                   - status: "starter" or "substitute"
+    82                   - position: Position code (e.g., "gk", "cb", "st")       
+    83                   - shirt_number: Shirt number (1-99)
+    84                   - is_captain: bool (optional)
+    85                   - is_goalkeeper: bool (optional)
+    86                   - formation_position: 1-11 (optional, for starters)      
+    87               formation: Formation string (e.g., "4-3-3")
+    88               submitted_by: User who submitted the lineup
+    89
+    90           Returns:
+    91               LineupSubmission instance
+    92
+    93           Raises:
+    94               LineupValidationError: If validation fails
+    95               LineupAlreadySubmitted: If lineup is locked
+    96               PlayerNotEligible: If player is suspended
+    97           """
+    98           # Check if match allows lineup submission
+    99           if match.status not in [Match.MatchStatus.SCHEDULED,
+  Match.MatchStatus.POSTPONED]:
+   100               raise LineupValidationError(
+   101                   f"Cannot submit lineup for match with status
+  '{match.get_status_display()}'"
+   102               )
+   103
+   104           # Check if club is in the match
+   105           if club.id not in (match.home_club_id, match.away_club_id):      
+   106               raise LineupValidationError("Club is not participating in    
+  this match")
+   107
+   108           # Get or create LineupSubmission
+   109           submission, created = LineupSubmission.objects.get_or_create(    
+   110               tenant=tenant,
+   111               match=match,
+   112               club=club,
+   113           )
+   114
+   115           # Check if already locked
+   116           if submission.status == LineupSubmission.SubmissionStatus.LOCKED:
+   117               raise LineupAlreadySubmitted("Lineup is locked and cannot be 
+  changed")
+   118
+   119           # Validate lineup
+   120           LineupService._validate_lineup(players)
+   121
+   122           # Check player eligibility
+   123           for player_entry in players:
+   124               player = Player.objects.get(id=player_entry["player_id"])    
+   125               is_eligible, reason = FairPlayService.is_player_eligible(    
+   126                   tenant=tenant,
+   127                   player=player,
+   128                   competition=match.competition,
+   129               )
+   130               if not is_eligible:
+   131                   raise PlayerNotEligible(
+   132                       f"Player {player.full_name} is not eligible:
+  {reason}"
+   133                   )
+   134
+   135           # Clear existing lineup entries
+   136           MatchLineup.objects.filter(
+   137               tenant=tenant,
+   138               match=match,
+   139               club=club,
+   140           ).delete()
+   141
+   142           # Create lineup entries
+   143           lineup_entries = []
+   144           for entry in players:
+   145               player = Player.objects.get(id=entry["player_id"])
+   146
+   147               lineup_entry = MatchLineup.objects.create(
+   148                   tenant=tenant,
+   149                   match=match,
+   150                   club=club,
+   151                   player=player,
+   152                   status=entry.get("status",
+  MatchLineup.LineupStatus.SUBSTITUTE),
+   153                   position=entry["position"],
+   154                   shirt_number=entry["shirt_number"],
+   155                   is_captain=entry.get("is_captain", False),
+   156                   is_goalkeeper=entry.get("is_goalkeeper", False),
+   157                   formation_position=entry.get("formation_position"),      
+   158                   submitted_by=submitted_by,
+   159               )
+   160               lineup_entries.append(lineup_entry)
+   161
+   162           # Update submission
+   163           submission.formation = formation
+   164           submission.submit(submitted_by)
+   165
+   166           return submission
+   167
+   168       @staticmethod
+   169       def _validate_lineup(players: List[dict]) -> None:
+   170           """
+   171           Validate lineup composition.
+   172
+   173           Raises:
+   174               LineupValidationError: If validation fails
+   175           """
+   176           if not players:
+   177               raise LineupValidationError("Lineup cannot be empty")        
+   178
+   179           starters = [p for p in players if p.get("status") ==
+  MatchLineup.LineupStatus.STARTER]
+   180           substitutes = [p for p in players if p.get("status") ==
+  MatchLineup.LineupStatus.SUBSTITUTE]
+   181
+   182           # Check number of starters
+   183           if len(starters) < LineupConfig.MIN_STARTERS:
+   184               raise LineupValidationError(
+   185                   f"At least {LineupConfig.MIN_STARTERS} starters required,
+  got {len(starters)}"
+   186               )
+   187
+   188           if len(starters) > LineupConfig.MAX_STARTERS:
+   189               raise LineupValidationError(
+   190                   f"Maximum {LineupConfig.MAX_STARTERS} starters allowed,  
+  got {len(starters)}"
+   191               )
+   192
+   193           # Check number of substitutes
+   194           if len(substitutes) > LineupConfig.MAX_SUBSTITUTES:
+   195               raise LineupValidationError(
+   196                   f"Maximum {LineupConfig.MAX_SUBSTITUTES} substitutes     
+  allowed, got {len(substitutes)}"
+   197               )
+   198
+   199           # Check total players
+   200           if len(players) > LineupConfig.MAX_TOTAL_PLAYERS:
+   201               raise LineupValidationError(
+   202                   f"Maximum {LineupConfig.MAX_TOTAL_PLAYERS} players       
+  allowed, got {len(players)}"
+   203               )
+   204
+   205           # Check goalkeepers
+   206           goalkeepers = [p for p in starters if p.get("is_goalkeeper",     
+  False)]
+   207           if len(goalkeepers) < LineupConfig.MIN_GOALKEEPERS:
+   208               raise LineupValidationError(
+   209                   f"At least {LineupConfig.MIN_GOALKEEPERS} goalkeeper     
+  required in starters"
+   210               )
+   211
+   212           # Check shirt numbers are unique
+   213           shirt_numbers = [p["shirt_number"] for p in players]
+   214           if len(shirt_numbers) != len(set(shirt_numbers)):
+   215               raise LineupValidationError("Shirt numbers must be unique    
+  within the lineup")
+   216
+   217           # Check players are unique
+   218           player_ids = [p["player_id"] for p in players]
+   219           if len(player_ids) != len(set(player_ids)):
+   220               raise LineupValidationError("A player can only appear once in
+  the lineup")
+   221
+   222           # Check captain count
+   223           captains = [p for p in starters if p.get("is_captain", False)]   
+   224           if len(captains) > 1:
+   225               raise LineupValidationError("Only one captain is allowed")   
+   226
+   227       # ─── Lineup Retrieval
+  ─────────────────────────────────────────────────────
+   228
+   229       @staticmethod
+   230       def get_lineup_for_club(
+   231           *,
+   232           tenant: Tenant,
+   233           match: Match,
+   234           club: Club
+   235       ) -> dict:
+   236           """
+   237           Get the complete lineup for a club in a match.
+   238
+   239           Returns:
+   240               Dict with starters, substitutes, formation, and submission   
+  status
+   241           """
+   242           try:
+   243               submission = LineupSubmission.objects.get(
+   244                   tenant=tenant,
+   245                   match=match,
+   246                   club=club,
+   247               )
+   248           except LineupSubmission.DoesNotExist:
+   249               submission = None
+   250
+   251           lineup_entries = MatchLineup.objects.filter(
+   252               tenant=tenant,
+   253               match=match,
+   254               club=club,
+   255           ).select_related("player").order_by("-status",
+  "formation_position", "shirt_number")
+   256
+   257           starters = [
+   258               {
+   259                   "player_id": str(entry.player.id),
+   260                   "player_name": entry.player.full_name,
+   261                   "position": entry.position,
+   262                   "position_display": entry.get_position_display(),        
+   263                   "shirt_number": entry.shirt_number,
+   264                   "is_captain": entry.is_captain,
+   265                   "is_goalkeeper": entry.is_goalkeeper,
+   266                   "formation_position": entry.formation_position,
+   267               }
+   268               for entry in lineup_entries
+   269               if entry.status == MatchLineup.LineupStatus.STARTER
+   270           ]
+   271
+   272           substitutes = [
+   273               {
+   274                   "player_id": str(entry.player.id),
+   275                   "player_name": entry.player.full_name,
+   276                   "position": entry.position,
+   277                   "position_display": entry.get_position_display(),        
+   278                   "shirt_number": entry.shirt_number,
+   279                   "is_goalkeeper": entry.is_goalkeeper,
+   280               }
+   281               for entry in lineup_entries
+   282               if entry.status == MatchLineup.LineupStatus.SUBSTITUTE       
+   283           ]
+   284
+   285           return {
+   286               "match_id": str(match.id),
+   287               "club_id": str(club.id),
+   288               "club_name": club.name,
+   289               "formation": submission.formation if submission else "",     
+   290               "status": submission.status if submission else "pending",    
+   291               "submitted_at": submission.submitted_at if submission else   
+  None,
+   292               "starters": starters,
+   293               "substitutes": substitutes,
+   294               "total_players": len(starters) + len(substitutes),
+   295           }
+   296
+   297       @staticmethod
+   298       def get_lineups_for_match(
+   299           *,
+   300           tenant: Tenant,
+   301           match: Match
+   302       ) -> dict:
+   303           """
+   304           Get lineups for both clubs in a match.
+   305
+   306           Returns:
+   307               Dict with home_club and away_club lineups
+   308           """
+   309           home_lineup = LineupService.get_lineup_for_club(
+   310               tenant=tenant,
+   311               match=match,
+   312               club=match.home_club,
+   313           )
+   314
+   315           away_lineup = LineupService.get_lineup_for_club(
+   316               tenant=tenant,
+   317               match=match,
+   318               club=match.away_club,
+   319           )
+   320
+   321           return {
+   322               "match_id": str(match.id),
+   323               "match_str": str(match),
+   324               "home_club": home_lineup,
+   325               "away_club": away_lineup,
+   326           }
+   327
+   328       # ─── Lineup Status Management
+  ──────────────────────────────────────────────
+   329
+   330       @staticmethod
+   331       def confirm_lineup(
+   332           *,
+   333           tenant: Tenant,
+   334           match: Match,
+   335           club: Club,
+   336           confirmed_by=None
+   337       ) -> LineupSubmission:
+   338           """Confirm a submitted lineup."""
+   339           try:
+   340               submission = LineupSubmission.objects.get(
+   341                   tenant=tenant,
+   342                   match=match,
+   343                   club=club,
+   344               )
+   345           except LineupSubmission.DoesNotExist:
+   346               raise LineupValidationError("Lineup has not been submitted   
+  yet")
+   347
+   348           if submission.status !=
+  LineupSubmission.SubmissionStatus.SUBMITTED:
+   349               raise LineupValidationError(
+   350                   f"Cannot confirm lineup with status
+  '{submission.get_status_display()}'"
+   351               )
+   352
+   353           submission.confirm(confirmed_by)
+   354           return submission
+   355
+   356       @staticmethod
+   357       def lock_lineup(
+   358           *,
+   359           tenant: Tenant,
+   360           match: Match,
+   361           club: Club
+   362       ) -> LineupSubmission:
+   363           """Lock a lineup (no further changes allowed)."""
+   364           try:
+   365               submission = LineupSubmission.objects.get(
+   366                   tenant=tenant,
+   367                   match=match,
+   368                   club=club,
+   369               )
+   370           except LineupSubmission.DoesNotExist:
+   371               raise LineupValidationError("Lineup has not been submitted   
+  yet")
+   372
+   373           submission.lock()
+   374           return submission
+   375
+   376       @staticmethod
+   377       def lock_all_lineups(
+   378           *,
+   379           tenant: Tenant,
+   380           match: Match
+   381       ) -> None:
+   382           """Lock all lineups for a match (called when match starts)."""   
+   383           LineupSubmission.objects.filter(
+   384               tenant=tenant,
+   385               match=match,
+   386           ).update(status=LineupSubmission.SubmissionStatus.LOCKED)        
+   387
+   388       # ─── Player Updates
+  ────────────────────────────────────────────────────────
+   389
+   390       @staticmethod
+   391       def update_player_minutes(
+   392           *,
+   393           tenant: Tenant,
+   394           match: Match,
+   395           club: Club,
+   396           player: Player,
+   397           minutes_played: int,
+   398           substituted_in_minute: Optional[int] = None,
+   399           substituted_out_minute: Optional[int] = None,
+   400       ) -> MatchLineup:
+   401           """
+   402           Update minutes played for a player after the match.
+   403           """
+   404           try:
+   405               lineup_entry = MatchLineup.objects.get(
+   406                   tenant=tenant,
+   407                   match=match,
+   408                   club=club,
+   409                   player=player,
+   410               )
+   411           except MatchLineup.DoesNotExist:
+   412               raise LineupValidationError(
+   413                   f"Player {player.full_name} not found in lineup for this 
+  match"
+   414               )
+   415
+   416           lineup_entry.minutes_played = minutes_played
+   417           lineup_entry.substituted_in_minute = substituted_in_minute       
+   418           lineup_entry.substituted_out_minute = substituted_out_minute     
+   419           lineup_entry.save(update_fields=[
+   420               "minutes_played",
+   421               "substituted_in_minute",
+   422               "substituted_out_minute",
+   423               "updated_at",
+   424           ])
+   425
+   426           return lineup_entry/

@@ -10,6 +10,8 @@ from competitions.views import (
     CompetitionStandingListView,
     CompetitionRegulationListCreateView,
     CompetitionRegulationDetailView,
+    LineupSubmissionViewSet,
+    MatchReportViewSet,
 )
 from competitions.views.match_center_views import (
     MatchEventListCreateView,
@@ -55,4 +57,63 @@ urlpatterns = [
     path("rankings/top-scorers/", TopScorersRankingView.as_view(), name="top-scorers-ranking"),
     path("rankings/season/", SeasonRankingView.as_view(), name="season-ranking"),
     path("rankings/recalculate/", RecalculateRankingsView.as_view(), name="recalculate-rankings"),
+    
+    # Phase 5 — Lineups & Match Reports
+    path(
+        "matches/<uuid:match_id>/lineups/",
+        LineupSubmissionViewSet.as_view({
+            'post': 'create',
+            'get': 'list'
+        }),
+        name="lineup-list-create"
+    ),
+    path(
+        "matches/<uuid:match_id>/lineups/<uuid:pk>/",
+        LineupSubmissionViewSet.as_view({
+            'get': 'retrieve'
+        }),
+        name="lineup-detail"
+    ),
+    path(
+        "matches/<uuid:match_id>/lineups/confirm/",
+        LineupSubmissionViewSet.as_view({
+            'post': 'confirm'
+        }),
+        name="lineup-confirm"
+    ),
+    path(
+        "matches/<uuid:match_id>/lineups/lock/",
+        LineupSubmissionViewSet.as_view({
+            'post': 'lock'
+        }),
+        name="lineup-lock"
+    ),
+    path(
+        "matches/<uuid:match_id>/report/",
+        MatchReportViewSet.as_view({
+            'get': 'get_report'
+        }),
+        name="match-report"
+    ),
+    path(
+        "matches/<uuid:match_id>/report/create/",
+        MatchReportViewSet.as_view({
+            'post': 'create_report'
+        }),
+        name="match-report-create"
+    ),
+    path(
+        "matches/<uuid:match_id>/report/add-goal/",
+        MatchReportViewSet.as_view({
+            'post': 'add_goal'
+        }),
+        name="match-report-add-goal"
+    ),
+    path(
+        "matches/<uuid:match_id>/report/update-stats/",
+        MatchReportViewSet.as_view({
+            'post': 'update_stats'
+        }),
+        name="match-report-update-stats"
+    ),
 ]
