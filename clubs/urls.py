@@ -5,6 +5,7 @@ All club endpoints are under /api/v1/clubs/.
 """
 
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 
 from clubs.views import (
     ClubMeView,
@@ -25,9 +26,13 @@ from clubs.views import (
     ClubSponsorsView,
     ClubSponsorDetailView,
     ClubPublicSponsorsView,
+    TransferViewSet,
 )
 
-urlpatterns = [
+router = DefaultRouter()
+router.register(r"transfers", TransferViewSet, basename="transfer")
+
+urlpatterns = router.urls + [
     # Authenticated — Club Management
     path("me/", ClubMeView.as_view(), name="club-me"),
     path("me/logo/", ClubLogoView.as_view(), name="club-logo"),

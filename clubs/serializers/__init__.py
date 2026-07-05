@@ -20,6 +20,17 @@ from clubs.serializers.club_affiliation_request import (
 )
 from clubs.serializers.club_document import ClubDocumentCreateSerializer, ClubDocumentSerializer
 from clubs.serializers.club_sponsor import ClubSponsorCreateSerializer, ClubSponsorSerializer, ClubSponsorUpdateSerializer
+from clubs.serializers.transfer_serializers import (
+    TransferCreateSerializer,
+    TransferSerializer,
+    TransferListSerializer,
+    TransferApproveSerializer,
+    TransferRejectSerializer,
+    TransferCancelSerializer,
+    LoanExtendSerializer,
+    LoanReturnSerializer,
+    LoanMakePermanentSerializer,
+)
 
 __all__ = [
     "ClubSerializer",
@@ -39,4 +50,13 @@ __all__ = [
     "ClubSponsorSerializer",
     "ClubSponsorCreateSerializer",
     "ClubSponsorUpdateSerializer",
+    "TransferCreateSerializer",
+    "TransferSerializer",
+    "TransferListSerializer",
+    "TransferApproveSerializer",
+    "TransferRejectSerializer",
+    "TransferCancelSerializer",
+    "LoanExtendSerializer",
+    "LoanReturnSerializer",
+    "LoanMakePermanentSerializer",
 ]
