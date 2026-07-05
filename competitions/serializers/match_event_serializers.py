@@ -4,6 +4,7 @@ BOLAYETU — MatchEvent Serializers (Phase 4: Match Center)
 
 from rest_framework import serializers
 from competitions.models import MatchEvent
+from competitions.serializers.utils import get_club_logo_url
 
 
 class MatchEventSerializer(serializers.ModelSerializer):
@@ -47,9 +48,7 @@ class MatchEventSerializer(serializers.ModelSerializer):
         return None
 
     def get_club_logo(self, obj: MatchEvent) -> str | None:
-        if obj.club and obj.club.logo:
-            return obj.club.logo
-        return None
+        return get_club_logo_url(obj.club)
 
 
 class MatchEventCreateSerializer(serializers.Serializer):

@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
@@ -85,7 +85,7 @@ class CompetitionAPITestCase(TestCase):
             tenant=self.tenant,
             home_club=self.club1,
             away_club=self.club2,
-            match_date=datetime(2026, 8, 1, 16, 0),
+            match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
             round_number=1,
             status=Match.MatchStatus.SCHEDULED,
         )
@@ -113,7 +113,7 @@ class CompetitionAPITestCase(TestCase):
             tenant=self.tenant,
             home_club=self.club1,
             away_club=self.club2,
-            match_date=datetime(2026, 8, 1, 16, 0),
+            match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
             round_number=1,
             status=Match.MatchStatus.SCHEDULED,
         )

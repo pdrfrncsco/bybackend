@@ -7,6 +7,7 @@ Handles scheduling (round-robin generator), score updates, and match status mana
 import logging
 from datetime import datetime, timedelta
 from django.db import transaction
+from django.utils import timezone
 
 from core.models import Tenant
 from clubs.models import Club
@@ -41,6 +42,9 @@ class MatchService:
         """Create a scheduled match."""
         if home_club.tenant != tenant or away_club.tenant != tenant or competition.tenant != tenant:
             raise PermissionError("All entities must belong to the same tenant.")
+
+        if timezone.is_naive(match_date):
+            match_date = timezone.make_aware(match_date, timezone.get_current_timezone())
 
         match = Match.objects.create(
             competition=competition,
@@ -139,6 +143,8 @@ class MatchService:
         for round_idx in range(num_rounds):
             round_number = round_idx + 1
             round_date = round_dates[round_idx]
+            if timezone.is_naive(round_date):
+                round_date = timezone.make_aware(round_date, timezone.get_current_timezone())
 
             for match_idx in range(matches_per_round):
                 home_idx = (round_idx + match_idx) % (num_teams - 1)
@@ -182,6 +188,8 @@ class MatchService:
                 first_leg_matches = [m for m in created_matches if m.round_number == first_leg_round]
 
                 for fl_match in first_leg_matches:
+                    if timezone.is_naive(round_date):
+                        round_date = timezone.make_aware(round_date, timezone.get_current_timezone())
                     match = Match.objects.create(
                         competition=competition,
                         tenant=tenant,

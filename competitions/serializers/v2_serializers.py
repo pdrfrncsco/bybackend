@@ -8,6 +8,7 @@ from rest_framework import serializers
 
 from clubs.models import Club
 from competitions.models import CompetitionRegistration, Match, Standing
+from competitions.serializers.utils import get_club_logo_url
 
 
 class CompetitionRegistrationSerializer(serializers.ModelSerializer):
@@ -24,10 +25,10 @@ class CompetitionRegistrationSerializer(serializers.ModelSerializer):
             "club_logo",
             "registered_at",
         ]
-        read_only_fields = ["id", "club_name", "club_logo", "registered_at"]
+    read_only_fields = ["id", "club_name", "club_logo", "registered_at"]
 
     def get_club_logo(self, obj: CompetitionRegistration) -> str | None:
-        return obj.club.logo.url if obj.club.logo else None
+        return get_club_logo_url(obj.club)
 
 
 class MatchSerializer(serializers.ModelSerializer):
@@ -66,10 +67,10 @@ class MatchSerializer(serializers.ModelSerializer):
         ]
 
     def get_home_club_logo(self, obj: Match) -> str | None:
-        return obj.home_club.logo.url if obj.home_club.logo else None
+        return get_club_logo_url(obj.home_club)
 
     def get_away_club_logo(self, obj: Match) -> str | None:
-        return obj.away_club.logo.url if obj.away_club.logo else None
+        return get_club_logo_url(obj.away_club)
 
 
 class StandingSerializer(serializers.ModelSerializer):
@@ -94,7 +95,7 @@ class StandingSerializer(serializers.ModelSerializer):
             "points",
             "position",
         ]
-        read_only_fields = [
+    read_only_fields = [
             "id",
             "club_name",
             "club_logo",
@@ -107,7 +108,7 @@ class StandingSerializer(serializers.ModelSerializer):
             "goal_difference",
             "points",
             "position",
-        ]
+    ]
 
     def get_club_logo(self, obj: Standing) -> str | None:
-        return obj.club.logo.url if obj.club.logo else None
+        return get_club_logo_url(obj.club)

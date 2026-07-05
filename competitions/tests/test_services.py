@@ -1,5 +1,5 @@
 from django.test import TestCase
-from datetime import datetime
+from datetime import datetime, timezone
 from core.models import Tenant
 from clubs.models import Club
 from competitions.models import Competition, CompetitionRegistration, Match, Standing
@@ -70,7 +70,7 @@ class CompetitionServicesTestCase(TestCase):
                 club=club,
             )
 
-        start_date = datetime(2026, 8, 1, 16, 0)
+        start_date = datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc)
         # Double round-robin: 4 teams = 6 rounds of 2 matches = 12 matches total
         matches = MatchService.generate_round_robin_schedule(
             tenant=self.tenant,
@@ -94,7 +94,7 @@ class CompetitionServicesTestCase(TestCase):
                 club=club,
             )
 
-        start_date = datetime(2026, 8, 1, 16, 0)
+        start_date = datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc)
         # 3 teams -> treated as 4 with bye.
         # N rounds = 3. Double round-robin = 6 rounds.
         # Each round has 1 match (the other team has bye).
@@ -124,7 +124,7 @@ class CompetitionServicesTestCase(TestCase):
             tenant=self.tenant,
             home_club=self.club1,
             away_club=self.club2,
-            match_date=datetime(2026, 8, 1, 16, 0),
+            match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
             round_number=1,
             status=Match.MatchStatus.SCHEDULED,
         )
