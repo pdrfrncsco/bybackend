@@ -18,6 +18,8 @@ from clubs.serializers.club_affiliation_request import (
     ClubAffiliationRequestCreateSerializer,
     ClubAffiliationRequestReviewSerializer,
 )
+from clubs.serializers.club_document import ClubDocumentCreateSerializer, ClubDocumentSerializer
+from clubs.serializers.club_sponsor import ClubSponsorCreateSerializer, ClubSponsorSerializer, ClubSponsorUpdateSerializer
 
 __all__ = [
     "ClubSerializer",
@@ -32,4 +34,9 @@ __all__ = [
     "ClubAffiliationRequestSerializer",
     "ClubAffiliationRequestCreateSerializer",
     "ClubAffiliationRequestReviewSerializer",
+    "ClubDocumentSerializer",
+    "ClubDocumentCreateSerializer",
+    "ClubSponsorSerializer",
+    "ClubSponsorCreateSerializer",
+    "ClubSponsorUpdateSerializer",
 ]
