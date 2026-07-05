@@ -13,6 +13,14 @@ from competitions.serializers.regulation import (
     CompetitionRegulationCreateSerializer,
     CompetitionRegulationUpdateSerializer,
 )
+from competitions.serializers.fair_play_serializers import (
+    PlayerSuspensionSerializer,
+    CreateSuspensionSerializer,
+    CompetitionRankingSerializer,
+    PlayerEligibilitySerializer,
+    FairPlayRankingSerializer,
+    TopScorerSerializer,
+)
 
 __all__ = [
     "CompetitionSerializer",
@@ -24,4 +32,10 @@ __all__ = [
     "CompetitionRegulationSerializer",
     "CompetitionRegulationCreateSerializer",
     "CompetitionRegulationUpdateSerializer",
+    "PlayerSuspensionSerializer",
+    "CreateSuspensionSerializer",
+    "CompetitionRankingSerializer",
+    "PlayerEligibilitySerializer",
+    "FairPlayRankingSerializer",
+    "TopScorerSerializer",
 ]

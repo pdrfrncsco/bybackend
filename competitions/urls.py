@@ -16,6 +16,15 @@ from competitions.views.match_center_views import (
     MatchEventDeleteView,
     CompetitionPlayerStatsView,
 )
+from competitions.views.fair_play_views import (
+    CompetitionSuspensionListView,
+    PlayerEligibilityView,
+    PlayerSuspensionCancelView,
+    CompetitionFairPlayRankingView,
+    TopScorersRankingView,
+    SeasonRankingView,
+    RecalculateRankingsView,
+)
 
 urlpatterns = [
     # Competition CRUD
@@ -35,4 +44,15 @@ urlpatterns = [
     path("<uuid:competition_id>/matches/<uuid:match_id>/events/", MatchEventListCreateView.as_view(), name="match-event-list-create"),
     path("<uuid:competition_id>/matches/<uuid:match_id>/events/<uuid:event_id>/", MatchEventDeleteView.as_view(), name="match-event-delete"),
     path("<uuid:competition_id>/stats/", CompetitionPlayerStatsView.as_view(), name="competition-player-stats"),
+
+    # Phase 2.4 — Fair Play & Suspensions
+    path("<uuid:competition_id>/suspensions/", CompetitionSuspensionListView.as_view(), name="competition-suspensions"),
+    path("<uuid:competition_id>/eligibility/<uuid:player_id>/", PlayerEligibilityView.as_view(), name="player-eligibility"),
+    path("suspensions/<uuid:suspension_id>/cancel/", PlayerSuspensionCancelView.as_view(), name="suspension-cancel"),
+    path("<uuid:competition_id>/fair-play-ranking/", CompetitionFairPlayRankingView.as_view(), name="fair-play-ranking"),
+
+    # Phase 2.4 — Rankings
+    path("rankings/top-scorers/", TopScorersRankingView.as_view(), name="top-scorers-ranking"),
+    path("rankings/season/", SeasonRankingView.as_view(), name="season-ranking"),
+    path("rankings/recalculate/", RecalculateRankingsView.as_view(), name="recalculate-rankings"),
 ]
