@@ -3,6 +3,7 @@ BOLAYETU — MatchEventService (Phase 4: Match Center)
 
 Business logic for recording and managing in-game match events.
 Goals automatically recalculate the home/away score on the Match row.
+Player stats are automatically synced to PlayerRegistration.
 """
 
 from django.db import transaction
@@ -51,6 +52,19 @@ class MatchEventService:
         match.away_score = away_score
         match.save(update_fields=["home_score", "away_score", "updated_at"])
 
+    @staticmethod
+    def _sync_player_stats(event: MatchEvent, operation: str = "add") -> None:
+        """
+        Sync player stats to PlayerRegistration after event add/remove.
+        
+        Uses StatsSyncService to update:
+            - PlayerRegistration stats (per club/competition)
+            - Global Player totals (denormalized)
+        """
+        from players.services.stats_sync_service import StatsSyncService
+        
+        StatsSyncService.sync_player_stats_from_event(event, operation)
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     @staticmethod
@@ -69,6 +83,7 @@ class MatchEventService:
     ) -> MatchEvent:
         """
         Record a new in-game event. If it's a goal type, recalculates score.
+        Automatically syncs player stats to PlayerRegistration.
 
         Args:
             tenant: The organisation/tenant context.
@@ -115,6 +130,9 @@ class MatchEventService:
         if event_type in goal_types:
             MatchEventService._recalculate_score(match)
 
+        # Auto-sync player stats
+        MatchEventService._sync_player_stats(event, operation="add")
+
         return event
 
     @staticmethod
@@ -122,6 +140,7 @@ class MatchEventService:
     def remove_event(*, tenant: Tenant, event_id: str) -> None:
         """
         Delete an event. Recalculates score if it was a goal.
+        Automatically syncs player stats after removal.
         """
         try:
             event = MatchEvent.objects.select_related("match").get(
@@ -136,6 +155,10 @@ class MatchEventService:
             MatchEvent.EventType.PENALTY_SCORED,
             MatchEvent.EventType.OWN_GOAL,
         }
+        
+        # Sync player stats BEFORE deletion (need event data)
+        MatchEventService._sync_player_stats(event, operation="remove")
+        
         event.delete()
 
         if was_goal:

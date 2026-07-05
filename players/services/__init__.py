@@ -36,6 +36,10 @@ class PlayerRegistrationConflict(Exception):
     pass
 
 
+# Import stats sync service for external use
+from players.services.stats_sync_service import StatsSyncService
+
+
 class PlayerService:
     """
     Write operations for the global Player entity.

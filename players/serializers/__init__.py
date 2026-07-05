@@ -71,7 +71,7 @@ class PlayerSerializer(serializers.ModelSerializer):
 
 class PlayerDetailSerializer(serializers.ModelSerializer):
     """
-    Extended player profile with career summary.
+    Extended player profile with career summary, videos, documents, and achievements.
     
     Used for: GET /api/v1/players/{id}/ (when ?expand=detail)
     """
@@ -82,6 +82,9 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
     status_label = serializers.SerializerMethodField()
     current_club = serializers.SerializerMethodField()
     career_history = serializers.SerializerMethodField()
+    videos = serializers.SerializerMethodField()
+    documents = serializers.SerializerMethodField()
+    achievements = serializers.SerializerMethodField()
     
     class Meta:
         model = Player
@@ -111,6 +114,9 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
             "total_assists",
             "current_club",
             "career_history",
+            "videos",
+            "documents",
+            "achievements",
             "created_at",
             "updated_at",
         ]
@@ -162,6 +168,68 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
                 "assists": registration.assists,
             }
             for registration in registrations
+        ]
+    
+    def get_videos(self, obj: Player) -> list:
+        """Return player's published videos."""
+        from players.models import PlayerVideo
+        videos = obj.videos.filter(
+            status=PlayerVideo.VideoStatus.PUBLISHED
+        ).order_by("-is_featured", "order", "-created_at")[:10]
+        return [
+            {
+                "id": video.id,
+                "title": video.title,
+                "video_type": video.video_type,
+                "video_type_label": video.get_video_type_display(),
+                "url": video.url,
+                "thumbnail": video.thumbnail,
+                "duration_seconds": video.duration_seconds,
+                "is_featured": video.is_featured,
+                "created_at": video.created_at,
+            }
+            for video in videos
+        ]
+    
+    def get_documents(self, obj: Player) -> list:
+        """Return player's public documents."""
+        from players.models import PlayerDocument
+        documents = obj.documents.filter(
+            is_private=False
+        ).order_by("-created_at")[:10]
+        return [
+            {
+                "id": doc.id,
+                "title": doc.title,
+                "category": doc.category,
+                "category_label": doc.get_category_display(),
+                "asset_url": doc.asset.public_url if doc.asset else None,
+                "is_valid": doc.is_valid,
+                "created_at": doc.created_at,
+            }
+            for doc in documents
+        ]
+    
+    def get_achievements(self, obj: Player) -> list:
+        """Return player's achievements."""
+        achievements = obj.achievements.all().order_by("-date_achieved", "-created_at")[:20]
+        return [
+            {
+                "id": achievement.id,
+                "title": achievement.title,
+                "achievement_type": achievement.achievement_type,
+                "achievement_type_label": achievement.get_achievement_type_display(),
+                "level": achievement.level,
+                "level_label": achievement.get_level_display(),
+                "date_achieved": achievement.date_achieved,
+                "year": achievement.year,
+                "season": achievement.season,
+                "club_name": achievement.club.name if achievement.club else None,
+                "competition_name": achievement.competition.name if achievement.competition else None,
+                "trophy_image": achievement.trophy_image,
+                "is_verified": achievement.is_verified,
+            }
+            for achievement in achievements
         ]
 
 
