@@ -4,7 +4,13 @@ BOLAYETU — Players Admin
 
 from django.contrib import admin
 
-from players.models import Player, PlayerRegistration
+from players.models import (
+    Player,
+    PlayerRegistration,
+    PlayerVideo,
+    PlayerDocument,
+    PlayerAchievement,
+)
 
 
 class PlayerRegistrationInline(admin.TabularInline):
@@ -24,6 +30,29 @@ class PlayerRegistrationInline(admin.TabularInline):
         "goals",
         "assists",
     )
+
+
+class PlayerVideoInline(admin.TabularInline):
+    model = PlayerVideo
+    extra = 0
+    raw_id_fields = ("media_asset", "match")
+    readonly_fields = ("id", "created_at", "updated_at")
+    fields = ("title", "video_type", "status", "media_asset", "is_featured", "created_at")
+
+
+class PlayerDocumentInline(admin.TabularInline):
+    model = PlayerDocument
+    extra = 0
+    raw_id_fields = ("asset", "club", "uploaded_by")
+    readonly_fields = ("id", "created_at", "updated_at", "verified_at")
+    fields = ("title", "category", "status", "asset", "club", "is_private", "created_at")
+
+
+class PlayerAchievementInline(admin.TabularInline):
+    model = PlayerAchievement
+    extra = 0
+    readonly_fields = ("id", "created_at", "updated_at")
+    fields = ("achievement_type", "title", "description", "date_achieved", "created_at")
 
 
 @admin.register(Player)
@@ -49,7 +78,12 @@ class PlayerAdmin(admin.ModelAdmin):
         "total_assists",
     )
     raw_id_fields = ("user",)
-    inlines = (PlayerRegistrationInline,)
+    inlines = (
+        PlayerRegistrationInline,
+        PlayerVideoInline,
+        PlayerDocumentInline,
+        PlayerAchievementInline,
+    )
     fieldsets = (
         (
             "Personal Information",
@@ -193,3 +227,30 @@ class PlayerRegistrationAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+
+@admin.register(PlayerVideo)
+class PlayerVideoAdmin(admin.ModelAdmin):
+    list_display = ("title", "player", "video_type", "status", "is_featured", "created_at")
+    list_filter = ("video_type", "status", "is_featured", "created_at")
+    search_fields = ("title", "description", "player__first_name", "player__last_name")
+    readonly_fields = ("id", "created_at", "updated_at")
+    raw_id_fields = ("player", "media_asset", "match")
+
+
+@admin.register(PlayerDocument)
+class PlayerDocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "player", "category", "status", "uploaded_by", "created_at")
+    list_filter = ("category", "status", "is_private", "created_at")
+    search_fields = ("title", "description", "player__first_name", "player__last_name")
+    readonly_fields = ("id", "created_at", "updated_at", "verified_at")
+    raw_id_fields = ("player", "asset", "club", "uploaded_by", "verified_by")
+
+
+@admin.register(PlayerAchievement)
+class PlayerAchievementAdmin(admin.ModelAdmin):
+    list_display = ("title", "player", "achievement_type", "level", "date_achieved")
+    list_filter = ("achievement_type", "level", "date_achieved")
+    search_fields = ("title", "description", "player__first_name", "player__last_name")
+    readonly_fields = ("id", "created_at", "updated_at")
+    raw_id_fields = ("player", "competition", "club")
