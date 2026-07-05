@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.db.models import Count, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce, TruncMonth
@@ -19,6 +19,12 @@ class DashboardAnalyticsSelector:
         MatchEvent.EventType.OWN_GOAL,
         MatchEvent.EventType.PENALTY_SCORED,
     ]
+    PERIOD_DAY_MAP = {
+        "7d": 7,
+        "30d": 30,
+        "90d": 90,
+        "365d": 365,
+    }
     MONTH_LABELS = {
         1: "JAN",
         2: "FEV",
@@ -47,7 +53,16 @@ class DashboardAnalyticsSelector:
         }
 
     @classmethod
-    def get_overview(cls, *, tenant=None) -> dict:
+    def get_overview(
+        cls,
+        *,
+        tenant=None,
+        competition=None,
+        club=None,
+        period: str = "all",
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> dict:
         clubs = Club.objects.all()
         competitions = Competition.objects.all()
         matches = Match.objects.all()
@@ -63,23 +78,50 @@ class DashboardAnalyticsSelector:
             registrations = registrations.filter(tenant=tenant)
             subscriptions = subscriptions.filter(tenant=tenant)
 
-        total_players = cls._count_distinct_players(registrations)
-        if tenant is None and total_players == 0:
+        competitions, clubs, matches, events, registrations = cls._apply_entity_filters(
+            competitions=competitions,
+            clubs=clubs,
+            matches=matches,
+            events=events,
+            registrations=registrations,
+            competition=competition,
+            club=club,
+        )
+
+        range_start, range_end = cls._resolve_date_range(
+            period=period,
+            start_date=start_date,
+            end_date=end_date,
+            competition=competition,
+        )
+
+        filtered_matches = cls._apply_match_date_filter(matches, range_start, range_end)
+        filtered_events = cls._apply_event_date_filter(events, range_start, range_end)
+        filtered_registrations = cls._apply_registration_date_filter(registrations, range_start, range_end)
+        filtered_competitions = cls._apply_competition_period_filter(
+            competitions=competitions,
+            range_start=range_start,
+            range_end=range_end,
+            keep_all=competition is not None,
+        )
+
+        total_players = cls._count_distinct_players(filtered_registrations)
+        if tenant is None and competition is None and club is None and total_players == 0:
             total_players = Player.objects.filter(status=Player.PlayerStatus.ACTIVE).count()
 
-        total_tournaments = competitions.count()
-        matches_finished = matches.filter(status=Match.MatchStatus.FINISHED).count()
-        goals_total = events.filter(event_type__in=cls.GOAL_EVENT_TYPES).count()
+        total_tournaments = filtered_competitions.count()
+        matches_finished = filtered_matches.filter(status=Match.MatchStatus.FINISHED).count()
+        goals_total = filtered_events.filter(event_type__in=cls.GOAL_EVENT_TYPES).count()
         subscribers_count = subscriptions.count()
         today = timezone.localdate()
 
-        players_this_month = registrations.filter(
+        players_this_month = filtered_registrations.filter(
             joined_date__year=today.year,
             joined_date__month=today.month,
         ).count()
 
         previous_month_date = today.replace(day=1) - timedelta(days=1)
-        players_last_month = registrations.filter(
+        players_last_month = filtered_registrations.filter(
             joined_date__year=previous_month_date.year,
             joined_date__month=previous_month_date.month,
         ).count()
@@ -89,17 +131,17 @@ class DashboardAnalyticsSelector:
 
         return {
             "kpis": {
-                "total_clubs": clubs.count(),
+                "total_clubs": clubs.distinct().count(),
                 "total_players": total_players,
                 "total_news": 0,
-                "active_tournaments": competitions.filter(status=CompetitionStatus.ACTIVE).count(),
-                "tournaments_upcoming": competitions.filter(status=CompetitionStatus.DRAFT).count(),
-                "tournaments_completed": competitions.filter(status=CompetitionStatus.COMPLETED).count(),
+                "active_tournaments": filtered_competitions.filter(status=CompetitionStatus.ACTIVE).count(),
+                "tournaments_upcoming": filtered_competitions.filter(status=CompetitionStatus.DRAFT).count(),
+                "tournaments_completed": filtered_competitions.filter(status=CompetitionStatus.COMPLETED).count(),
                 "matches_finished": matches_finished,
-                "matches_scheduled": matches.filter(status=Match.MatchStatus.SCHEDULED).count(),
-                "matches_live": matches.filter(status=Match.MatchStatus.LIVE).count(),
-                "total_matches": matches.count(),
-                "matches_today": matches.filter(match_date__date=today).count(),
+                "matches_scheduled": filtered_matches.filter(status=Match.MatchStatus.SCHEDULED).count(),
+                "matches_live": filtered_matches.filter(status=Match.MatchStatus.LIVE).count(),
+                "total_matches": filtered_matches.count(),
+                "matches_today": filtered_matches.filter(match_date__date=today).count(),
                 "players_this_month": players_this_month,
                 "players_last_month": players_last_month,
                 "goals_total": goals_total,
@@ -108,15 +150,151 @@ class DashboardAnalyticsSelector:
                 "total_revenue": 0,
                 "avg_subscribers_per_tournament": avg_subscribers_per_tournament,
             },
-            "tournaments": cls._build_tournament_summaries(competitions),
-            "top_clubs_by_players": cls._build_top_clubs(clubs),
-            "top_scorers": cls._build_top_scorers(registrations),
-            "goals_evolution": cls._build_goals_evolution(competitions, events),
-            "live_matches": cls._build_matches(matches.filter(status=Match.MatchStatus.LIVE)[:5]),
+            "tournaments": cls._build_tournament_summaries(filtered_competitions),
+            "top_clubs_by_players": cls._build_top_clubs(clubs=clubs, registrations=filtered_registrations),
+            "top_scorers": cls._build_top_scorers(filtered_registrations),
+            "goals_evolution": cls._build_goals_evolution(filtered_competitions, filtered_events),
+            "live_matches": cls._build_matches(filtered_matches.filter(status=Match.MatchStatus.LIVE)[:5]),
             "upcoming_matches": cls._build_matches(
-                matches.filter(status=Match.MatchStatus.SCHEDULED).order_by("match_date")[:5]
+                filtered_matches.filter(status=Match.MatchStatus.SCHEDULED).order_by("match_date")[:5]
             ),
         }
+
+    @classmethod
+    def _apply_entity_filters(
+        cls,
+        *,
+        competitions,
+        clubs,
+        matches,
+        events,
+        registrations,
+        competition=None,
+        club=None,
+    ):
+        if competition is not None:
+            competitions = competitions.filter(id=competition.id)
+            matches = matches.filter(competition=competition)
+            events = events.filter(match__competition=competition)
+            registrations = registrations.filter(competition=competition)
+            clubs = clubs.filter(
+                Q(competition_registrations__competition=competition)
+                | Q(player_registrations__competition=competition)
+                | Q(home_matches__competition=competition)
+                | Q(away_matches__competition=competition)
+            )
+
+        if club is not None:
+            clubs = clubs.filter(id=club.id)
+            matches = matches.filter(Q(home_club=club) | Q(away_club=club))
+            events = events.filter(club=club)
+            registrations = registrations.filter(club=club)
+            competitions = competitions.filter(
+                Q(registrations__club=club)
+                | Q(player_registrations__club=club)
+                | Q(matches__home_club=club)
+                | Q(matches__away_club=club)
+            )
+
+        return (
+            competitions.distinct(),
+            clubs.distinct(),
+            matches.distinct(),
+            events.distinct(),
+            registrations.distinct(),
+        )
+
+    @classmethod
+    def _resolve_date_range(
+        cls,
+        *,
+        period: str,
+        start_date: date | None,
+        end_date: date | None,
+        competition=None,
+    ) -> tuple[date | None, date | None]:
+        if start_date or end_date:
+            return start_date, end_date
+
+        if not period or period == "all":
+            return None, None
+
+        today = timezone.localdate()
+        if period in cls.PERIOD_DAY_MAP:
+            days = cls.PERIOD_DAY_MAP[period]
+            return today - timedelta(days=days), today
+
+        if period == "season":
+            if competition is not None:
+                return cls._season_bounds_from_value(competition.season)
+            return cls._current_season_bounds(today)
+
+        return None, None
+
+    @staticmethod
+    def _current_season_bounds(today: date) -> tuple[date, date]:
+        start_year = today.year if today.month >= 7 else today.year - 1
+        return date(start_year, 7, 1), date(start_year + 1, 6, 30)
+
+    @staticmethod
+    def _season_bounds_from_value(season: str) -> tuple[date, date]:
+        if "/" in season:
+            start_text, end_text = season.split("/", 1)
+            start_year = int(start_text)
+            end_suffix = int(end_text)
+            end_year = (start_year // 100) * 100 + end_suffix
+            if end_year < start_year:
+                end_year += 100
+            return date(start_year, 7, 1), date(end_year, 6, 30)
+
+        year = int(season)
+        return date(year, 1, 1), date(year, 12, 31)
+
+    @staticmethod
+    def _apply_match_date_filter(queryset, range_start: date | None, range_end: date | None):
+        if range_start:
+            queryset = queryset.filter(match_date__date__gte=range_start)
+        if range_end:
+            queryset = queryset.filter(match_date__date__lte=range_end)
+        return queryset
+
+    @staticmethod
+    def _apply_event_date_filter(queryset, range_start: date | None, range_end: date | None):
+        if range_start:
+            queryset = queryset.filter(match__match_date__date__gte=range_start)
+        if range_end:
+            queryset = queryset.filter(match__match_date__date__lte=range_end)
+        return queryset
+
+    @staticmethod
+    def _apply_registration_date_filter(queryset, range_start: date | None, range_end: date | None):
+        if range_start:
+            queryset = queryset.filter(joined_date__gte=range_start)
+        if range_end:
+            queryset = queryset.filter(joined_date__lte=range_end)
+        return queryset
+
+    @staticmethod
+    def _apply_competition_period_filter(
+        *, competitions, range_start: date | None, range_end: date | None, keep_all: bool
+    ):
+        if keep_all or (range_start is None and range_end is None):
+            return competitions.distinct()
+
+        match_filter = Q()
+        registration_filter = Q()
+        created_filter = Q()
+
+        if range_start:
+            match_filter &= Q(matches__match_date__date__gte=range_start)
+            registration_filter &= Q(player_registrations__joined_date__gte=range_start)
+            created_filter &= Q(created_at__date__gte=range_start)
+        if range_end:
+            match_filter &= Q(matches__match_date__date__lte=range_end)
+            registration_filter &= Q(player_registrations__joined_date__lte=range_end)
+            created_filter &= Q(created_at__date__lte=range_end)
+
+        return competitions.filter(match_filter | registration_filter | created_filter).distinct()
 
     @staticmethod
     def _count_distinct_players(registrations) -> int:
@@ -124,15 +302,19 @@ class DashboardAnalyticsSelector:
 
     @classmethod
     def _build_tournament_summaries(cls, competitions):
-        queryset = competitions.annotate(
-            teams_count=Count("registrations__club", distinct=True),
-            matches_count=Count("matches", distinct=True),
-            finished_matches_count=Count(
-                "matches",
-                filter=Q(matches__status=Match.MatchStatus.FINISHED),
-                distinct=True,
-            ),
-        ).order_by("-created_at")[:5]
+        queryset = (
+            competitions.distinct()
+            .annotate(
+                teams_count=Count("registrations__club", distinct=True),
+                matches_count=Count("matches", distinct=True),
+                finished_matches_count=Count(
+                    "matches",
+                    filter=Q(matches__status=Match.MatchStatus.FINISHED),
+                    distinct=True,
+                ),
+            )
+            .order_by("-created_at")[:5]
+        )
 
         summaries = []
         for competition in queryset:
@@ -174,10 +356,20 @@ class DashboardAnalyticsSelector:
         return len(club_ids)
 
     @classmethod
-    def _build_top_clubs(cls, clubs):
-        queryset = clubs.annotate(
-            players_count=Count("player_registrations__player", distinct=True),
-            goals_total=Coalesce(Sum("player_registrations__goals"), 0),
+    def _build_top_clubs(cls, *, clubs, registrations):
+        scoped_clubs = (
+            clubs.filter(player_registrations__in=registrations).distinct() if registrations.exists() else clubs.none()
+        )
+        queryset = scoped_clubs.annotate(
+            players_count=Count(
+                "player_registrations__player",
+                filter=Q(player_registrations__in=registrations),
+                distinct=True,
+            ),
+            goals_total=Coalesce(
+                Sum("player_registrations__goals", filter=Q(player_registrations__in=registrations)),
+                0,
+            ),
         ).order_by("-players_count", "-goals_total", "name")[:5]
 
         items = []

@@ -1,6 +1,25 @@
 from rest_framework import serializers
 
 
+class DashboardFilterSerializer(serializers.Serializer):
+    competition_id = serializers.UUIDField(required=False)
+    club_id = serializers.UUIDField(required=False)
+    period = serializers.ChoiceField(
+        choices=["all", "7d", "30d", "90d", "365d", "season"],
+        required=False,
+        default="all",
+    )
+    start_date = serializers.DateField(required=False)
+    end_date = serializers.DateField(required=False)
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date")
+        end_date = attrs.get("end_date")
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError("start_date cannot be after end_date.")
+        return attrs
+
+
 class DashboardKpisSerializer(serializers.Serializer):
     total_clubs = serializers.IntegerField()
     total_players = serializers.IntegerField()
@@ -70,7 +89,12 @@ class GoalsEvolutionPeriodSerializer(serializers.Serializer):
 
 class GoalsEvolutionSerializer(serializers.Serializer):
     tournament_name = serializers.CharField()
-    data = GoalsEvolutionPeriodSerializer(many=True)
+    periods = GoalsEvolutionPeriodSerializer(source="data", many=True)
+
+    def to_representation(self, instance):
+        payload = super().to_representation(instance)
+        payload["data"] = payload.pop("periods", [])
+        return payload
 
 
 class DashboardOverviewSerializer(serializers.Serializer):

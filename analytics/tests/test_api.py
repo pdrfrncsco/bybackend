@@ -276,6 +276,66 @@ class DashboardAnalyticsApiTest(APITestCase):
         self.assertEqual(response.data["top_scorers"][0]["name"], "António Manuel")
         self.assertTrue(all(item["club"] != "Sagrada Esperança" for item in response.data["top_scorers"]))
 
+    def test_overview_supports_competition_cut(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(
+            reverse("dashboard-overview"),
+            {"competition_id": str(self.comp_a_active.id)},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["kpis"]["total_clubs"], 2)
+        self.assertEqual(response.data["kpis"]["total_players"], 2)
+        self.assertEqual(response.data["kpis"]["active_tournaments"], 1)
+        self.assertEqual(response.data["kpis"]["tournaments_completed"], 0)
+        self.assertEqual(response.data["kpis"]["matches_finished"], 1)
+        self.assertEqual(response.data["kpis"]["matches_live"], 1)
+        self.assertEqual(response.data["kpis"]["matches_scheduled"], 1)
+        self.assertEqual(response.data["kpis"]["total_matches"], 3)
+        self.assertEqual(response.data["kpis"]["goals_total"], 3)
+        self.assertEqual(len(response.data["tournaments"]), 1)
+        self.assertEqual(response.data["tournaments"][0]["name"], "Girabola 2026")
+        self.assertTrue(all(item["club"] != "" for item in response.data["top_scorers"]))
+
+    def test_overview_supports_club_cut(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(
+            reverse("dashboard-overview"),
+            {"club_id": str(self.club_a1.id)},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["kpis"]["total_clubs"], 1)
+        self.assertEqual(response.data["kpis"]["total_players"], 2)
+        self.assertEqual(response.data["kpis"]["active_tournaments"], 1)
+        self.assertEqual(response.data["kpis"]["tournaments_completed"], 1)
+        self.assertEqual(response.data["kpis"]["total_matches"], 4)
+        self.assertEqual(response.data["kpis"]["goals_total"], 3)
+        self.assertEqual(len(response.data["top_clubs_by_players"]), 1)
+        self.assertEqual(response.data["top_clubs_by_players"][0]["name"], "Petro de Luanda")
+        self.assertTrue(all(item["club"] == "Petro de Luanda" for item in response.data["top_scorers"]))
+
+    def test_overview_supports_period_cut(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get(
+            reverse("dashboard-overview"),
+            {"period": "7d"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["kpis"]["total_players"], 2)
+        self.assertEqual(response.data["kpis"]["matches_finished"], 1)
+        self.assertEqual(response.data["kpis"]["matches_live"], 1)
+        self.assertEqual(response.data["kpis"]["matches_scheduled"], 0)
+        self.assertEqual(response.data["kpis"]["total_matches"], 2)
+        self.assertEqual(response.data["kpis"]["goals_total"], 3)
+        self.assertEqual(response.data["kpis"]["players_last_month"], 0)
+        self.assertEqual(len(response.data["upcoming_matches"]), 0)
+        self.assertTrue(all(item["name"] != "Carlos Pedro" for item in response.data["top_scorers"]))
+
     def test_overview_blocks_cross_tenant_subdomain_access(self):
         self.client.force_authenticate(user=self.user)
 
