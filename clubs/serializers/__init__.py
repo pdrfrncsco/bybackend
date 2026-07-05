@@ -13,6 +13,11 @@ from clubs.serializers.club import (
     ClubUpdateSerializer,
     PublicClubSerializer,
 )
+from clubs.serializers.club_affiliation_request import (
+    ClubAffiliationRequestSerializer,
+    ClubAffiliationRequestCreateSerializer,
+    ClubAffiliationRequestReviewSerializer,
+)
 
 __all__ = [
     "ClubSerializer",
@@ -24,4 +29,7 @@ __all__ = [
     "ClubMemberSerializer",
     "ClubSquadMemberSerializer",
     "ClubStaffSerializer",
+    "ClubAffiliationRequestSerializer",
+    "ClubAffiliationRequestCreateSerializer",
+    "ClubAffiliationRequestReviewSerializer",
 ]

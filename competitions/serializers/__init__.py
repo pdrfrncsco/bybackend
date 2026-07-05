@@ -8,6 +8,11 @@ from competitions.serializers.v2_serializers import (
     MatchSerializer,
     StandingSerializer,
 )
+from competitions.serializers.regulation import (
+    CompetitionRegulationSerializer,
+    CompetitionRegulationCreateSerializer,
+    CompetitionRegulationUpdateSerializer,
+)
 
 __all__ = [
     "CompetitionSerializer",
@@ -16,4 +21,7 @@ __all__ = [
     "CompetitionRegistrationSerializer",
     "MatchSerializer",
     "StandingSerializer",
+    "CompetitionRegulationSerializer",
+    "CompetitionRegulationCreateSerializer",
+    "CompetitionRegulationUpdateSerializer",
 ]

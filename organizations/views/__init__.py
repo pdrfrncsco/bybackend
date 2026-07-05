@@ -19,6 +19,11 @@ from organizations.views.organization_views import (
     OrganizationMembersView,
     OrganizationMemberDetailView,
 )
+from organizations.views.club_affiliation_views import (
+    OrganizationClubRequestCreateView,
+    OrganizationClubRequestsView,
+    OrganizationClubRequestReviewView,
+)
 
 __all__ = [
     "OrganizationMeView",
@@ -36,4 +41,7 @@ __all__ = [
     "OrganizationUnsubscribeView",
     "OrganizationMembersView",
     "OrganizationMemberDetailView",
+    "OrganizationClubRequestCreateView",
+    "OrganizationClubRequestsView",
+    "OrganizationClubRequestReviewView",
 ]

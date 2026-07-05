@@ -88,3 +88,11 @@ class DuplicateClubMember(ClubException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = "This user is already an active member of this club."
     default_code = "duplicate_club_member"
+
+
+class DuplicateClubAffiliationRequest(ClubException):
+    """Raised when an identical club affiliation request already exists."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "A club affiliation request with this name already exists in this organization."
+    default_code = "duplicate_club_affiliation_request"

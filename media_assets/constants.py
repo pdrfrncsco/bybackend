@@ -60,6 +60,7 @@ class OwnerType(models.TextChoices):
     ORGANIZATION = "organization", "Organização"
     CLUB = "club", "Clube"
     COMPETITION = "competition", "Competição"
+    COMPETITION_REGULATION = "competition_regulation", "Regulamento de Competição"
     MATCH = "match", "Jogo"
     NEWS = "news", "Notícia"
     PLAYER = "player", "Jogador"

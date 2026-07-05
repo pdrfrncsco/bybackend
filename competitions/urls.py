@@ -8,6 +8,8 @@ from competitions.views import (
     CompetitionMatchListView,
     MatchScoreUpdateView,
     CompetitionStandingListView,
+    CompetitionRegulationListCreateView,
+    CompetitionRegulationDetailView,
 )
 from competitions.views.match_center_views import (
     MatchEventListCreateView,
@@ -25,6 +27,8 @@ urlpatterns = [
     path("<uuid:competition_id>/generate-schedule/", CompetitionGenerateScheduleView.as_view(), name="competition-generate-schedule"),
     path("<uuid:competition_id>/matches/", CompetitionMatchListView.as_view(), name="competition-match-list"),
     path("<uuid:competition_id>/standings/", CompetitionStandingListView.as_view(), name="competition-standing-list"),
+    path("<uuid:competition_id>/regulations/", CompetitionRegulationListCreateView.as_view(), name="competition-regulation-list-create"),
+    path("<uuid:competition_id>/regulations/<uuid:regulation_id>/", CompetitionRegulationDetailView.as_view(), name="competition-regulation-detail"),
     path("matches/<uuid:match_id>/", MatchScoreUpdateView.as_view(), name="match-score-update"),
 
     # Phase 4 — Match Center (súmula + player stats)

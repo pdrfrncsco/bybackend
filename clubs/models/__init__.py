@@ -3,6 +3,7 @@ BOLAYETU — Clubs Models
 """
 
 from clubs.models.club import Club
+from clubs.models.club_affiliation_request import ClubAffiliationRequest
 from clubs.models.club_member import ClubMember
 
-__all__ = ["Club", "ClubMember"]
+__all__ = ["Club", "ClubMember", "ClubAffiliationRequest"]
