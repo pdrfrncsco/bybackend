@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from analytics.models import GeneratedReport
+from analytics.constants import ReportType, ReportFormat
 
 
 class DashboardFilterSerializer(serializers.Serializer):
@@ -71,6 +73,7 @@ class DashboardTopScorerSerializer(serializers.Serializer):
 
 class DashboardMatchSerializer(serializers.Serializer):
     id = serializers.UUIDField()
+    name = serializers.CharField(required=False)
     tournament = serializers.CharField()
     status = serializers.ChoiceField(choices=["scheduled", "live", "finished"])
     date = serializers.DateTimeField()
@@ -112,3 +115,39 @@ class PublicStatsSerializer(serializers.Serializer):
     total_players = serializers.IntegerField()
     active_tournaments = serializers.IntegerField()
     total_matches = serializers.IntegerField()
+
+
+class GeneratedReportSerializer(serializers.ModelSerializer):
+    created_by_email = serializers.EmailField(source="created_by.email", read_only=True)
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GeneratedReport
+        fields = [
+            "id",
+            "name",
+            "report_type",
+            "status",
+            "format",
+            "filters",
+            "created_by",
+            "created_by_email",
+            "file",
+            "file_url",
+            "error_message",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "status", "created_by", "file", "error_message", "created_at", "updated_at"]
+
+    def get_file_url(self, obj) -> str | None:
+        if obj.file:
+            return obj.file.public_url
+        return None
+
+
+class ReportRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=255)
+    report_type = serializers.ChoiceField(choices=ReportType.CHOICES)
+    format = serializers.ChoiceField(choices=ReportFormat.CHOICES)
+    filters = serializers.JSONField(required=False, default=dict)

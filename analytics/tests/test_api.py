@@ -8,6 +8,11 @@ from rest_framework.test import APITestCase
 
 from accounts.constants import AccountStatus, MembershipRole
 from accounts.models import TenantMembership, User
+from analytics.models import KPISnapshot, GeneratedReport
+from analytics.constants import MetricKey, ReportType, ReportStatus, ReportFormat
+from analytics.services.kpi_service import KPIService
+from analytics.services.report_service import ReportService
+from analytics.tasks import snapshot_kpis_daily_task
 from clubs.models import Club
 from competitions.constants import CompetitionStatus
 from competitions.models import Competition, CompetitionRegistration, Match, MatchEvent
@@ -347,3 +352,194 @@ class DashboardAnalyticsApiTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertFalse(response.data["success"])
         self.assertEqual(response.data["message"], "You do not belong to this organization.")
+
+
+@override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
+class SpecializedDashboardApiTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="admin@bolayetu.com",
+            password="SecurePass123!",
+            status=AccountStatus.ACTIVE,
+            is_email_verified=True,
+        )
+        self.tenant_a = Tenant.objects.create(
+            name="FAF",
+            slug="faf",
+            subdomain="faf",
+            status=Tenant.TenantStatus.ACTIVE,
+            is_public=True,
+        )
+        TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant_a,
+            role=MembershipRole.ADMIN,
+            is_active=True,
+        )
+        self.club = Club.objects.create(name="Petro de Luanda", tenant=self.tenant_a, short_name="APL")
+        self.competition = Competition.objects.create(
+            name="Girabola 2026",
+            tenant=self.tenant_a,
+            season="2026/27",
+            status=CompetitionStatus.ACTIVE,
+        )
+
+    def test_organization_dashboard_success(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(reverse("dashboard-organization"), HTTP_HOST="faf.bolayetu.com")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("kpis", response.data)
+
+    def test_club_dashboard_success(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            reverse("dashboard-club", kwargs={"club_id": self.club.id}),
+            HTTP_HOST="faf.bolayetu.com",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_competition_dashboard_success(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            reverse("dashboard-competition", kwargs={"competition_id": self.competition.id}),
+            HTTP_HOST="faf.bolayetu.com",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+@override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
+class ReportsApiTest(APITestCase):
+    def setUp(self):
+        self.user_a = User.objects.create_user(
+            email="admin_a@bolayetu.com",
+            password="SecurePass123!",
+            status=AccountStatus.ACTIVE,
+            is_email_verified=True,
+        )
+        self.user_b = User.objects.create_user(
+            email="admin_b@bolayetu.com",
+            password="SecurePass123!",
+            status=AccountStatus.ACTIVE,
+            is_email_verified=True,
+        )
+        self.tenant_a = Tenant.objects.create(
+            name="Tenant A",
+            slug="tenant-a",
+            subdomain="tenant-a",
+            status=Tenant.TenantStatus.ACTIVE,
+            is_public=True,
+        )
+        self.tenant_b = Tenant.objects.create(
+            name="Tenant B",
+            slug="tenant-b",
+            subdomain="tenant-b",
+            status=Tenant.TenantStatus.ACTIVE,
+            is_public=True,
+        )
+        TenantMembership.objects.create(
+            user=self.user_a,
+            tenant=self.tenant_a,
+            role=MembershipRole.ADMIN,
+            is_active=True,
+        )
+        TenantMembership.objects.create(
+            user=self.user_b,
+            tenant=self.tenant_b,
+            role=MembershipRole.ADMIN,
+            is_active=True,
+        )
+
+    def test_request_report_generates_completed_report_due_to_eager_celery(self):
+        self.client.force_authenticate(user=self.user_a)
+        payload = {
+            "name": "FAF Organization Report",
+            "report_type": ReportType.ORGANIZATION_PERFORMANCE,
+            "format": ReportFormat.CSV,
+            "filters": {},
+        }
+        response = self.client.post(
+            reverse("report-list-create"),
+            payload,
+            format="json",
+            HTTP_HOST="tenant-a.bolayetu.com",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["name"], payload["name"])
+        self.assertEqual(response.data["status"], ReportStatus.PENDING)
+
+        # Fetch list
+        response_list = self.client.get(
+            reverse("report-list-create"),
+            HTTP_HOST="tenant-a.bolayetu.com",
+        )
+        self.assertEqual(response_list.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response_list.data), 1)
+
+        # Retrieve detail
+        report_id = response.data["id"]
+        response_detail = self.client.get(
+            reverse("report-detail", kwargs={"pk": report_id}),
+            HTTP_HOST="tenant-a.bolayetu.com",
+        )
+        self.assertEqual(response_detail.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_detail.data["status"], ReportStatus.COMPLETED)
+
+        # Delete
+        response_delete = self.client.delete(
+            reverse("report-detail", kwargs={"pk": report_id}),
+            HTTP_HOST="tenant-a.bolayetu.com",
+        )
+        self.assertEqual(response_delete.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(GeneratedReport.objects.filter(id=report_id).exists())
+
+    def test_report_tenant_isolation(self):
+        # Create a report for Tenant A
+        report = ReportService.request_report(
+            tenant=self.tenant_a,
+            name="Report A",
+            report_type=ReportType.ORGANIZATION_PERFORMANCE,
+            format=ReportFormat.CSV,
+            filters={},
+            created_by=self.user_a,
+        )
+
+        # Attempt to access using Tenant B user
+        self.client.force_authenticate(user=self.user_b)
+        response_detail = self.client.get(
+            reverse("report-detail", kwargs={"pk": report.id}),
+            HTTP_HOST="tenant-b.bolayetu.com",
+        )
+        self.assertEqual(response_detail.status_code, status.HTTP_404_NOT_FOUND)
+
+
+@override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
+class KPISnapshotTest(APITestCase):
+    def setUp(self):
+        self.tenant = Tenant.objects.create(
+            name="FAF",
+            slug="faf",
+            subdomain="faf",
+            status=Tenant.TenantStatus.ACTIVE,
+            is_public=True,
+        )
+
+    def test_snapshot_kpis_creation(self):
+        # Snapshot KPIs
+        KPIService.snapshot_all_tenants()
+
+        # Check snapshots exist
+        global_snapshots = KPISnapshot.objects.filter(tenant=None)
+        self.assertTrue(global_snapshots.exists())
+        self.assertEqual(
+            global_snapshots.filter(metric_key=MetricKey.TOTAL_PLAYERS).first().value,
+            0.0,  # No players in test DB setup for this specific class
+        )
+
+        tenant_snapshots = KPISnapshot.objects.filter(tenant=self.tenant)
+        self.assertTrue(tenant_snapshots.exists())
+
+    def test_snapshot_periodic_task(self):
+        # Run daily task
+        res = snapshot_kpis_daily_task.delay()
+        self.assertEqual(res.result["status"], "success")
+        self.assertTrue(KPISnapshot.objects.exists())
