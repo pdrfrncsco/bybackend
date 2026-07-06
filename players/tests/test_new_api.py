@@ -11,7 +11,8 @@ from datetime import date, timedelta
 
 from players.models import Player, PlayerDocument, PlayerVideo, PlayerAchievement
 from clubs.models import Club
-from core.models import Tenant, TenantMembership
+from core.models import Tenant
+from accounts.models import TenantMembership
 
 
 class PlayerDocumentAPITestCase(TestCase):
@@ -147,10 +148,10 @@ class PlayerVideoAPITestCase(TestCase):
         response = self.client.get(f"/api/v1/players/{self.player.slug}/videos/")
         self.assertEqual(response.status_code, 200)
         
-        # Only published video should be returned
-        # Note: This depends on pagination - may need to adjust
         data = response.json()
-        self.assertIn("results", data)
+        results = data.get("data", {}).get("results", data.get("results", []))
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]["title"], "Published Video")
 
 
 class PlayerAchievementAPITestCase(TestCase):

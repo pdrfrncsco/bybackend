@@ -385,9 +385,24 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 
-# ─────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────
+# CELERY BEAT — Periodic Tasks
+# ───────────────────────────────────────────────────────────────────
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Snapshot KPIs for all tenants every day at midnight (Africa/Luanda)
+    "analytics.snapshot_kpis_daily": {
+        "task": "analytics.snapshot_kpis_daily_task",
+        "schedule": crontab(hour=0, minute=0),
+        "options": {"expires": 3600},
+    },
+}
+
+# ───────────────────────────────────────────────────────────────────
 # EMAIL
-# ─────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────
 
 # In development: print emails to the console.
 # In production:  use SMTP or a provider like SendGrid / Mailgun.
@@ -456,6 +471,11 @@ LOGGING = {
             "propagate": False,
         },
         "media_assets": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "analytics": {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,

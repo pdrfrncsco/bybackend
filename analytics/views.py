@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 
 from accounts.permissions import IsActiveAccount
 from accounts.selectors import TenantMembershipSelector
-from analytics.selectors import DashboardAnalyticsSelector
+from analytics.selectors import DashboardAnalyticsSelector, ComparativeAnalyticsSelector
 from analytics.serializers import (
     DashboardFilterSerializer,
     DashboardOverviewSerializer,
@@ -335,3 +335,104 @@ class GeneratedReportDetailView(APIView):
 
         report.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReportDownloadView(APIView):
+    """Redirect to the signed CDN URL for a generated report file."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, CanManageReports]
+
+    @extend_schema(
+        tags=["analytics"],
+        summary="Get download URL for a generated report",
+        responses={200: None},
+    )
+    def get(self, request, pk):
+        from django.http import JsonResponse
+
+        tenant = getattr(request, "tenant", None)
+        if tenant is None:
+            tenant = OrganizationSelector.get_for_user(user=request.user)
+
+        queryset = GeneratedReport.objects.select_related("file").all()
+        if tenant:
+            queryset = queryset.filter(tenant=tenant)
+
+        report = queryset.filter(id=pk).first()
+        if report is None:
+            return error_response(message="Report not found.", status_code=404)
+
+        if report.file is None:
+            return error_response(message="Report file not yet available.", status_code=404)
+
+        from media_assets.storage import get_storage_provider
+        provider = get_storage_provider()
+        
+        # If object_key is not set (e.g. mock asset), fallback to public_url
+        if report.file.object_key:
+            download_url = provider.generate_signed_url(
+                object_key=report.file.object_key,
+                expires_in=3600,
+            )
+        else:
+            download_url = report.file.public_url
+
+        return Response({"download_url": download_url, "filename": report.file.original_filename})
+
+
+class ComparativeAnalyticsView(APIView):
+    """Period-over-period KPI comparison."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, CanViewTenantAnalytics]
+
+    @extend_schema(
+        tags=["analytics"],
+        summary="Compare KPIs across two consecutive periods",
+        parameters=[
+            OpenApiParameter(
+                "period",
+                OpenApiTypes.STR,
+                OpenApiParameter.QUERY,
+                required=False,
+                enum=["7d", "30d", "90d", "365d"],
+                description="Window size. Current period is [today-N, today]; previous is [today-2N, today-N-1].",
+            ),
+            OpenApiParameter("competition_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("club_id", OpenApiTypes.UUID, OpenApiParameter.QUERY, required=False),
+        ],
+        responses={200: None},
+    )
+    def get(self, request):
+        tenant = getattr(request, "tenant", None)
+        if tenant is None:
+            tenant = OrganizationSelector.get_for_user(user=request.user)
+
+        period = request.query_params.get("period", "30d")
+
+        competition = None
+        competition_id = request.query_params.get("competition_id")
+        if competition_id:
+            qs = Competition.objects.all()
+            if tenant:
+                qs = qs.filter(tenant=tenant)
+            competition = qs.filter(id=competition_id).first()
+            if competition is None:
+                return error_response(message="Competition not found.", status_code=404)
+
+        club = None
+        club_id = request.query_params.get("club_id")
+        if club_id:
+            qs = Club.objects.all()
+            if tenant:
+                qs = qs.filter(tenant=tenant)
+            club = qs.filter(id=club_id).first()
+            if club is None:
+                return error_response(message="Club not found.", status_code=404)
+
+        payload = ComparativeAnalyticsSelector.compare(
+            tenant=tenant,
+            competition=competition,
+            club=club,
+            period=period,
+        )
+        return Response(payload)

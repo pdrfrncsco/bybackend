@@ -406,6 +406,17 @@ class SpecializedDashboardApiTest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_comparative_analytics_success(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(
+            reverse("analytics-compare"),
+            {"period": "30d"},
+            HTTP_HOST="faf.bolayetu.com",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("comparison", response.data)
+
+
 
 @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
 class ReportsApiTest(APITestCase):
@@ -510,6 +521,45 @@ class ReportsApiTest(APITestCase):
             HTTP_HOST="tenant-b.bolayetu.com",
         )
         self.assertEqual(response_detail.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_report_download_success(self):
+        from media_assets.models import MediaAsset
+        from media_assets.constants import AssetCategory, AssetStatus, AssetType
+        self.client.force_authenticate(user=self.user_a)
+
+        # Create asset
+        asset = MediaAsset.objects.create(
+            name="Report Test",
+            tenant=self.tenant_a,
+            original_filename="report_test.csv",
+            extension="csv",
+            size_bytes=123,
+            mime_type="text/csv",
+            asset_type=AssetType.DOCUMENT,
+            category=AssetCategory.DOCUMENT,
+            uploaded_by=self.user_a,
+            status=AssetStatus.READY,
+        )
+
+        # Create report
+        report = GeneratedReport.objects.create(
+            tenant=self.tenant_a,
+            name="Download Report",
+            report_type=ReportType.ORGANIZATION_PERFORMANCE,
+            format=ReportFormat.CSV,
+            status=ReportStatus.COMPLETED,
+            file=asset,
+            created_by=self.user_a,
+        )
+
+        response = self.client.get(
+            reverse("report-download", kwargs={"pk": report.id}),
+            HTTP_HOST="tenant-a.bolayetu.com",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("download_url", response.data)
+        self.assertEqual(response.data["filename"], "report_test.csv")
+
 
 
 @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])

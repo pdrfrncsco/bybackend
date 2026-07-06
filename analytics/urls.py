@@ -8,6 +8,8 @@ from analytics.views import (
     CompetitionDashboardView,
     GeneratedReportListCreateView,
     GeneratedReportDetailView,
+    ReportDownloadView,
+    ComparativeAnalyticsView,
 )
 
 urlpatterns = [
@@ -16,6 +18,8 @@ urlpatterns = [
     path("dashboard/organization/", OrganizationDashboardView.as_view(), name="dashboard-organization"),
     path("dashboard/club/<uuid:club_id>/", ClubDashboardView.as_view(), name="dashboard-club"),
     path("dashboard/competition/<uuid:competition_id>/", CompetitionDashboardView.as_view(), name="dashboard-competition"),
+    path("compare/", ComparativeAnalyticsView.as_view(), name="analytics-compare"),
     path("reports/", GeneratedReportListCreateView.as_view(), name="report-list-create"),
     path("reports/<uuid:pk>/", GeneratedReportDetailView.as_view(), name="report-detail"),
+    path("reports/<uuid:pk>/download/", ReportDownloadView.as_view(), name="report-download"),
 ]
