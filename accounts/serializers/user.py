@@ -77,6 +77,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 class TenantMembershipSerializer(serializers.ModelSerializer):
     """Read-only serializer for tenant membership data."""
 
+    user = UserMinimalSerializer(read_only=True)
     tenant_name = serializers.CharField(source="tenant.name", read_only=True)
     tenant_slug = serializers.CharField(source="tenant.slug", read_only=True)
 
@@ -84,6 +85,7 @@ class TenantMembershipSerializer(serializers.ModelSerializer):
         model = TenantMembership
         fields = [
             "id",
+            "user",
             "tenant",
             "tenant_name",
             "tenant_slug",

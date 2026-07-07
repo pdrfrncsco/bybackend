@@ -166,6 +166,7 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
     Serializer for public organization listing.
 
     Used for: GET /api/v1/organizations/public/
+             GET /api/v1/organizations/public/:slug/
     """
 
     logo_url = serializers.SerializerMethodField()
@@ -174,6 +175,7 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
     verified = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
     active_subscribers = serializers.SerializerMethodField()
+    is_subscribed = serializers.SerializerMethodField()
 
     class Meta:
         model = Tenant
@@ -198,6 +200,7 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
             "is_verified",
             "verified",
             "active_subscribers",
+            "is_subscribed",
             "created_at",
         ]
         read_only_fields = fields
@@ -251,6 +254,14 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
         if hasattr(obj, "_subscriber_count"):
             return obj._subscriber_count
         return obj.subscriptions.filter(is_active=True).count()
+
+    def get_is_subscribed(self, obj: Tenant) -> bool:
+        """Return True if the current request user is an active subscriber."""
+        request = self.context.get("request")
+        if request is None or not request.user.is_authenticated:
+            return False
+        from organizations.selectors import OrganizationSelector
+        return OrganizationSelector.is_subscribed(user=request.user, tenant=obj)
 
 
 class OrganizationKpisSerializer(serializers.Serializer):
