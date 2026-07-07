@@ -15,22 +15,23 @@ import logging
 from django.db import transaction
 
 from accounts.models import User
-from core.models import Tenant
-from clubs.constants import ClubStatus, ClubMemberRole
+from clubs.constants import ClubMemberRole, ClubStatus
 from clubs.exceptions import (
-    ClubNotFound,
-    DuplicateClubName,
-    ClubSuspended,
-    NotClubAdmin,
-    NoClubMembership,
-    InvalidLogoFile,
     ClubMemberNotFound,
-    DuplicateJerseyNumber,
+    ClubNotFound,
+    ClubSuspended,
     DuplicateClubMember,
+    DuplicateClubName,
+    DuplicateJerseyNumber,
+    InvalidLogoFile,
+    NoClubMembership,
+    NotClubAdmin,
 )
 from clubs.models import Club, ClubMember
 from clubs.selectors import ClubSelector
 from clubs.validators import validate_logo_file
+from core.events import EventType
+from core.models import Tenant
 
 logger = logging.getLogger(__name__)
 
@@ -91,10 +92,20 @@ class ClubService:
         Only non-None values are updated.
         """
         updatable_fields = [
-            "name", "short_name", "primary_color", "secondary_color",
-            "founded_year", "stadium_name", "stadium_capacity",
-            "country", "city", "email", "phone", "website",
-            "description", "is_public",
+            "name",
+            "short_name",
+            "primary_color",
+            "secondary_color",
+            "founded_year",
+            "stadium_name",
+            "stadium_capacity",
+            "country",
+            "city",
+            "email",
+            "phone",
+            "website",
+            "description",
+            "is_public",
         ]
 
         updated_fields = ["updated_at"]
@@ -116,15 +127,14 @@ class ClubService:
         Upload a logo for a club using the DAM (Digital Asset Management) system.
 
         Creates a MediaAsset record and links it to the Club via MediaUsage.
-        Also updates the legacy `club.logo` ImageField for backwards compatibility.
         """
         from media_assets.constants import AssetCategory, OwnerType
-        from media_assets.services import MediaAssetService
         from media_assets.exceptions import (
             InvalidMediaFile,
             MediaAssetTooLarge,
             UnsupportedMediaType,
         )
+        from media_assets.services import MediaAssetService
 
         try:
             asset = MediaAssetService.upload_for_owner(
@@ -140,18 +150,8 @@ class ClubService:
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise InvalidLogoFile(detail=str(exc.detail)) from exc
 
-        # Keep the legacy ImageField populated for backwards compatibility
-        # TODO: Phase 2 — remove legacy ImageField from Club once all consumers use DAM
-        import os as _os
-        ext = _os.path.splitext(file.name)[1] if file.name else ".jpg"
-        filename = f"{club.slug}{ext}"
-        file.seek(0)
-        club.logo.save(filename, file, save=False)
-        club.save(update_fields=["logo", "updated_at"])
-
         logger.info("Logo uploaded via DAM for club: %s (asset=%s)", club.name, asset.id)
         return club
-
 
     @staticmethod
     @transaction.atomic
@@ -159,6 +159,8 @@ class ClubService:
         """Activate a club."""
         club.status = ClubStatus.ACTIVE
         club.save(update_fields=["status", "updated_at"])
+
+        ClubService._publish_club_event(club=club, event_type=EventType.CLUB_APPROVED)
 
         logger.info("Club activated: %s", club.name)
         return club
@@ -170,8 +172,30 @@ class ClubService:
         club.status = ClubStatus.SUSPENDED
         club.save(update_fields=["status", "updated_at"])
 
+        ClubService._publish_club_event(club=club, event_type=EventType.CLUB_SUSPENDED)
+
         logger.info("Club suspended: %s", club.name)
         return club
+
+    @staticmethod
+    def _publish_club_event(*, club: Club, event_type: str) -> None:
+        """Publish a club lifecycle domain event (dispatched after commit).
+
+        Best-effort: publishing failures are logged and never block the
+        underlying business operation (status change is already saved).
+        """
+        from core.events import Event, publish_event
+
+        try:
+            evt = Event(
+                type=event_type,
+                payload={"club_id": str(club.id), "club_name": club.name},
+                origin="clubs.service",
+                tenant_id=str(club.tenant_id) if club.tenant_id else None,
+            )
+            publish_event(evt)
+        except Exception:
+            logger.exception("Failed to publish %s event for club %s", event_type, club.id)
 
     @staticmethod
     @transaction.atomic
@@ -194,9 +218,7 @@ class ClubService:
         """
         # Check for existing membership
         if user is not None:
-            existing = ClubMember.objects.filter(
-                club=club, user=user, is_active=True
-            ).first()
+            existing = ClubMember.objects.filter(club=club, user=user, is_active=True).first()
             if existing:
                 raise DuplicateClubMember()
 
@@ -232,17 +254,26 @@ class ClubService:
     ) -> ClubMember:
         """Update a club member's information."""
         updatable_fields = [
-            "full_name", "role", "jersey_number", "position",
-            "is_active", "joined_at", "left_at",
+            "full_name",
+            "role",
+            "jersey_number",
+            "position",
+            "is_active",
+            "joined_at",
+            "left_at",
         ]
 
         # Check jersey number conflict if being updated
         if "jersey_number" in kwargs and kwargs["jersey_number"] is not None:
-            conflict = ClubMember.objects.filter(
-                club=member.club,
-                jersey_number=kwargs["jersey_number"],
-                is_active=True,
-            ).exclude(pk=member.pk).exists()
+            conflict = (
+                ClubMember.objects.filter(
+                    club=member.club,
+                    jersey_number=kwargs["jersey_number"],
+                    is_active=True,
+                )
+                .exclude(pk=member.pk)
+                .exists()
+            )
             if conflict:
                 raise DuplicateJerseyNumber()
 
@@ -285,8 +316,7 @@ class ClubService:
         """
         # Try club admin roles first
         member = (
-            ClubMember.objects
-            .filter(
+            ClubMember.objects.filter(
                 user=user,
                 is_active=True,
                 role__in=ClubMemberRole.ADMIN_ROLES,
@@ -303,8 +333,7 @@ class ClubService:
         from accounts.models import TenantMembership
 
         tenant_admin = (
-            TenantMembership.objects
-            .filter(
+            TenantMembership.objects.filter(
                 user=user,
                 is_active=True,
                 role__in=MembershipRole.ADMIN_ROLES,
@@ -314,11 +343,7 @@ class ClubService:
         )
 
         if tenant_admin:
-            club = (
-                Club.objects
-                .filter(tenant=tenant_admin.tenant, status=ClubStatus.ACTIVE)
-                .first()
-            )
+            club = Club.objects.filter(tenant=tenant_admin.tenant, status=ClubStatus.ACTIVE).first()
             if club:
                 return club
 

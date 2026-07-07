@@ -24,6 +24,7 @@ import uuid
 from django.conf import settings
 from django.db import transaction
 
+from core.events import Event, EventType, publish_event
 from media_assets.constants import (
     AssetCategory,
     AssetStatus,
@@ -201,28 +202,32 @@ class MediaAssetService:
 
         logger.info(
             "Asset uploaded: %s (owner=%s/%s, role=%s)",
-            asset.id, owner_type, owner_id, role,
+            asset.id,
+            owner_type,
+            owner_id,
+            role,
         )
 
-        # 7. Queue thumbnail generation (async)
-        MediaAssetService._queue_thumbnail_task(asset_id=str(asset.id))
+        # Publish domain event (will be dispatched after DB commit)
+        try:
+            evt = Event(
+                type=EventType.ASSET_UPLOADED,
+                payload={
+                    "asset_id": str(asset.id),
+                    "owner_type": owner_type,
+                    "owner_id": str(owner_id),
+                    "role": role,
+                    "cdn_url": cdn_url,
+                },
+                origin="media_assets.service",
+                tenant_id=(getattr(tenant, "id", None) if tenant else None),
+                user_id=(getattr(uploaded_by, "id", None) if uploaded_by else None),
+            )
+            publish_event(evt)
+        except Exception:
+            logger.exception("Failed to publish AssetUploaded event for asset %s", asset.id)
 
         return asset
-
-    @staticmethod
-    def _queue_thumbnail_task(*, asset_id: str) -> None:
-        """
-        Enqueue the Celery thumbnail generation task.
-        Fails silently if Celery is not available (dev environment).
-        """
-        try:
-            from media_assets.tasks import generate_thumbnails
-            generate_thumbnails.delay(asset_id)
-        except Exception:
-            logger.debug(
-                "Thumbnail task not queued (Celery may not be running): asset=%s",
-                asset_id,
-            )
 
     @staticmethod
     def get_asset(*, asset_id: str) -> MediaAsset:
@@ -266,6 +271,7 @@ class MediaAssetService:
         # Queue physical deletion
         try:
             from media_assets.tasks import delete_asset_from_storage
+
             delete_asset_from_storage.delay(asset_id, asset.object_key)
         except Exception:
             logger.debug("Physical deletion task not queued: asset=%s", asset_id)

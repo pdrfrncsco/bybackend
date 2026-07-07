@@ -44,3 +44,4 @@ python-json-logger
 
 # Background Tasks & Celery
 celery
+django-celery-beat==2.9.0

@@ -18,7 +18,7 @@ from django.db.models import QuerySet, Count, Q
 
 from accounts.models import User
 from clubs.constants import ClubStatus, ClubMemberRole
-from clubs.models import Club, ClubMember
+from clubs.models import Club, ClubMember, ClubDocument, ClubSponsor
 
 logger = logging.getLogger(__name__)
 
@@ -86,13 +86,18 @@ class ClubSelector:
     @staticmethod
     def get_squad(*, club: Club) -> QuerySet:
         """
-        Return all active players for a club, ordered by jersey number.
+        Return all active players for a club, ordered by shirt number.
+        
+        NOTE: This method now uses PlayerRegistration instead of ClubMember.
+        ClubMember with role="player" is deprecated - use PlayerRegistration instead.
         """
+        from players.models import PlayerRegistration
+        
         return (
-            ClubMember.objects
-            .filter(club=club, is_active=True, role=ClubMemberRole.PLAYER)
-            .select_related("user")
-            .order_by("jersey_number")
+            PlayerRegistration.objects
+            .filter(club=club, status__in=["registered", "loaned"])
+            .select_related("player")
+            .order_by("shirt_number")
         )
 
     @staticmethod
@@ -161,25 +166,81 @@ class ClubSelector:
     def get_kpis(*, club: Club) -> dict:
         """
         Retrieve KPI statistics for a club.
-
-        Returns placeholder data for matches/competitions — will be
-        populated when the competitions module is implemented.
         """
         squad_count = ClubSelector.get_squad(club=club).count()
         staff_count = ClubSelector.get_staff(club=club).count()
 
+        from competitions.constants import CompetitionStatus
+        from competitions.models import Competition, Match
+
+        club_matches = (
+            Match.objects.filter(tenant=club.tenant)
+            .filter(Q(home_club=club) | Q(away_club=club))
+            .select_related("competition", "home_club", "away_club")
+        )
+
+        finished_matches = club_matches.filter(status=Match.MatchStatus.FINISHED)
+        total_matches = club_matches.count()
+        wins = draws = losses = 0
+        goals_for = goals_against = 0
+        clean_sheets = 0
+
+        for match in finished_matches:
+            if match.home_club_id == club.id:
+                club_goals = match.home_score or 0
+                opponent_goals = match.away_score or 0
+            else:
+                club_goals = match.away_score or 0
+                opponent_goals = match.home_score or 0
+
+            goals_for += club_goals
+            goals_against += opponent_goals
+
+            if club_goals > opponent_goals:
+                wins += 1
+            elif club_goals == opponent_goals:
+                draws += 1
+            else:
+                losses += 1
+
+            if opponent_goals == 0:
+                clean_sheets += 1
+
+        active_competitions = (
+            Competition.objects.filter(tenant=club.tenant, status=CompetitionStatus.ACTIVE)
+            .filter(Q(matches__home_club=club) | Q(matches__away_club=club) | Q(standings__club=club))
+            .distinct()
+            .count()
+        )
+
         return {
             "squad_size": squad_count,
             "staff_count": staff_count,
-            "total_matches": 0,
-            "wins": 0,
-            "draws": 0,
-            "losses": 0,
-            "goals_for": 0,
-            "goals_against": 0,
-            "clean_sheets": 0,
-            "active_competitions": 0,
+            "total_matches": total_matches,
+            "wins": wins,
+            "draws": draws,
+            "losses": losses,
+            "goals_for": goals_for,
+            "goals_against": goals_against,
+            "clean_sheets": clean_sheets,
+            "active_competitions": active_competitions,
         }
+
+    @staticmethod
+    def get_documents(*, club: Club) -> QuerySet:
+        return ClubDocument.objects.filter(club=club).select_related("asset", "uploaded_by")
+
+    @staticmethod
+    def get_public_documents(*, club: Club) -> QuerySet:
+        return ClubDocument.objects.filter(club=club, is_public=True).select_related("asset")
+
+    @staticmethod
+    def get_sponsors(*, club: Club) -> QuerySet:
+        return ClubSponsor.objects.filter(club=club).select_related("logo_asset", "uploaded_by")
+
+    @staticmethod
+    def get_public_sponsors(*, club: Club) -> QuerySet:
+        return ClubSponsor.objects.filter(club=club, is_active=True).select_related("logo_asset")
 
     @staticmethod
     def count_for_tenant(*, tenant_id: uuid.UUID) -> int:

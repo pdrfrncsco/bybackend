@@ -9,7 +9,7 @@ No business logic lives here.
 from rest_framework import serializers
 
 from core.models import Tenant
-from organizations.constants import OrganizationType, OrganizationStatus
+from organizations.constants import OrganizationStatus, OrganizationType
 
 
 class OrganizationSerializer(serializers.ModelSerializer):
@@ -20,6 +20,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
     """
 
     logo_url = serializers.SerializerMethodField()
+    banner_url = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     verified = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
@@ -33,9 +34,7 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "slug",
             "type",
             "type_label",
-            "logo",
             "logo_url",
-            "banner",
             "banner_url",
             "primary_color",
             "secondary_color",
@@ -58,29 +57,51 @@ class OrganizationSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = [
-            "id", "slug", "logo_url", "banner_url", "location", "verified",
-            "type_label", "status_label", "created_at", "updated_at",
+            "id",
+            "slug",
+            "logo_url",
+            "banner_url",
+            "location",
+            "verified",
+            "type_label",
+            "status_label",
+            "created_at",
+            "updated_at",
         ]
 
     def get_logo_url(self, obj: Tenant) -> str:
-        """Return the full logo URL or empty string."""
+        """Return the DAM logo URL for this organization, if any."""
         try:
-            # If ImageField/FieldFile is used, .url provides the public URL
-            if getattr(obj, "logo"):
-                return obj.logo.url
+            from media_assets.constants import AssetCategory, OwnerType
+            from media_assets.services import MediaAssetService
+
+            return (
+                MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.ORGANIZATION,
+                    owner_id=obj.id,
+                    role=AssetCategory.LOGO,
+                )
+                or ""
+            )
         except Exception:
-            pass
-        # Fallback to attribute (string) or empty
-        return getattr(obj, "logo", "") or ""
+            return ""
 
     def get_banner_url(self, obj: Tenant) -> str:
-        """Return the full banner URL or empty string."""
+        """Return the DAM banner URL for this organization, if any."""
         try:
-            if getattr(obj, "banner"):
-                return obj.banner.url
+            from media_assets.constants import AssetCategory, OwnerType
+            from media_assets.services import MediaAssetService
+
+            return (
+                MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.ORGANIZATION,
+                    owner_id=obj.id,
+                    role=AssetCategory.BANNER,
+                )
+                or ""
+            )
         except Exception:
-            pass
-        return getattr(obj, "banner", "") or ""
+            return ""
 
     def get_location(self, obj: Tenant) -> str:
         """Return a combined location string."""
@@ -128,6 +149,18 @@ class OrganizationUpdateSerializer(serializers.ModelSerializer):
         ]
 
 
+class OrganizationLogoUploadSerializer(serializers.Serializer):
+    """Serializer describing the multipart payload for organization logo uploads."""
+
+    logo = serializers.ImageField(help_text="Image file (JPEG, PNG, WebP or SVG, max 5MB).")
+
+
+class OrganizationBannerUploadSerializer(serializers.Serializer):
+    """Serializer describing the multipart payload for organization banner uploads."""
+
+    banner = serializers.ImageField(help_text="Image file (JPEG, PNG, WebP or SVG, max 5MB).")
+
+
 class PublicOrganizationSerializer(serializers.ModelSerializer):
     """
     Serializer for public organization listing.
@@ -136,6 +169,7 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
     """
 
     logo_url = serializers.SerializerMethodField()
+    banner_url = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     verified = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
@@ -149,8 +183,8 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
             "slug",
             "type",
             "type_label",
-            "logo",
             "logo_url",
+            "banner_url",
             "primary_color",
             "secondary_color",
             "country",
@@ -169,20 +203,38 @@ class PublicOrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_logo_url(self, obj: Tenant) -> str:
+        """Return the DAM logo URL. No legacy field fallback for public data."""
         try:
-            if getattr(obj, "logo"):
-                return obj.logo.url
+            from media_assets.constants import AssetCategory, OwnerType
+            from media_assets.services import MediaAssetService
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=obj.id,
+                role=AssetCategory.LOGO,
+            )
+            if url:
+                return url
         except Exception:
             pass
-        return getattr(obj, "logo", "") or ""
+        return ""
 
     def get_banner_url(self, obj: Tenant) -> str:
+        """Return the DAM banner URL. No legacy field fallback for public data."""
         try:
-            if getattr(obj, "banner"):
-                return obj.banner.url
+            from media_assets.constants import AssetCategory, OwnerType
+            from media_assets.services import MediaAssetService
+
+            url = MediaAssetService.get_usage_url(
+                owner_type=OwnerType.ORGANIZATION,
+                owner_id=obj.id,
+                role=AssetCategory.BANNER,
+            )
+            if url:
+                return url
         except Exception:
             pass
-        return getattr(obj, "banner", "") or ""
+        return ""
 
     def get_location(self, obj: Tenant) -> str:
         parts = [p for p in [obj.city, obj.country] if p]

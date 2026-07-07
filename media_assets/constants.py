@@ -60,6 +60,7 @@ class OwnerType(models.TextChoices):
     ORGANIZATION = "organization", "Organização"
     CLUB = "club", "Clube"
     COMPETITION = "competition", "Competição"
+    COMPETITION_REGULATION = "competition_regulation", "Regulamento de Competição"
     MATCH = "match", "Jogo"
     NEWS = "news", "Notícia"
     PLAYER = "player", "Jogador"
@@ -82,6 +83,8 @@ ALLOWED_DOCUMENT_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.ms-excel",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/csv",
+    "text/plain",
 }
 
 ALLOWED_VIDEO_TYPES = {

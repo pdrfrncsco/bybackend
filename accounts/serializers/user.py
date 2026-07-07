@@ -7,7 +7,7 @@ These serializers are used for GET responses — never for mutations.
 
 from rest_framework import serializers
 
-from accounts.models import User, TenantMembership
+from accounts.models import TenantMembership, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -92,3 +92,13 @@ class TenantMembershipSerializer(serializers.ModelSerializer):
             "joined_at",
         ]
         read_only_fields = fields
+
+
+class TenantMembershipCreateSerializer(serializers.Serializer):
+    """Input serializer for inviting/adding a member to an organization."""
+
+    email = serializers.EmailField()
+    role = serializers.ChoiceField(
+        choices=TenantMembership._meta.get_field("role").choices,
+        required=False,
+    )

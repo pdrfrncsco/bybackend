@@ -1,0 +1,36 @@
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["."]
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "*/migrations/*",
+    "staticfiles",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "I001", "F401", "W291", "W292", "W293", "E402", "F541"]
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*" = ["E501", "F401", "E", "F", "W"]
+"config/settings.py" = ["E501"]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "manage.py",
+    "config/wsgi.py",
+    "config/celery.py",
+    "*/admin.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 45

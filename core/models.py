@@ -66,23 +66,8 @@ class Tenant(BaseModel):
         help_text="e.g. 'faf' for faf.bolayetu.com",
     )
 
-    # Branding
-    logo = models.ImageField(
-        upload_to="logos/",
-        max_length=500,
-        null=True,
-        blank=True,
-        verbose_name="Logo",
-        help_text="Organization logo file (stored in configured DEFAULT_FILE_STORAGE).",
-    )
-    banner = models.ImageField(
-        upload_to="banners/",
-        max_length=500,
-        null=True,
-        blank=True,
-        verbose_name="Banner",
-        help_text="Organization banner file (stored in configured DEFAULT_FILE_STORAGE).",
-    )
+    # Branding: logo/banner are served exclusively via MediaAsset/MediaUsage
+    # (owner_type=organization, role=logo/banner). See 08A_DIGITAL_ASSET_MANAGEMENT.md.
     primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
     secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")
 

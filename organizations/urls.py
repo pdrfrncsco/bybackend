@@ -22,6 +22,9 @@ from organizations.views import (
     OrganizationUnsubscribeView,
     OrganizationMembersView,
     OrganizationMemberDetailView,
+    OrganizationClubRequestCreateView,
+    OrganizationClubRequestsView,
+    OrganizationClubRequestReviewView,
 )
 
 urlpatterns = [
@@ -41,8 +44,13 @@ urlpatterns = [
     path("public/<slug:slug>/history/", OrganizationHistoryView.as_view(), name="organization-history"),
     path("public/<slug:slug>/tournaments/", OrganizationTournamentsView.as_view(), name="organization-tournaments"),
     path("public/<slug:slug>/clubs/", OrganizationClubsView.as_view(), name="organization-clubs"),
+    path("public/<slug:slug>/club-requests/", OrganizationClubRequestCreateView.as_view(), name="organization-club-request-create"),
 
     # Authenticated — Subscriptions
     path("public/<slug:slug>/subscribe/", OrganizationSubscribeView.as_view(), name="organization-subscribe"),
     path("public/<slug:slug>/unsubscribe/", OrganizationUnsubscribeView.as_view(), name="organization-unsubscribe"),
+
+    # Authenticated — Club request management
+    path("me/club-requests/", OrganizationClubRequestsView.as_view(), name="organization-club-requests"),
+    path("me/club-requests/<uuid:request_id>/", OrganizationClubRequestReviewView.as_view(), name="organization-club-request-review"),
 ]

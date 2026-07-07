@@ -140,7 +140,7 @@ class MediaAsset(BaseModel):
 
     # ─── Ownership ───────────────────────────────────────────────────────
     owner_type = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=OwnerType.choices,
         default=OwnerType.ORGANIZATION,
         verbose_name="Owner Type",

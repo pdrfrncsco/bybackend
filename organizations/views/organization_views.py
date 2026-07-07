@@ -26,36 +26,38 @@ Endpoints:
 
 import logging
 
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from django.db import IntegrityError
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.views import APIView
 
+# Additional imports for member management
+from accounts.models import TenantMembership, User
 from accounts.permissions import IsActiveAccount
-from common.responses import success_response, created_response, error_response
+from accounts.serializers.user import TenantMembershipCreateSerializer, TenantMembershipSerializer
+from common.responses import created_response, error_response, success_response
 from core.models import Tenant
 from organizations.exceptions import (
-    OrganizationNotFound,
     NoOrganizationMembership,
     NotOrganizationAdmin,
+    OrganizationNotFound,
 )
 from organizations.permissions import (
     IsOrganizationAdmin,
 )
 from organizations.selectors import OrganizationSelector
-from organizations.services import OrganizationService
 from organizations.serializers import (
+    OnboardingStatusSerializer,
+    OrganizationBannerUploadSerializer,
+    OrganizationHistoryEntrySerializer,
+    OrganizationKpisSerializer,
+    OrganizationLogoUploadSerializer,
     OrganizationSerializer,
     OrganizationUpdateSerializer,
     PublicOrganizationSerializer,
-    OrganizationKpisSerializer,
-    OrganizationHistoryEntrySerializer,
     SubscriptionResponseSerializer,
-    OnboardingStatusSerializer,
 )
-# Additional imports for member management
-from accounts.models import TenantMembership, User
-from accounts.serializers.user import TenantMembershipSerializer
-from django.db import IntegrityError
+from organizations.services import OrganizationService
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +120,7 @@ class OrganizationLogoView(APIView):
 
     @extend_schema(
         tags=["organizations"],
-        request={"multipart/form-data": None},
+        request=OrganizationLogoUploadSerializer,
         responses={200: OrganizationSerializer},
     )
     def post(self, request):
@@ -148,7 +150,7 @@ class OrganizationBannerView(APIView):
 
     @extend_schema(
         tags=["organizations"],
-        request={"multipart/form-data": None},
+        request=OrganizationBannerUploadSerializer,
         responses={200: OrganizationSerializer},
     )
     def post(self, request):
@@ -185,7 +187,9 @@ class OrganizationMembersView(APIView):
         serializer = TenantMembershipSerializer(memberships, many=True)
         return success_response(data=serializer.data, message="Members retrieved successfully.")
 
-    @extend_schema(tags=["organizations"], request={"application/json": None}, responses={201: TenantMembershipSerializer})
+    @extend_schema(
+        tags=["organizations"], request=TenantMembershipCreateSerializer, responses={201: TenantMembershipSerializer}
+    )
     def post(self, request):
         tenant = OrganizationService.get_organization_for_user(user=request.user)
         OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
@@ -323,9 +327,7 @@ class OrganizationOnboardingStatusView(APIView):
             is_admin = False
 
         competitions = CompetitionSelector.list_for_tenant(tenant=tenant)
-        onboarding_required = (
-            tenant.status == Tenant.TenantStatus.PENDING and is_admin
-        )
+        onboarding_required = tenant.status == Tenant.TenantStatus.PENDING and is_admin
 
         return success_response(
             data={
@@ -363,6 +365,7 @@ class OrganizationPublicListView(APIView):
 
         # Annotate with subscriber count to avoid N+1
         from django.db.models import Count, Q
+
         queryset = queryset.annotate(
             _subscriber_count=Count(
                 "subscriptions",
@@ -372,6 +375,7 @@ class OrganizationPublicListView(APIView):
 
         # Use standard pagination envelope
         from common.pagination import StandardPagination
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request)
         serializer = PublicOrganizationSerializer(page, many=True)

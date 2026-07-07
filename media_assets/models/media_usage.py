@@ -46,7 +46,7 @@ class MediaUsage(BaseModel):
 
     # Generic relation — identifies the owning entity
     owner_type = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=OwnerType.choices,
         verbose_name="Owner Type",
         db_index=True,

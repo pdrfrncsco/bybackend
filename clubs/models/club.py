@@ -50,21 +50,10 @@ class Club(BaseModel):
         verbose_name="Organization",
     )
 
-    # Branding
-    logo = models.ImageField(
-        upload_to="club-logos/",
-        max_length=500,
-        null=True,
-        blank=True,
-        verbose_name="Logo",
-        help_text="Club logo file (stored in configured DEFAULT_FILE_STORAGE).",
-    )
-    primary_color = models.CharField(
-        max_length=7, default="#014D40", verbose_name="Primary Color"
-    )
-    secondary_color = models.CharField(
-        max_length=7, default="#94D3C1", verbose_name="Secondary Color"
-    )
+    # Branding: logo is served exclusively via MediaAsset/MediaUsage
+    # (owner_type=club, role=logo). See 08A_DIGITAL_ASSET_MANAGEMENT.md.
+    primary_color = models.CharField(max_length=7, default="#014D40", verbose_name="Primary Color")
+    secondary_color = models.CharField(max_length=7, default="#94D3C1", verbose_name="Secondary Color")
 
     # Foundation
     founded_year = models.PositiveIntegerField(

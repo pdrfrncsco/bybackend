@@ -7,10 +7,13 @@ Environment variables are loaded from .env in development.
 All secrets must be provided via environment variables in production.
 """
 
-import os
 import logging.config
-from pathlib import Path
+import os
+import sys
 from datetime import timedelta
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
 
 # ─────────────────────────────────────────────────────────────────────
 # PATHS
@@ -28,10 +31,11 @@ SECRET_KEY = os.environ.get(
 )
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in ("true", "1", "yes")
+TESTING = "test" in sys.argv
 
 ALLOWED_HOSTS = os.environ.get(
     "DJANGO_ALLOWED_HOSTS",
-    "localhost,127.0.0.1",
+    "localhost,127.0.0.1,testserver",
 ).split(",")
 
 # ─────────────────────────────────────────────────────────────────────
@@ -45,7 +49,6 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
@@ -54,19 +57,25 @@ INSTALLED_APPS = [
     "corsheaders",
     "drf_spectacular",
     "django_celery_beat",
-
     # Bolayetu — Infrastructure
     "common",
     "core",
-
+    # Bolayetu — Global Domain (Phase 2)
+    "players",
     # Bolayetu — Domains (Phase 1)
     "accounts",
     # Bolayetu — Domains (Phase 2)
     "organizations",
     "clubs",
     "competitions",
+    # Bolayetu — Analytics (Phase 4)
+    "analytics",
+    # Bolayetu — Transfers (Phase 7)
+    "transfers",
     # Bolayetu — DAM (Phase 1 — Digital Asset Management)
     "media_assets",
+    # Bolayetu — Notifications & Subscriptions (Phase 5)
+    "notifications",
 ]
 
 # ─────────────────────────────────────────────────────────────────────
@@ -117,15 +126,18 @@ DATABASES = {
     }
 }
 
-# Use PostgreSQL in production
-if not DEBUG:
+# Use PostgreSQL when explicitly configured or in production.
+_db_engine = os.environ.get("DB_ENGINE", "").strip().lower()
+_sqlite_engines = {"sqlite", "sqlite3", "django.db.backends.sqlite3"}
+_postgres_engines = {"postgres", "postgresql", "django.db.backends.postgresql"}
+if _db_engine in _postgres_engines or (not DEBUG and _db_engine not in _sqlite_engines):
     DATABASES["default"] = {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "bolayetu"),
-        "USER": os.environ.get("DB_USER", "postgres"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", ""),
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+        "NAME": os.environ.get("DB_NAME", os.environ.get("POSTGRES_DB", "bolayetu")),
+        "USER": os.environ.get("DB_USER", os.environ.get("POSTGRES_USER", "postgres")),
+        "PASSWORD": os.environ.get("DB_PASSWORD", os.environ.get("POSTGRES_PASSWORD", "")),
+        "HOST": os.environ.get("DB_HOST", os.environ.get("POSTGRES_HOST", "localhost")),
+        "PORT": os.environ.get("DB_PORT", os.environ.get("POSTGRES_PORT", "5432")),
         "OPTIONS": {
             "connect_timeout": 10,
         },
@@ -206,21 +218,15 @@ REST_FRAMEWORK = {
 
 # Browsable API only in DEBUG mode
 if DEBUG:
-    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append(
-        "rest_framework.renderers.BrowsableAPIRenderer"
-    )
+    REST_FRAMEWORK["DEFAULT_RENDERER_CLASSES"].append("rest_framework.renderers.BrowsableAPIRenderer")
 
 # ─────────────────────────────────────────────────────────────────────
 # JWT
 # ─────────────────────────────────────────────────────────────────────
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=int(os.environ.get("JWT_ACCESS_LIFETIME_MINUTES", "60"))
-    ),
-    "REFRESH_TOKEN_LIFETIME": timedelta(
-        days=int(os.environ.get("JWT_REFRESH_LIFETIME_DAYS", "7"))
-    ),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=int(os.environ.get("JWT_ACCESS_LIFETIME_MINUTES", "60"))),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=int(os.environ.get("JWT_REFRESH_LIFETIME_DAYS", "7"))),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,
@@ -264,7 +270,10 @@ SPECTACULAR_SETTINGS = {
         {"name": "organizations", "description": "Organization management"},
         {"name": "clubs", "description": "Gestão de clubes"},
         {"name": "competitions", "description": "Competições e calendário"},
+        {"name": "analytics", "description": "Dashboards e métricas agregadas do ecossistema"},
         {"name": "media", "description": "Digital Asset Management — upload e gestão de ficheiros"},
+        {"name": "players", "description": "Jogadores — entidade global (perfil, carreira, registos de clube)"},
+        {"name": "transfers", "description": "Transferências de jogadores entre clubes"},
     ],
 }
 
@@ -276,13 +285,36 @@ SPECTACULAR_SETTINGS = {
 
 USE_CLOUDFLARE_R2 = os.environ.get("USE_CLOUDFLARE_R2", "False").lower() in ("true", "1", "yes")
 CLOUDFLARE_R2_ENDPOINT = os.environ.get("CLOUDFLARE_R2_ENDPOINT", "")
-CLOUDFLARE_R2_ACCESS_KEY_ID = os.environ.get("CLOUDFLARE_R2_ACCESS_KEY_ID", "")
-CLOUDFLARE_R2_SECRET_ACCESS_KEY = os.environ.get("CLOUDFLARE_R2_SECRET_ACCESS_KEY", "")
+CLOUDFLARE_R2_ACCESS_KEY_ID = os.environ.get(
+    "CLOUDFLARE_R2_ACCESS_KEY_ID",
+    os.environ.get("CLOUDFLARE_R2_ACCESS_KEY", ""),
+)
+CLOUDFLARE_R2_SECRET_ACCESS_KEY = os.environ.get(
+    "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+    os.environ.get("CLOUDFLARE_R2_SECRET_KEY", ""),
+)
 CLOUDFLARE_R2_BUCKET = os.environ.get("CLOUDFLARE_R2_BUCKET", "bolayetu-storage")
 CLOUDFLARE_R2_REGION = os.environ.get("CLOUDFLARE_R2_REGION", "auto")
-CLOUDFLARE_R2_CDN_URL = os.environ.get("CLOUDFLARE_R2_CDN_URL", "")  # e.g. https://cdn.bolayetu.com
+CLOUDFLARE_R2_CDN_URL = os.environ.get(
+    "CLOUDFLARE_R2_CDN_URL",
+    os.environ.get("CLOUDFLARE_CDN_DOMAIN", ""),
+).rstrip("/")  # e.g. https://cdn.bolayetu.com
 
 if USE_CLOUDFLARE_R2:
+    _missing_r2 = [
+        name
+        for name, value in {
+            "CLOUDFLARE_R2_ENDPOINT": CLOUDFLARE_R2_ENDPOINT,
+            "CLOUDFLARE_R2_ACCESS_KEY_ID": CLOUDFLARE_R2_ACCESS_KEY_ID,
+            "CLOUDFLARE_R2_SECRET_ACCESS_KEY": CLOUDFLARE_R2_SECRET_ACCESS_KEY,
+            "CLOUDFLARE_R2_BUCKET": CLOUDFLARE_R2_BUCKET,
+            "CLOUDFLARE_R2_CDN_URL": CLOUDFLARE_R2_CDN_URL,
+        }.items()
+        if not value
+    ]
+    if _missing_r2:
+        raise ImproperlyConfigured("USE_CLOUDFLARE_R2=True requires: " + ", ".join(_missing_r2))
+
     # Also configure Django's default file storage for backwards-compat
     # (used by legacy ImageFields on Tenant and Club — will be migrated in Phase 1)
     DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
@@ -327,8 +359,25 @@ if not DEBUG:
 # CELERY
 # ─────────────────────────────────────────────────────────────────────
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+if TESTING:
+    # Tests must never depend on a real broker/result backend. This is
+    # enforced unconditionally (not overridable via env vars) so a stray
+    # CI/dev environment variable can't reintroduce a Redis dependency and
+    # cause slow/flaky tests (see docs/AUDITORIA_CONFORMIDADE_BACKEND_2026-07-04.md).
+    CELERY_BROKER_URL = "memory://"
+    CELERY_RESULT_BACKEND = "cache+memory://"
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+else:
+    CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")
+    CELERY_TASK_ALWAYS_EAGER = os.environ.get("CELERY_TASK_ALWAYS_EAGER", "False").lower() in ("true", "1", "yes")
+    CELERY_TASK_EAGER_PROPAGATES = os.environ.get("CELERY_TASK_EAGER_PROPAGATES", "False").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
@@ -336,9 +385,24 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60  # 30 minutes
 
-# ─────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────
+# CELERY BEAT — Periodic Tasks
+# ───────────────────────────────────────────────────────────────────
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    # Snapshot KPIs for all tenants every day at midnight (Africa/Luanda)
+    "analytics.snapshot_kpis_daily": {
+        "task": "analytics.snapshot_kpis_daily_task",
+        "schedule": crontab(hour=0, minute=0),
+        "options": {"expires": 3600},
+    },
+}
+
+# ───────────────────────────────────────────────────────────────────
 # EMAIL
-# ─────────────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────────
 
 # In development: print emails to the console.
 # In production:  use SMTP or a provider like SendGrid / Mailgun.
@@ -407,6 +471,11 @@ LOGGING = {
             "propagate": False,
         },
         "media_assets": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "analytics": {
             "handlers": ["console"],
             "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,

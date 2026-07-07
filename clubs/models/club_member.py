@@ -1,12 +1,16 @@
 """
 BOLAYETU — ClubMember Model
 
-Represents a member of a football club (player, coach, staff, etc.).
+Represents a member of a football club (coach, staff, etc.).
 
 A ClubMember links a User to a Club with a specific role.
 This is different from TenantMembership:
     - TenantMembership: User is a STAFF MEMBER of the organization.
-    - ClubMember: User is a PLAYER/COACH/STAFF of a specific club.
+    - ClubMember: User is a COACH/STAFF of a specific club.
+
+IMPORTANT: ClubMember with role="player" is DEPRECATED.
+Players should now be managed via PlayerRegistration (players app).
+See: 06A_GLOBAL_AND_TENANT_DOMAIN.md
 
 Architecture:
     - ClubMember is TENANT-SCOPED through the Club's tenant.
