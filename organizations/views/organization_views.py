@@ -378,7 +378,7 @@ class OrganizationPublicListView(APIView):
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request)
-        serializer = PublicOrganizationSerializer(page, many=True)
+        serializer = PublicOrganizationSerializer(page, many=True, context={"request": request})
         return paginator.get_paginated_response(serializer.data)
 
 
@@ -399,7 +399,7 @@ class OrganizationPublicDetailView(APIView):
         if tenant is None:
             raise OrganizationNotFound()
 
-        serializer = PublicOrganizationSerializer(tenant)
+        serializer = PublicOrganizationSerializer(tenant, context={"request": request})
         return success_response(
             data=serializer.data,
             message="Organization retrieved successfully.",
