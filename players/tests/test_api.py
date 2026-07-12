@@ -237,3 +237,69 @@ class PlayerSearchViewTestCase(TestCase):
         
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data['data']), 0)
+
+
+class PlayerRegisterViewTestCase(TestCase):
+    """Test POST /api/v1/players/{slug}/register/"""
+
+    def setUp(self):
+        from accounts.models import TenantMembership
+
+        self.client = APIClient()
+        self.tenant = Tenant.objects.create(name="Test Org", slug="test-org")
+        self.club = Club.objects.create(name="Test Club", slug="test-club", tenant=self.tenant)
+        self.player = Player.objects.create(
+            first_name="John",
+            last_name="Doe",
+            slug="john-doe",
+            date_of_birth=date(2000, 1, 15),
+            nationality="PT",
+            primary_position="st",
+            status="active",
+        )
+        self.org_member = User.objects.create_user(
+            email="manager@test.com",
+            password="testpass123",
+            first_name="Club",
+            last_name="Manager",
+        )
+        TenantMembership.objects.create(
+            user=self.org_member,
+            tenant=self.tenant,
+            role="admin",
+            is_active=True,
+        )
+
+    def test_tenant_member_can_register_player(self):
+        self.client.force_authenticate(user=self.org_member)
+        response = self.client.post(
+            f"/api/v1/players/{self.player.slug}/register/",
+            {
+                "club_id": str(self.club.id),
+                "joined_date": "2026-01-01",
+                "shirt_number": 9,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        payload = response.json()
+        self.assertTrue(payload["success"])
+        self.assertEqual(
+            PlayerRegistration.objects.filter(player=self.player, club=self.club).count(),
+            1,
+        )
+
+    def test_non_member_cannot_register_player(self):
+        outsider = User.objects.create_user(email="outsider@test.com", password="testpass123")
+        self.client.force_authenticate(user=outsider)
+        response = self.client.post(
+            f"/api/v1/players/{self.player.slug}/register/",
+            {
+                "club_id": str(self.club.id),
+                "joined_date": "2026-01-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

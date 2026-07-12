@@ -204,8 +204,7 @@ class PlayerRegisterView(APIView):
     )
     def post(self, request, slug: str):
         from clubs.models import Club
-        from clubs.selectors import ClubSelector
-        from core.models import TenantMembership
+        from accounts.selectors import TenantMembershipSelector
 
         player = PlayerSelector.get_by_slug(slug)
         if not player:
@@ -224,12 +223,10 @@ class PlayerRegisterView(APIView):
         except Club.DoesNotExist:
             return error_response(message="Club not found.", status_code=404)
 
-        # Verify requesting user belongs to the club's tenant
-        is_member = TenantMembership.objects.filter(
+        if not TenantMembershipSelector.user_belongs_to_tenant(
             user=request.user,
-            tenant=club.tenant,
-        ).exists()
-        if not is_member:
+            tenant_id=club.tenant_id,
+        ):
             return error_response(
                 message="You do not belong to this club's organization.",
                 status_code=403,
