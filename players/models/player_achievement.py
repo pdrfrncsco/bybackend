@@ -131,6 +131,24 @@ class PlayerAchievement(BaseModel):
     )
 
     # Media
+    trophy_asset = models.ForeignKey(
+        "media_assets.MediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="player_achievement_trophies",
+        verbose_name="Trophy Asset",
+        help_text="Uploaded trophy image via DAM",
+    )
+    certificate_asset = models.ForeignKey(
+        "media_assets.MediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="player_achievement_certificates",
+        verbose_name="Certificate Asset",
+        help_text="Uploaded certificate via DAM",
+    )
     trophy_image = models.URLField(
         max_length=500,
         null=True,
