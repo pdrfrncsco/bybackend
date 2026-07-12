@@ -81,39 +81,48 @@ class PlayerDocumentSerializer(serializers.ModelSerializer):
         return None
 
 
-class PlayerDocumentCreateSerializer(serializers.ModelSerializer):
+class PlayerDocumentCreateSerializer(serializers.Serializer):
     """
     Serializer for uploading a new player document.
-    
-    Used for: POST /api/v1/players/{slug}/documents/
+
+    Accepts either a file upload (`document`) or a pre-existing DAM asset UUID (`asset`).
     """
-    
-    class Meta:
-        model = PlayerDocument
-        fields = [
-            "title",
-            "category",
-            "description",
-            "asset",
-            "valid_from",
-            "valid_until",
-            "club",
-            "is_private",
-        ]
-    
-    def validate_asset(self, value):
-        """Validate that the asset exists and is a document type."""
-        if not value:
-            raise serializers.ValidationError("Asset is required.")
-        
-        # Check if asset is a document type (not image/video)
-        from media_assets.constants import AssetType
-        if value.asset_type not in [AssetType.DOCUMENT, AssetType.PDF]:
-            raise serializers.ValidationError(
-                "Asset must be a document or PDF type."
-            )
-        
-        return value
+
+    title = serializers.CharField(max_length=255)
+    category = serializers.ChoiceField(choices=PlayerDocument.DocumentCategory.choices)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    document = serializers.FileField(required=False)
+    asset = serializers.UUIDField(required=False)
+    valid_from = serializers.DateField(required=False, allow_null=True)
+    valid_until = serializers.DateField(required=False, allow_null=True)
+    club = serializers.UUIDField(required=False, allow_null=True)
+    is_private = serializers.BooleanField(required=False, default=False)
+
+    def validate(self, data):
+        document = data.get("document")
+        asset_id = data.get("asset")
+
+        if not document and not asset_id:
+            raise serializers.ValidationError("Either document file or asset UUID is required.")
+
+        if document and asset_id:
+            raise serializers.ValidationError("Provide either document file or asset UUID, not both.")
+
+        if asset_id:
+            from media_assets.constants import AssetType
+            from media_assets.models import MediaAsset
+
+            try:
+                asset = MediaAsset.objects.get(id=asset_id)
+            except MediaAsset.DoesNotExist as exc:
+                raise serializers.ValidationError({"asset": "Asset not found."}) from exc
+
+            if asset.asset_type not in [AssetType.DOCUMENT, AssetType.PDF]:
+                raise serializers.ValidationError({"asset": "Asset must be a document or PDF type."})
+
+            data["asset_instance"] = asset
+
+        return data
 
 
 class PlayerDocumentUpdateSerializer(serializers.ModelSerializer):

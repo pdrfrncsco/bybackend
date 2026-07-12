@@ -5,21 +5,21 @@ API endpoints for player videos.
 
 Endpoints:
     GET    /api/v1/players/{slug}/videos/           — List player videos
-    POST   /api/v1/players/{slug}/videos/           — Upload a video (staff only)
+    POST   /api/v1/players/{slug}/videos/           — Upload a video
     GET    /api/v1/players/{slug}/videos/{id}/      — Get video detail
-    PATCH  /api/v1/players/{slug}/videos/{id}/      — Update video (staff only)
-    DELETE /api/v1/players/{slug}/videos/{id}/      — Delete video (staff only)
-    POST   /api/v1/players/{slug}/videos/{id}/publish/ — Publish video (staff only)
+    PATCH  /api/v1/players/{slug}/videos/{id}/      — Update video
+    DELETE /api/v1/players/{slug}/videos/{id}/      — Delete video
+    POST   /api/v1/players/{slug}/videos/{id}/publish/ — Publish video
 """
 
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.views import APIView
 
-from common.responses import success_response, error_response
+from common.responses import error_response, success_response
 from common.pagination import StandardPagination
-from players.models import Player, PlayerVideo
+from competitions.models import Match
+from players.models import PlayerVideo
 from players.selectors import PlayerSelector
 from players.serializers.player_video import (
     PlayerVideoSerializer,
@@ -27,16 +27,27 @@ from players.serializers.player_video import (
     PlayerVideoUpdateSerializer,
     PlayerVideoPublishSerializer,
 )
-from players.permissions import IsStaffOrReadOnly
+from players.services.player_video_service import PlayerVideoService
+from players.views.player_media_helpers import (
+    player_can_view_all_content,
+    player_read_permissions,
+    player_write_permission,
+    player_write_permissions,
+)
 
 
 class PlayerVideoListView(APIView):
     """
     GET:  List videos for a player.
-    POST: Upload a new video (staff only).
+    POST: Upload a new video via DAM or external URL.
     """
 
-    permission_classes = [IsStaffOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return player_read_permissions()
+        return player_write_permissions()
 
     @extend_schema(
         tags=["players"],
@@ -48,8 +59,7 @@ class PlayerVideoListView(APIView):
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
-        # Public users only see published videos
-        if request.user.is_authenticated and request.user.is_staff:
+        if player_can_view_all_content(request, player):
             videos = player.videos.all()
         else:
             videos = player.videos.filter(status=PlayerVideo.VideoStatus.PUBLISHED)
@@ -63,7 +73,7 @@ class PlayerVideoListView(APIView):
 
     @extend_schema(
         tags=["players"],
-        summary="Upload a player video (staff only)",
+        summary="Upload a player video",
         request=PlayerVideoCreateSerializer,
         responses={201: PlayerVideoSerializer},
     )
@@ -71,6 +81,10 @@ class PlayerVideoListView(APIView):
         player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
+
+        permission_error = player_write_permission(request, player)
+        if permission_error:
+            return permission_error
 
         serializer = PlayerVideoCreateSerializer(data=request.data)
         if not serializer.is_valid():
@@ -80,11 +94,43 @@ class PlayerVideoListView(APIView):
                 status_code=400,
             )
 
-        video = PlayerVideo.objects.create(
-            player=player,
-            status=PlayerVideo.VideoStatus.DRAFT,
-            **serializer.validated_data,
-        )
+        validated = serializer.validated_data
+        match = None
+        match_id = validated.get("match")
+        if match_id:
+            match = Match.objects.filter(id=match_id).first()
+            if not match:
+                return error_response(message="Match not found.", status_code=400)
+
+        try:
+            if validated.get("video"):
+                video = PlayerVideoService.upload_video(
+                    player=player,
+                    title=validated["title"],
+                    video_type=validated["video_type"],
+                    video_file=validated["video"],
+                    description=validated.get("description", ""),
+                    thumbnail_url=validated.get("thumbnail_url", ""),
+                    match=match,
+                    is_featured=validated.get("is_featured", False),
+                    order=validated.get("order"),
+                    uploaded_by=request.user,
+                )
+            else:
+                video = PlayerVideoService.create_from_fields(
+                    player=player,
+                    title=validated["title"],
+                    video_type=validated["video_type"],
+                    video_url=validated.get("video_url"),
+                    media_asset=validated.get("media_asset_instance"),
+                    description=validated.get("description", ""),
+                    thumbnail_url=validated.get("thumbnail_url", ""),
+                    match=match,
+                    is_featured=validated.get("is_featured", False),
+                    order=validated.get("order"),
+                )
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=400)
 
         result = PlayerVideoSerializer(video)
         return success_response(
@@ -97,11 +143,16 @@ class PlayerVideoListView(APIView):
 class PlayerVideoDetailView(APIView):
     """
     GET:   Get video details.
-    PATCH: Update video (staff only).
-    DELETE: Delete video (staff only).
+    PATCH: Update video.
+    DELETE: Delete video.
     """
 
-    permission_classes = [IsStaffOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return player_read_permissions()
+        return player_write_permissions()
 
     @extend_schema(
         tags=["players"],
@@ -118,10 +169,7 @@ class PlayerVideoDetailView(APIView):
         except PlayerVideo.DoesNotExist:
             return error_response(message="Video not found.", status_code=404)
 
-        # Check visibility permissions
-        if video.status != PlayerVideo.VideoStatus.PUBLISHED and not (
-            request.user.is_authenticated and request.user.is_staff
-        ):
+        if video.status != PlayerVideo.VideoStatus.PUBLISHED and not player_can_view_all_content(request, player):
             return error_response(message="Video not found.", status_code=404)
 
         serializer = PlayerVideoSerializer(video)
@@ -129,7 +177,7 @@ class PlayerVideoDetailView(APIView):
 
     @extend_schema(
         tags=["players"],
-        summary="Update player video (staff only)",
+        summary="Update player video",
         request=PlayerVideoUpdateSerializer,
         responses={200: PlayerVideoSerializer},
     )
@@ -137,6 +185,10 @@ class PlayerVideoDetailView(APIView):
         player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
+
+        permission_error = player_write_permission(request, player)
+        if permission_error:
+            return permission_error
 
         try:
             video = player.videos.get(id=video_id)
@@ -159,7 +211,7 @@ class PlayerVideoDetailView(APIView):
 
     @extend_schema(
         tags=["players"],
-        summary="Delete player video (staff only)",
+        summary="Delete player video",
         responses={204: None},
     )
     def delete(self, request, slug: str, video_id: str):
@@ -167,25 +219,30 @@ class PlayerVideoDetailView(APIView):
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
+        permission_error = player_write_permission(request, player)
+        if permission_error:
+            return permission_error
+
         try:
             video = player.videos.get(id=video_id)
         except PlayerVideo.DoesNotExist:
             return error_response(message="Video not found.", status_code=404)
 
-        video.delete()
+        PlayerVideoService.remove_video(video=video)
         return success_response(message="Video deleted successfully.")
 
 
 class PlayerVideoPublishView(APIView):
     """
-    POST: Publish a video (staff only).
+    POST: Publish a video.
     """
 
-    permission_classes = [IsStaffOrReadOnly]
+    def get_permissions(self):
+        return player_write_permissions()
 
     @extend_schema(
         tags=["players"],
-        summary="Publish player video (staff only)",
+        summary="Publish player video",
         request=PlayerVideoPublishSerializer,
         responses={200: PlayerVideoSerializer},
     )
@@ -193,6 +250,10 @@ class PlayerVideoPublishView(APIView):
         player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
+
+        permission_error = player_write_permission(request, player)
+        if permission_error:
+            return permission_error
 
         try:
             video = player.videos.get(id=video_id)

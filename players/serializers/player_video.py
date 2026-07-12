@@ -71,37 +71,55 @@ class PlayerVideoSerializer(serializers.ModelSerializer):
         return None
 
 
-class PlayerVideoCreateSerializer(serializers.ModelSerializer):
+class PlayerVideoCreateSerializer(serializers.Serializer):
     """
     Serializer for uploading a new player video.
-    
-    Used for: POST /api/v1/players/{slug}/videos/
+
+    Accepts an external URL, a file upload (`video`), or a pre-existing DAM asset UUID.
     """
-    
-    class Meta:
-        model = PlayerVideo
-        fields = [
-            "title",
-            "description",
-            "video_type",
-            "video_url",
-            "thumbnail_url",
-            "media_asset",
-            "match",
-            "is_featured",
-            "order",
-        ]
-    
+
+    title = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    video_type = serializers.ChoiceField(choices=PlayerVideo.VideoType.choices)
+    video_url = serializers.URLField(required=False, allow_blank=True, default="")
+    thumbnail_url = serializers.URLField(required=False, allow_blank=True, default="")
+    video = serializers.FileField(required=False)
+    media_asset = serializers.UUIDField(required=False)
+    match = serializers.UUIDField(required=False, allow_null=True)
+    is_featured = serializers.BooleanField(required=False, default=False)
+    order = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+
     def validate(self, data):
-        """Validate that either video_url or media_asset is provided."""
-        video_url = data.get("video_url")
-        media_asset = data.get("media_asset")
-        
-        if not video_url and not media_asset:
+        video_url = (data.get("video_url") or "").strip()
+        video_file = data.get("video")
+        media_asset_id = data.get("media_asset")
+
+        if not video_url and not video_file and not media_asset_id:
             raise serializers.ValidationError(
-                "Either video_url or media_asset must be provided."
+                "Either video_url, video file, or media_asset UUID must be provided."
             )
-        
+
+        provided_sources = sum(bool(value) for value in (video_url, video_file, media_asset_id))
+        if provided_sources > 1:
+            raise serializers.ValidationError(
+                "Provide only one source: video_url, video file, or media_asset UUID."
+            )
+
+        if media_asset_id:
+            from media_assets.constants import AssetType
+            from media_assets.models import MediaAsset
+
+            try:
+                asset = MediaAsset.objects.get(id=media_asset_id)
+            except MediaAsset.DoesNotExist as exc:
+                raise serializers.ValidationError({"media_asset": "Asset not found."}) from exc
+
+            if asset.asset_type != AssetType.VIDEO:
+                raise serializers.ValidationError({"media_asset": "Asset must be a video type."})
+
+            data["media_asset_instance"] = asset
+
+        data["video_url"] = video_url or None
         return data
 
 
