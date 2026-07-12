@@ -7,6 +7,7 @@ from django.contrib import admin
 from players.models import (
     Player,
     PlayerRegistration,
+    PlayerRegistrationRequest,
     PlayerVideo,
     PlayerDocument,
     PlayerAchievement,
@@ -227,6 +228,15 @@ class PlayerRegistrationAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+
+@admin.register(PlayerRegistrationRequest)
+class PlayerRegistrationRequestAdmin(admin.ModelAdmin):
+    list_display = ("player", "club", "status", "joined_date", "submitted_by", "created_at")
+    list_filter = ("status", "created_at")
+    search_fields = ("player__first_name", "player__last_name", "club__name")
+    readonly_fields = ("id", "created_at", "updated_at", "reviewed_at")
+    raw_id_fields = ("player", "club", "tenant", "competition", "submitted_by", "reviewed_by", "registration")
 
 
 @admin.register(PlayerVideo)

@@ -26,6 +26,8 @@ from clubs.views import (
     ClubSponsorsView,
     ClubSponsorDetailView,
     ClubPublicSponsorsView,
+    ClubMePlayerRegistrationRequestsView,
+    ClubMePlayerRegistrationRequestReviewView,
     TransferViewSet,
 )
 
@@ -36,6 +38,12 @@ urlpatterns = router.urls + [
     # Authenticated — Club Management
     path("me/", ClubMeView.as_view(), name="club-me"),
     path("me/logo/", ClubLogoView.as_view(), name="club-logo"),
+    path("me/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-player-registration-requests"),
+    path(
+        "me/player-registration-requests/<uuid:request_id>/",
+        ClubMePlayerRegistrationRequestReviewView.as_view(),
+        name="club-player-registration-request-review",
+    ),
     path("", ClubCreateView.as_view(), name="club-create"),
 
     # Authenticated — Club Status Management

@@ -42,6 +42,7 @@ from players.views import (
     PlayerRegisterView,
 )
 from players.views.player_me_views import PlayerAvatarView, PlayerMeView
+from players.views.player_registration_request_views import PlayerMeRegistrationRequestListCreateView
 from players.views.player_document_views import (
     PlayerDocumentListView,
     PlayerDocumentDetailView,
@@ -64,6 +65,7 @@ urlpatterns = [
     path("search/", PlayerSearchView.as_view(), name="player-search"),
     path("me/", PlayerMeView.as_view(), name="player-me"),
     path("me/avatar/", PlayerAvatarView.as_view(), name="player-me-avatar"),
+    path("me/registration-requests/", PlayerMeRegistrationRequestListCreateView.as_view(), name="player-me-registration-requests"),
     path("<slug:slug>/", PlayerDetailUpdateView.as_view(), name="player-detail-update"),
     path("<slug:slug>/avatar/", PlayerAvatarView.as_view(), name="player-avatar"),
     path("<slug:slug>/register/", PlayerRegisterView.as_view(), name="player-register"),
