@@ -57,6 +57,16 @@ class PlayerSelector:
             status="active"
         )
 
+    @staticmethod
+    def get_for_user(user) -> Optional[Player]:
+        """Get the player profile linked to an authenticated user."""
+        if not user or not getattr(user, "is_authenticated", False):
+            return None
+        try:
+            return user.player_profile
+        except Player.DoesNotExist:
+            return None
+
 
 class PlayerRegistrationSelector:
     """Read-only queries for PlayerRegistration data."""

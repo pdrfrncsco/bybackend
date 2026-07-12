@@ -41,6 +41,7 @@ from players.views import (
     PlayerSearchView,
     PlayerRegisterView,
 )
+from players.views.player_me_views import PlayerAvatarView, PlayerMeView
 from players.views.player_document_views import (
     PlayerDocumentListView,
     PlayerDocumentDetailView,
@@ -61,7 +62,10 @@ urlpatterns = [
     # Player CRUD
     path("", PlayerListCreateView.as_view(), name="player-list-create"),
     path("search/", PlayerSearchView.as_view(), name="player-search"),
+    path("me/", PlayerMeView.as_view(), name="player-me"),
+    path("me/avatar/", PlayerAvatarView.as_view(), name="player-me-avatar"),
     path("<slug:slug>/", PlayerDetailUpdateView.as_view(), name="player-detail-update"),
+    path("<slug:slug>/avatar/", PlayerAvatarView.as_view(), name="player-avatar"),
     path("<slug:slug>/register/", PlayerRegisterView.as_view(), name="player-register"),
     
     # Player Documents

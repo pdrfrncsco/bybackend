@@ -31,6 +31,11 @@ class PlayerNotFound(Exception):
     pass
 
 
+class NoPlayerProfile(Exception):
+    """Raised when the authenticated user has no linked player profile."""
+    pass
+
+
 class PlayerRegistrationConflict(Exception):
     """Raised when an active registration already exists for the same player+club+competition."""
     pass
@@ -122,6 +127,47 @@ class PlayerService:
             player.save(update_fields=updated)
             logger.info("Player updated: %s — fields: %s", player.full_name, updated)
 
+        return player
+
+    @staticmethod
+    def get_player_for_user(user) -> Player:
+        """Return the player profile linked to the authenticated user."""
+        from players.selectors import PlayerSelector
+
+        player = PlayerSelector.get_for_user(user)
+        if not player:
+            raise NoPlayerProfile("No player profile linked to this account.")
+        return player
+
+    @staticmethod
+    @transaction.atomic
+    def upload_avatar(*, player: Player, file, uploaded_by=None) -> Player:
+        """Upload a player avatar via the DAM and persist the public URL on the profile."""
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.exceptions import (
+            InvalidMediaFile,
+            MediaAssetTooLarge,
+            UnsupportedMediaType,
+        )
+        from media_assets.services import MediaAssetService
+
+        try:
+            asset = MediaAssetService.upload_for_owner(
+                file=file,
+                owner_type=OwnerType.PLAYER,
+                owner_id=player.id,
+                role=AssetCategory.AVATAR,
+                name=f"{player.full_name} Avatar",
+                tenant=None,
+                uploaded_by=uploaded_by,
+                images_only=True,
+            )
+        except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
+            raise ValueError(str(exc.detail if hasattr(exc, "detail") else exc)) from exc
+
+        player.avatar = asset.public_url
+        player.save(update_fields=["avatar", "updated_at"])
+        logger.info("Avatar uploaded via DAM for player: %s (asset=%s)", player.full_name, asset.id)
         return player
 
     @staticmethod

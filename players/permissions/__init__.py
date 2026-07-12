@@ -35,3 +35,24 @@ class CanManagePlayerRegistrations(IsAuthenticated):
     """
 
     message = "You must be a member of this organization to manage player registrations."
+
+
+class CanManagePlayerProfile(BasePermission):
+    """
+    Staff can manage any player profile.
+    Authenticated users can manage their own linked player profile.
+    """
+
+    message = "You do not have permission to manage this player profile."
+
+    def has_permission(self, request, view) -> bool:
+        return bool(request.user and request.user.is_authenticated)
+
+    @staticmethod
+    def can_manage(*, user, player: "Player") -> bool:
+        if user.is_staff:
+            return True
+        from players.selectors import PlayerSelector
+
+        linked = PlayerSelector.get_for_user(user)
+        return linked is not None and linked.id == player.id

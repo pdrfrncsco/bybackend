@@ -28,7 +28,7 @@ from common.pagination import StandardPagination
 from players.models import Player, PlayerRegistration
 from players.selectors import PlayerSelector, PlayerRegistrationSelector
 from players.serializers import PlayerSerializer, PlayerDetailSerializer, PlayerRegistrationSerializer
-from players.services import PlayerService, PlayerRegistrationService, PlayerNotFound, PlayerRegistrationConflict
+from players.services import NoPlayerProfile, PlayerNotFound, PlayerRegistrationService, PlayerService, PlayerRegistrationConflict
 from players.permissions import IsStaffOrReadOnly, CanManagePlayerRegistrations
 
 
