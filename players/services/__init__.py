@@ -68,6 +68,7 @@ class PlayerService:
         foot: Optional[str] = None,
         bio: Optional[str] = None,
         avatar: Optional[str] = None,
+        is_public: bool = True,
         user_id=None,
     ) -> Player:
         """
@@ -98,6 +99,7 @@ class PlayerService:
             foot=foot or None,
             bio=bio or None,
             avatar=avatar or None,
+            is_public=is_public,
             user_id=user_id,
         )
 
@@ -115,7 +117,7 @@ class PlayerService:
         allowed_fields = {
             "first_name", "last_name", "date_of_birth", "nationality",
             "primary_position", "email", "phone", "height_cm", "weight_kg",
-            "foot", "bio", "avatar", "status",
+            "foot", "bio", "avatar", "status", "is_public",
         }
         updated = []
         for field, value in kwargs.items():

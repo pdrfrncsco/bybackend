@@ -29,6 +29,7 @@ class UserSerializer(serializers.ModelSerializer):
             "last_name",
             "full_name",
             "phone",
+            "profile_type",
             "status",
             "is_email_verified",
             "language",

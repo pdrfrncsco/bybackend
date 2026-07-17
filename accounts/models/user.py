@@ -22,7 +22,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from accounts.constants import AccountStatus, LanguageCode, TimezoneDefault
+from accounts.constants import AccountStatus, LanguageCode, ProfileType, TimezoneDefault
 
 
 class UserManager(BaseUserManager):
@@ -114,6 +114,15 @@ class User(AbstractUser):
         null=True,
         blank=True,
         verbose_name="Phone Number",
+    )
+
+    # Profile type
+    profile_type = models.CharField(
+        max_length=30,
+        choices=ProfileType.CHOICES,
+        default=ProfileType.FAN,
+        verbose_name="Profile Type",
+        help_text="Primary self-service profile for the account.",
     )
 
     # Account status

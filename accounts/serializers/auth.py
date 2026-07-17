@@ -7,7 +7,7 @@ These handle INPUT validation only — no business logic.
 
 from rest_framework import serializers
 
-from accounts.constants import LanguageCode
+from accounts.constants import LanguageCode, ProfileType
 from accounts.validators import validate_password_strength
 from organizations.constants import OrganizationType
 
@@ -32,6 +32,11 @@ class RegisterSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=150, default="", allow_blank=True)
     last_name = serializers.CharField(max_length=150, default="", allow_blank=True)
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True, default=None)
+    profile_type = serializers.ChoiceField(
+        choices=ProfileType.CHOICES,
+        required=False,
+        default=ProfileType.FAN,
+    )
 
     def validate_password(self, value: str) -> str:
         """Apply domain password strength rules."""

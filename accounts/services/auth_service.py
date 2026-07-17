@@ -23,7 +23,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from accounts.constants import AccountStatus
+from accounts.constants import AccountStatus, ProfileType
 from accounts.exceptions import (
     AccountNotFound,
     AccountSuspended,
@@ -61,6 +61,7 @@ class AuthService:
         first_name: str = "",
         last_name: str = "",
         phone: str | None = None,
+        profile_type: str = ProfileType.FAN,
     ) -> tuple[User, dict]:
         """
         Register a new user and return JWT tokens.
@@ -72,6 +73,7 @@ class AuthService:
             first_name: Optional first name.
             last_name: Optional last name.
             phone: Optional phone number.
+            profile_type: Primary profile type for the account.
 
         Returns:
             Tuple of (User, tokens_dict) where tokens_dict contains
@@ -93,6 +95,7 @@ class AuthService:
             first_name=first_name,
             last_name=last_name,
             phone=phone,
+            profile_type=profile_type,
             status=AccountStatus.ACTIVE,
             is_email_verified=True,
         )
@@ -136,6 +139,7 @@ class AuthService:
             first_name=first_name,
             last_name=last_name,
             phone=phone,
+            profile_type=ProfileType.ORGANIZATION,
             status=AccountStatus.ACTIVE,
             is_email_verified=True,
         )

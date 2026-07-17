@@ -100,6 +100,7 @@ class Player(BaseModel):
     # Profile
     bio = models.TextField(null=True, blank=True, verbose_name="Biography")
     avatar = models.URLField(max_length=500, null=True, blank=True, verbose_name="Avatar URL")
+    is_public = models.BooleanField(default=True, verbose_name="Is Public")
     
     # Status
     status = models.CharField(

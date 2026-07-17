@@ -28,25 +28,39 @@ class PlayerSelector:
             return Player.objects.get(slug=slug)
         except Player.DoesNotExist:
             return None
+
+    @staticmethod
+    def get_public_by_slug(slug: str) -> Optional[Player]:
+        """Get a public active player by slug."""
+        try:
+            return Player.objects.get(slug=slug, status="active", is_public=True)
+        except Player.DoesNotExist:
+            return None
     
     @staticmethod
     def list_active() -> QuerySet:
         """List all active players."""
-        return Player.objects.filter(status="active").order_by("-updated_at")
+        return Player.objects.filter(status="active", is_public=True).order_by("-updated_at")
+
+    @staticmethod
+    def list_public_active() -> QuerySet:
+        """List all public active players."""
+        return Player.objects.filter(status="active", is_public=True).order_by("-updated_at")
     
     @staticmethod
     def search(query: str) -> QuerySet:
         """Search players by name."""
         return Player.objects.filter(
             Q(first_name__icontains=query) | Q(last_name__icontains=query)
-        ).filter(status="active")
+        ).filter(status="active", is_public=True)
     
     @staticmethod
     def list_by_position(position: str) -> QuerySet:
         """List players by primary position."""
         return Player.objects.filter(
             primary_position=position,
-            status="active"
+            status="active",
+            is_public=True,
         )
     
     @staticmethod
@@ -54,7 +68,8 @@ class PlayerSelector:
         """List players by nationality."""
         return Player.objects.filter(
             nationality=nationality,
-            status="active"
+            status="active",
+            is_public=True,
         )
 
     @staticmethod

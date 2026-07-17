@@ -44,6 +44,7 @@ class RegisterView(APIView):
             first_name=serializer.validated_data.get("first_name", ""),
             last_name=serializer.validated_data.get("last_name", ""),
             phone=serializer.validated_data.get("phone"),
+            profile_type=serializer.validated_data.get("profile_type", "fan"),
         )
 
         return created_response(

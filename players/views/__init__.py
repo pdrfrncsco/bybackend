@@ -58,7 +58,7 @@ class PlayerListCreateView(APIView):
         elif nationality:
             queryset = PlayerSelector.list_by_nationality(nationality)
         else:
-            queryset = PlayerSelector.list_active()
+            queryset = PlayerSelector.list_public_active()
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request)
@@ -121,7 +121,7 @@ class PlayerDetailUpdateView(APIView):
         responses={200: PlayerDetailSerializer},
     )
     def get(self, request, slug: str):
-        player = PlayerSelector.get_by_slug(slug)
+        player = PlayerSelector.get_public_by_slug(slug)
 
         if not player:
             return error_response(
