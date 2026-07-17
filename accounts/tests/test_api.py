@@ -7,7 +7,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import User
-from accounts.constants import AccountStatus
+from accounts.constants import AccountStatus, ProfileType
+from players.selectors import PlayerSelector
 
 
 class AuthAPITest(APITestCase):
@@ -30,6 +31,29 @@ class AuthAPITest(APITestCase):
         self.assertIn("access", response.data["data"])
         self.assertIn("refresh", response.data["data"])
         self.assertEqual(response.data["data"]["user"]["email"], "api_register@bolayetu.com")
+
+    def test_register_api_player_bootstraps_profile(self):
+        """Player registrations create a linked Player profile automatically."""
+        url = reverse("register")
+        data = {
+            "email": "api_player@bolayetu.com",
+            "password": "SecurePassword123!",
+            "password_confirm": "SecurePassword123!",
+            "first_name": "Rita",
+            "last_name": "Silva",
+            "profile_type": ProfileType.PLAYER,
+        }
+        response = self.client.post(url, data, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["data"]["user"]["profile_type"], ProfileType.PLAYER)
+
+        user = User.objects.get(email="api_player@bolayetu.com")
+        player = PlayerSelector.get_for_user(user)
+        self.assertIsNotNone(player)
+        self.assertEqual(player.first_name, "Rita")
+        self.assertFalse(player.is_public)
 
     def test_register_api_password_mismatch(self):
         """POST /api/v1/auth/register/ returns validation error if passwords do not match."""

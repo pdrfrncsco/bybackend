@@ -100,6 +100,18 @@ class AuthService:
             is_email_verified=True,
         )
 
+        if profile_type == ProfileType.PLAYER:
+            from players.services import PlayerService
+
+            PlayerService.create_player(
+                first_name=first_name or user.first_name or "Player",
+                last_name=last_name or user.last_name or "Profile",
+                email=email,
+                phone=phone,
+                user_id=user.id,
+                is_public=False,
+            )
+
         tokens = AuthService._generate_tokens(user=user)
         logger.info("New user registered: %s", email)
         return user, tokens

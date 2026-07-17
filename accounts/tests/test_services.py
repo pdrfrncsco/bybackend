@@ -7,6 +7,7 @@ from django.test import TestCase
 from accounts.services.auth_service import AuthService
 from accounts.services.user_service import UserService
 from accounts.models import User
+from accounts.constants import ProfileType
 from accounts.exceptions import (
     EmailAlreadyRegistered,
     PasswordMismatch,
@@ -14,6 +15,7 @@ from accounts.exceptions import (
     AccountSuspended,
     IncorrectPassword,
 )
+from players.selectors import PlayerSelector
 
 
 class AuthServiceTest(TestCase):
@@ -32,6 +34,24 @@ class AuthServiceTest(TestCase):
         self.assertEqual(user.first_name, "Pedro")
         self.assertIn("access", tokens)
         self.assertIn("refresh", tokens)
+
+    def test_registration_player_bootstraps_player_profile(self):
+        """Player registrations should create a linked Player profile automatically."""
+        user, _ = AuthService.register(
+            email="player@bolayetu.com",
+            password="SecurePass123!",
+            password_confirm="SecurePass123!",
+            first_name="Ana",
+            last_name="Mendes",
+            profile_type=ProfileType.PLAYER,
+        )
+
+        player = PlayerSelector.get_for_user(user)
+        self.assertIsNotNone(player)
+        self.assertEqual(player.first_name, "Ana")
+        self.assertEqual(player.last_name, "Mendes")
+        self.assertEqual(player.email, "player@bolayetu.com")
+        self.assertFalse(player.is_public)
 
     def test_registration_password_mismatch(self):
         """AuthService.register raises PasswordMismatch when confirms do not match."""
