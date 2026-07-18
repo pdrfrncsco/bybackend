@@ -15,6 +15,7 @@ from accounts.exceptions import (
     AccountSuspended,
     IncorrectPassword,
 )
+from clubs.models import Club
 from players.selectors import PlayerSelector
 
 
@@ -52,6 +53,20 @@ class AuthServiceTest(TestCase):
         self.assertEqual(player.last_name, "Mendes")
         self.assertEqual(player.email, "player@bolayetu.com")
         self.assertFalse(player.is_public)
+
+    def test_registration_club_does_not_create_tenant_scoped_club(self):
+        """Club registrations create the user identity; club creation happens after affiliation approval."""
+        user, _ = AuthService.register(
+            email="club@bolayetu.com",
+            password="SecurePass123!",
+            password_confirm="SecurePass123!",
+            first_name="Clube",
+            last_name="Gestor",
+            profile_type=ProfileType.CLUB,
+        )
+
+        self.assertEqual(user.profile_type, ProfileType.CLUB)
+        self.assertFalse(Club.objects.exists())
 
     def test_registration_password_mismatch(self):
         """AuthService.register raises PasswordMismatch when confirms do not match."""

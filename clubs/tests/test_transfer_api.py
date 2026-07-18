@@ -12,7 +12,7 @@ from decimal import Decimal
 from core.models import Tenant
 from clubs.models import Club, Transfer
 from players.models import Player
-from accounts.models import User
+from accounts.models import User, TenantMembership
 
 
 class TransferAPITestCase(APITestCase):
@@ -27,8 +27,12 @@ class TransferAPITestCase(APITestCase):
             password="password123",
             is_staff=True,
         )
-        self.user.tenant = self.tenant
-        self.user.save()
+        TenantMembership.objects.create(
+            user=self.user,
+            tenant=self.tenant,
+            role="owner",
+            is_active=True,
+        )
         self.client.force_authenticate(user=self.user)
 
         # Create clubs

@@ -8,11 +8,14 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from common.pagination import StandardPagination
+from accounts.models import TenantMembership
+from accounts.selectors import TenantMembershipSelector
 from clubs.models import Club, Transfer
 from clubs.serializers.transfer_serializers import (
     TransferSerializer, TransferCreateSerializer,
@@ -78,9 +81,42 @@ class TransferViewSet(viewsets.ModelViewSet):
             return LoanMakePermanentSerializer
         return TransferSerializer
 
+    def _get_tenant(self):
+        """
+        Resolve the tenant for the current request.
+
+        Prefer the tenant resolved by middleware when available. Fall back to
+        a user-attached tenant for legacy test fixtures, then to the first
+        active membership.
+        """
+        request_tenant = getattr(self.request, "tenant", None)
+        if request_tenant is not None:
+            membership = TenantMembershipSelector.get_membership(
+                user=self.request.user,
+                tenant_id=request_tenant.id,
+            )
+            if membership and membership.is_active:
+                return request_tenant
+            raise PermissionDenied("You do not have access to this tenant.")
+
+        legacy_tenant = getattr(self.request.user, "tenant", None)
+        if legacy_tenant is not None:
+            return legacy_tenant
+
+        membership = (
+            TenantMembership.objects
+            .filter(user=self.request.user, is_active=True)
+            .select_related("tenant")
+            .first()
+        )
+        if membership:
+            return membership.tenant
+
+        raise PermissionDenied("Unable to resolve tenant for the authenticated user.")
+
     def get_queryset(self):
         """Filter transfers by tenant."""
-        tenant = self.request.user.tenant
+        tenant = self._get_tenant()
         return Transfer.objects.filter(
             tenant=tenant
         ).select_related('player', 'from_club', 'to_club')
@@ -88,7 +124,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """Create a new transfer."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -144,7 +180,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def approve(self, request, pk=None):
         """Approve a pending transfer."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
 
         try:
@@ -167,7 +203,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def reject(self, request, pk=None):
         """Reject a pending transfer."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -193,7 +229,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def complete(self, request, pk=None):
         """Complete a transfer and create player registration."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
 
         try:
@@ -225,7 +261,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def cancel(self, request, pk=None):
         """Cancel a transfer."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -252,7 +288,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def extend_loan(self, request, pk=None):
         """Extend a loan's end date."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -278,7 +314,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def return_loan(self, request, pk=None):
         """Return a loan to the origin club."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
 
         try:
@@ -310,7 +346,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @transaction.atomic
     def make_permanent(self, request, pk=None):
         """Convert a loan to a permanent transfer."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         transfer = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -337,7 +373,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def pending_approvals(self, request):
         """List pending transfers awaiting approval."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         club_id = request.query_params.get('club_id')
 
         club = None
@@ -355,7 +391,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def active_loans(self, request):
         """List active loans."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         club_id = request.query_params.get('club_id')
 
         club = None
@@ -373,7 +409,7 @@ class TransferViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def expiring_loans(self, request):
         """List loans expiring soon."""
-        tenant = request.user.tenant
+        tenant = self._get_tenant()
         days = request.query_params.get('days', 30)
 
         try:

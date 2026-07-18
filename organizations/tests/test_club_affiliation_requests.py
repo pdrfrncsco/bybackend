@@ -4,7 +4,8 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import TenantMembership
-from clubs.models import Club, ClubAffiliationRequest
+from clubs.constants import ClubMemberRole
+from clubs.models import Club, ClubAffiliationRequest, ClubMember
 from core.models import Tenant
 
 User = get_user_model()
@@ -63,6 +64,14 @@ class ClubAffiliationRequestAPITestCase(TestCase):
         self.assertEqual(request_obj.status, ClubAffiliationRequest.Status.APPROVED)
         self.assertIsNotNone(request_obj.club)
         self.assertTrue(Club.objects.filter(id=request_obj.club_id, tenant=self.tenant).exists())
+        self.assertTrue(
+            ClubMember.objects.filter(
+                club=request_obj.club,
+                user=self.user,
+                role=ClubMemberRole.PRESIDENT,
+                is_active=True,
+            ).exists()
+        )
 
     def test_review_club_affiliation_request_rejects(self):
         request_obj = ClubAffiliationRequest.objects.create(

@@ -4,7 +4,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import User
-from clubs.constants import ClubStatus
+from clubs.constants import ClubMemberRole, ClubStatus
 from clubs.exceptions import DuplicateClubAffiliationRequest, DuplicateClubName
 from clubs.models import Club, ClubAffiliationRequest
 from clubs.services.club_service import ClubService
@@ -76,6 +76,12 @@ class ClubAffiliationService:
                 is_verified=False,
             )
             club = ClubService.activate(club=club)
+            if request_obj.submitted_by_id:
+                ClubService.add_member(
+                    club=club,
+                    user=request_obj.submitted_by,
+                    role=ClubMemberRole.PRESIDENT,
+                )
             request_obj.club = club
             request_obj.status = ClubAffiliationRequest.Status.APPROVED
         else:
