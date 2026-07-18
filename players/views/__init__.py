@@ -121,13 +121,26 @@ class PlayerDetailUpdateView(APIView):
         responses={200: PlayerDetailSerializer},
     )
     def get(self, request, slug: str):
-        player = PlayerSelector.get_public_by_slug(slug)
+        player = PlayerSelector.get_by_slug(slug)
 
         if not player:
             return error_response(
                 message="Player not found.",
                 status_code=404,
             )
+
+        if not player.is_public:
+            if not request.user or not request.user.is_authenticated:
+                return error_response(
+                    message="Player not found.",
+                    status_code=404,
+                )
+            from players.permissions import CanManagePlayerProfile
+            if not CanManagePlayerProfile.can_manage(user=request.user, player=player):
+                return error_response(
+                    message="Player not found.",
+                    status_code=404,
+                )
 
         serializer = PlayerDetailSerializer(player)
         return success_response(data=serializer.data, message="Player retrieved successfully.")

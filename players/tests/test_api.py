@@ -168,6 +168,46 @@ class PlayerDetailViewTestCase(TestCase):
         
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_get_private_player_anonymous(self):
+        """Test that anonymous users get 404 for a private player."""
+        self.player.is_public = False
+        self.player.save()
+        
+        response = self.client.get('/api/v1/players/john-doe/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_get_private_player_owner(self):
+        """Test that the owner player themselves can view their private profile."""
+        user = User.objects.create_user(username="owner", email="owner@test.com", password="password")
+        self.player.is_public = False
+        self.player.user = user
+        self.player.save()
+        
+        self.client.force_authenticate(user=user)
+        response = self.client.get('/api/v1/players/john-doe/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_private_player_staff(self):
+        """Test that staff users can view private profiles."""
+        staff_user = User.objects.create_superuser(username="staff", email="staff@test.com", password="password")
+        self.player.is_public = False
+        self.player.save()
+        
+        self.client.force_authenticate(user=staff_user)
+        response = self.client.get('/api/v1/players/john-doe/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_get_private_player_other_user(self):
+        """Test that other authenticated users get 404 for a private player."""
+        other_user = User.objects.create_user(username="other", email="other@test.com", password="password")
+        self.player.is_public = False
+        self.player.save()
+        
+        self.client.force_authenticate(user=other_user)
+        response = self.client.get('/api/v1/players/john-doe/')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
 
 class PlayerSearchViewTestCase(TestCase):
     """Test GET /api/v1/players/search/"""
