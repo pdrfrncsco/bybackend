@@ -6,7 +6,7 @@ from django.utils import timezone
 from accounts.models import User
 from clubs.constants import ClubMemberRole, ClubStatus
 from clubs.exceptions import DuplicateClubAffiliationRequest, DuplicateClubName
-from clubs.models import Club, ClubAffiliationRequest
+from clubs.models import Club, ClubAffiliationRequest, ClubMember
 from clubs.services.club_service import ClubService
 from core.models import Tenant
 
@@ -14,6 +14,55 @@ logger = logging.getLogger(__name__)
 
 
 class ClubAffiliationService:
+    @staticmethod
+    def _ensure_club_for_request(*, request_obj: ClubAffiliationRequest) -> Club:
+        club = request_obj.club
+
+        if club is None:
+            club = Club.objects.filter(
+                tenant=request_obj.tenant,
+                name__iexact=request_obj.name,
+            ).first()
+
+        if club is None:
+            club = ClubService.create_club(
+                tenant=request_obj.tenant,
+                name=request_obj.name,
+                short_name=request_obj.short_name,
+                founded_year=request_obj.founded_year,
+                city=request_obj.city,
+                country=request_obj.country,
+                email=request_obj.email,
+                phone=request_obj.phone,
+                website=request_obj.website,
+                description=request_obj.description,
+                primary_color=request_obj.primary_color,
+                secondary_color=request_obj.secondary_color,
+                stadium_name=request_obj.stadium_name,
+                stadium_capacity=request_obj.stadium_capacity,
+                status=ClubStatus.INACTIVE,
+                is_public=True,
+                is_verified=False,
+            )
+
+        if club.status != ClubStatus.ACTIVE:
+            club = ClubService.activate(club=club)
+
+        if request_obj.submitted_by_id:
+            ClubMember.objects.update_or_create(
+                club=club,
+                user=request_obj.submitted_by,
+                defaults={
+                    "role": ClubMemberRole.PRESIDENT,
+                    "is_active": True,
+                },
+            )
+
+        if request_obj.club_id != club.id:
+            request_obj.club = club
+
+        return club
+
     @staticmethod
     @transaction.atomic
     def submit_request(
@@ -45,6 +94,12 @@ class ClubAffiliationService:
         approve: bool,
         review_notes: str = "",
     ) -> ClubAffiliationRequest:
+        if request_obj.status == ClubAffiliationRequest.Status.APPROVED and request_obj.club_id is None:
+            ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
+            request_obj.save(update_fields=["club", "updated_at"])
+            logger.info("Approved club affiliation request repaired: %s", request_obj.id)
+            return request_obj
+
         if request_obj.status != ClubAffiliationRequest.Status.PENDING:
             raise ValueError("This request has already been reviewed.")
 
@@ -53,36 +108,11 @@ class ClubAffiliationService:
         request_obj.reviewed_at = timezone.now()
 
         if approve:
-            if Club.objects.filter(tenant=request_obj.tenant, name__iexact=request_obj.name).exists():
+            existing_club = Club.objects.filter(tenant=request_obj.tenant, name__iexact=request_obj.name).first()
+            if existing_club is not None and request_obj.club_id not in (None, existing_club.id):
                 raise DuplicateClubName()
 
-            club = ClubService.create_club(
-                tenant=request_obj.tenant,
-                name=request_obj.name,
-                short_name=request_obj.short_name,
-                founded_year=request_obj.founded_year,
-                city=request_obj.city,
-                country=request_obj.country,
-                email=request_obj.email,
-                phone=request_obj.phone,
-                website=request_obj.website,
-                description=request_obj.description,
-                primary_color=request_obj.primary_color,
-                secondary_color=request_obj.secondary_color,
-                stadium_name=request_obj.stadium_name,
-                stadium_capacity=request_obj.stadium_capacity,
-                status=ClubStatus.INACTIVE,
-                is_public=True,
-                is_verified=False,
-            )
-            club = ClubService.activate(club=club)
-            if request_obj.submitted_by_id:
-                ClubService.add_member(
-                    club=club,
-                    user=request_obj.submitted_by,
-                    role=ClubMemberRole.PRESIDENT,
-                )
-            request_obj.club = club
+            ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
             request_obj.status = ClubAffiliationRequest.Status.APPROVED
         else:
             request_obj.status = ClubAffiliationRequest.Status.REJECTED

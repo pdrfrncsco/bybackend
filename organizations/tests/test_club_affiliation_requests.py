@@ -94,3 +94,33 @@ class ClubAffiliationRequestAPITestCase(TestCase):
         request_obj.refresh_from_db()
         self.assertEqual(request_obj.status, ClubAffiliationRequest.Status.REJECTED)
         self.assertIsNone(request_obj.club)
+
+    def test_review_approved_request_without_club_repairs_state(self):
+        request_obj = ClubAffiliationRequest.objects.create(
+            tenant=self.tenant,
+            submitted_by=self.user,
+            name="Academia Reparada",
+            city="Luanda",
+            country="Angola",
+            status=ClubAffiliationRequest.Status.APPROVED,
+            club=None,
+        )
+
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.patch(
+            f"/api/v1/organizations/me/club-requests/{request_obj.id}/",
+            {"approve": True, "review_notes": "Reparar estado aprovado"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        request_obj.refresh_from_db()
+        self.assertIsNotNone(request_obj.club)
+        self.assertTrue(
+            ClubMember.objects.filter(
+                club=request_obj.club,
+                user=self.user,
+                role=ClubMemberRole.PRESIDENT,
+                is_active=True,
+            ).exists()
+        )
