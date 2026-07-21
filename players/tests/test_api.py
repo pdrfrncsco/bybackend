@@ -343,3 +343,63 @@ class PlayerRegisterViewTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PlayerOnboardingStatusViewTestCase(TestCase):
+    """Test GET /api/v1/players/me/onboarding-status/."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="player-onboarding@test.com", password="testpass123")
+
+    def test_status_requires_linked_player_profile(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertTrue(payload["onboarding_required"])
+        self.assertFalse(payload["has_player_profile"])
+        self.assertEqual(payload["next_step"], "profile")
+
+    def test_status_requires_basic_info_and_specific_position(self):
+        Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            user=self.user,
+            primary_position="multiple",
+            status="active",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertTrue(payload["onboarding_required"])
+        self.assertTrue(payload["has_player_profile"])
+        self.assertFalse(payload["has_basic_info"])
+        self.assertFalse(payload["has_football_info"])
+        self.assertEqual(payload["next_step"], "profile")
+
+    def test_status_complete_after_basic_info_and_position(self):
+        Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            date_of_birth=date(2001, 4, 2),
+            nationality="Angolana",
+            user=self.user,
+            primary_position="st",
+            status="active",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertFalse(payload["onboarding_required"])
+        self.assertTrue(payload["has_basic_info"])
+        self.assertTrue(payload["has_football_info"])
+        self.assertIsNone(payload["next_step"])
