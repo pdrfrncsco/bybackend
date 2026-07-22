@@ -243,6 +243,64 @@ class ClubSelector:
         return ClubSponsor.objects.filter(club=club, is_active=True).select_related("logo_asset")
 
     @staticmethod
+    def get_competitions(*, club: Club) -> QuerySet:
+        """
+        Return all competitions where the club is registered or has matches/standings.
+        """
+        from competitions.models import Competition
+
+        return (
+            Competition.objects.filter(
+                Q(registrations__club=club)
+                | Q(matches__home_club=club)
+                | Q(matches__away_club=club)
+                | Q(standings__club=club)
+            )
+            .distinct()
+            .order_by("-created_at")
+        )
+
+    @staticmethod
+    def get_matches(
+        *,
+        club: Club,
+        status: Optional[str] = None,
+        competition_id: Optional[str] = None,
+    ) -> QuerySet:
+        """
+        Return matches involving the club (home or away).
+        """
+        from competitions.models import Match
+
+        queryset = (
+            Match.objects.filter(Q(home_club=club) | Q(away_club=club))
+            .select_related("home_club", "away_club", "competition")
+            .order_by("match_date", "round_number")
+        )
+        if status:
+            queryset = queryset.filter(status=status)
+        if competition_id:
+            queryset = queryset.filter(competition_id=competition_id)
+        return queryset
+
+    @staticmethod
+    def get_standings(*, club: Club, competition_id: Optional[str] = None) -> QuerySet:
+        """
+        Return standings table rows for competitions the club participates in.
+        """
+        from competitions.models import Standing
+
+        competitions = ClubSelector.get_competitions(club=club)
+        queryset = (
+            Standing.objects.filter(competition__in=competitions)
+            .select_related("club", "competition")
+            .order_by("competition", "position", "-points")
+        )
+        if competition_id:
+            queryset = queryset.filter(competition_id=competition_id)
+        return queryset
+
+    @staticmethod
     def count_for_tenant(*, tenant_id: uuid.UUID) -> int:
         """Count active clubs for a tenant."""
         return Club.objects.filter(
