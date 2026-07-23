@@ -28,6 +28,12 @@ from clubs.views import (
     ClubPublicSponsorsView,
     ClubMePlayerRegistrationRequestsView,
     ClubMePlayerRegistrationRequestReviewView,
+    ClubPublicCompetitionsView,
+    ClubPublicMatchesView,
+    ClubPublicStandingsView,
+    ClubMeCompetitionsView,
+    ClubMeMatchesView,
+    ClubMeStandingsView,
     TransferViewSet,
 )
 
@@ -38,6 +44,9 @@ urlpatterns = router.urls + [
     # Authenticated — Club Management
     path("me/", ClubMeView.as_view(), name="club-me"),
     path("me/logo/", ClubLogoView.as_view(), name="club-logo"),
+    path("me/competitions/", ClubMeCompetitionsView.as_view(), name="club-me-competitions"),
+    path("me/matches/", ClubMeMatchesView.as_view(), name="club-me-matches"),
+    path("me/standings/", ClubMeStandingsView.as_view(), name="club-me-standings"),
     path("me/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-player-registration-requests"),
     path(
         "me/player-registration-requests/<uuid:request_id>/",
@@ -66,4 +75,8 @@ urlpatterns = router.urls + [
     path("public/<slug:slug>/staff/", ClubStaffView.as_view(), name="club-staff"),
     path("public/<slug:slug>/documents/", ClubPublicDocumentsView.as_view(), name="club-public-documents"),
     path("public/<slug:slug>/sponsors/", ClubPublicSponsorsView.as_view(), name="club-public-sponsors"),
+    path("public/<slug:slug>/competitions/", ClubPublicCompetitionsView.as_view(), name="club-public-competitions"),
+    path("public/<slug:slug>/matches/", ClubPublicMatchesView.as_view(), name="club-public-matches"),
+    path("public/<slug:slug>/standings/", ClubPublicStandingsView.as_view(), name="club-public-standings"),
 ]
+

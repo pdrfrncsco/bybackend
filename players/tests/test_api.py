@@ -12,6 +12,8 @@ from datetime import date
 
 from players.models import Player, PlayerRegistration
 from clubs.models import Club
+from clubs.models import ClubMember
+from clubs.constants import ClubMemberRole
 from competitions.models import Competition
 from core.models import Tenant
 
@@ -343,3 +345,107 @@ class PlayerRegisterViewTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class PlayerOnboardingStatusViewTestCase(TestCase):
+    """Test GET /api/v1/players/me/onboarding-status/."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email="player-onboarding@test.com", password="testpass123")
+
+    def test_status_requires_linked_player_profile(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertTrue(payload["onboarding_required"])
+        self.assertFalse(payload["has_player_profile"])
+        self.assertEqual(payload["next_step"], "profile")
+
+    def test_status_requires_basic_info_and_specific_position(self):
+        Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            user=self.user,
+            primary_position="multiple",
+            status="active",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertTrue(payload["onboarding_required"])
+        self.assertTrue(payload["has_player_profile"])
+        self.assertFalse(payload["has_basic_info"])
+        self.assertFalse(payload["has_football_info"])
+        self.assertEqual(payload["next_step"], "profile")
+
+    def test_status_complete_after_basic_info_and_position(self):
+        Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            date_of_birth=date(2001, 4, 2),
+            nationality="Angolana",
+            user=self.user,
+            primary_position="st",
+            status="active",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertFalse(payload["onboarding_required"])
+        self.assertTrue(payload["has_basic_info"])
+        self.assertTrue(payload["has_football_info"])
+        self.assertIsNone(payload["next_step"])
+
+
+class PlayerRegisterClubUserTestCase(TestCase):
+    """Test POST /api/v1/players/{slug}/register/ for club-managed users."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.tenant = Tenant.objects.create(name="Test Org", slug="test-org")
+        self.club = Club.objects.create(name="Test Club", slug="test-club", tenant=self.tenant)
+        self.player = Player.objects.create(
+            first_name="John",
+            last_name="Doe",
+            slug="john-doe",
+            date_of_birth=date(2000, 1, 15),
+            nationality="PT",
+            primary_position="st",
+            status="active",
+        )
+        self.club_user = User.objects.create_user(
+            email="club@test.com",
+            password="testpass123",
+            profile_type="club",
+        )
+        ClubMember.objects.create(
+            user=self.club_user,
+            club=self.club,
+            role=ClubMemberRole.MANAGER,
+            is_active=True,
+        )
+
+    def test_club_user_can_register_player_without_tenant_membership(self):
+        self.client.force_authenticate(user=self.club_user)
+
+        response = self.client.post(
+            f"/api/v1/players/{self.player.slug}/register/",
+            {
+                "club_id": str(self.club.id),
+                "joined_date": "2026-07-22",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(PlayerRegistration.objects.filter(player=self.player, club=self.club).count(), 1)

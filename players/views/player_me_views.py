@@ -14,6 +14,57 @@ from players.serializers import PlayerDetailSerializer, PlayerSerializer
 from players.services import NoPlayerProfile, PlayerService
 
 
+class PlayerOnboardingStatusView(APIView):
+    """
+    Return onboarding gate status for the authenticated user's player profile.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(tags=["players"])
+    def get(self, request):
+        try:
+            player = PlayerService.get_player_for_user(request.user)
+        except NoPlayerProfile:
+            return success_response(
+                data={
+                    "onboarding_required": True,
+                    "has_player_profile": False,
+                    "has_basic_info": False,
+                    "has_football_info": False,
+                    "next_step": "profile",
+                    "player": None,
+                },
+                message="Player onboarding status retrieved successfully.",
+            )
+
+        has_basic_info = bool(
+            player.first_name
+            and player.last_name
+            and player.date_of_birth
+            and player.nationality
+        )
+        has_football_info = bool(player.primary_position and player.primary_position != "multiple")
+        onboarding_required = not (has_basic_info and has_football_info)
+        next_step = None
+        if not has_basic_info:
+            next_step = "profile"
+        elif not has_football_info:
+            next_step = "football"
+
+        return success_response(
+            data={
+                "onboarding_required": onboarding_required,
+                "has_player_profile": True,
+                "has_basic_info": has_basic_info,
+                "has_football_info": has_football_info,
+                "next_step": next_step,
+                "player": PlayerSerializer(player).data,
+            },
+            message="Player onboarding status retrieved successfully.",
+        )
+
+
 class PlayerMeView(APIView):
     """
     GET/PATCH /api/v1/players/me/

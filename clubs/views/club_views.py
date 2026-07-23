@@ -446,3 +446,139 @@ class ClubStaffView(APIView):
             data=serializer.data,
             message="Club staff retrieved successfully.",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Club Competitions, Matches & Standings Endpoints
+# ─────────────────────────────────────────────────────────────────────
+
+
+class ClubPublicCompetitionsView(APIView):
+    """Retrieve public competitions linked to a club."""
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["clubs"])
+    def get(self, request, slug: str):
+        club = ClubSelector.get_by_slug(slug=slug)
+        if club is None:
+            raise ClubNotFound()
+
+        from competitions.serializers import CompetitionSerializer
+
+        competitions = ClubSelector.get_competitions(club=club)
+        serializer = CompetitionSerializer(competitions, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Club competitions retrieved successfully.",
+        )
+
+
+class ClubPublicMatchesView(APIView):
+    """Retrieve public matches for a club."""
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["clubs"])
+    def get(self, request, slug: str):
+        club = ClubSelector.get_by_slug(slug=slug)
+        if club is None:
+            raise ClubNotFound()
+
+        from competitions.serializers import MatchSerializer
+
+        status = request.query_params.get("status")
+        competition_id = request.query_params.get("competition_id")
+
+        matches = ClubSelector.get_matches(club=club, status=status, competition_id=competition_id)
+        serializer = MatchSerializer(matches, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Club matches retrieved successfully.",
+        )
+
+
+class ClubPublicStandingsView(APIView):
+    """Retrieve public standings for competitions involving a club."""
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["clubs"])
+    def get(self, request, slug: str):
+        club = ClubSelector.get_by_slug(slug=slug)
+        if club is None:
+            raise ClubNotFound()
+
+        from competitions.serializers import StandingSerializer
+
+        competition_id = request.query_params.get("competition_id")
+
+        standings = ClubSelector.get_standings(club=club, competition_id=competition_id)
+        serializer = StandingSerializer(standings, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Club standings retrieved successfully.",
+        )
+
+
+class ClubMeCompetitionsView(APIView):
+    """Retrieve competitions for the authenticated user's club."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(tags=["clubs"])
+    def get(self, request):
+        club = ClubService.get_club_for_user(user=request.user)
+
+        from competitions.serializers import CompetitionSerializer
+
+        competitions = ClubSelector.get_competitions(club=club)
+        serializer = CompetitionSerializer(competitions, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Club competitions retrieved successfully.",
+        )
+
+
+class ClubMeMatchesView(APIView):
+    """Retrieve matches for the authenticated user's club."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(tags=["clubs"])
+    def get(self, request):
+        club = ClubService.get_club_for_user(user=request.user)
+
+        from competitions.serializers import MatchSerializer
+
+        status = request.query_params.get("status")
+        competition_id = request.query_params.get("competition_id")
+
+        matches = ClubSelector.get_matches(club=club, status=status, competition_id=competition_id)
+        serializer = MatchSerializer(matches, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Club matches retrieved successfully.",
+        )
+
+
+class ClubMeStandingsView(APIView):
+    """Retrieve standings for the authenticated user's club."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(tags=["clubs"])
+    def get(self, request):
+        club = ClubService.get_club_for_user(user=request.user)
+
+        from competitions.serializers import StandingSerializer
+
+        competition_id = request.query_params.get("competition_id")
+
+        standings = ClubSelector.get_standings(club=club, competition_id=competition_id)
+        serializer = StandingSerializer(standings, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Club standings retrieved successfully.",
+        )
+

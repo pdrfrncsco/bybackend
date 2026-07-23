@@ -216,7 +216,9 @@ class PlayerRegisterView(APIView):
         responses={201: PlayerRegistrationSerializer},
     )
     def post(self, request, slug: str):
+        from clubs.exceptions import NoClubMembership
         from clubs.models import Club
+        from clubs.services import ClubService
         from accounts.selectors import TenantMembershipSelector
 
         player = PlayerSelector.get_by_slug(slug)
@@ -236,10 +238,16 @@ class PlayerRegisterView(APIView):
         except Club.DoesNotExist:
             return error_response(message="Club not found.", status_code=404)
 
-        if not TenantMembershipSelector.user_belongs_to_tenant(
-            user=request.user,
-            tenant_id=club.tenant_id,
-        ):
+        belongs_to_tenant = TenantMembershipSelector.user_belongs_to_tenant(user=request.user, tenant_id=club.tenant_id)
+
+        belongs_to_club = False
+        try:
+            managed_club = ClubService.get_club_for_user(user=request.user)
+            belongs_to_club = managed_club.id == club.id
+        except NoClubMembership:
+            belongs_to_club = False
+
+        if not (belongs_to_tenant or belongs_to_club):
             return error_response(
                 message="You do not belong to this club's organization.",
                 status_code=403,

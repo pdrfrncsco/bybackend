@@ -28,18 +28,18 @@ class PlayerRegistration(BaseModel):
     """
 
     class RegistrationStatus(models.TextChoices):
-        REGISTERED = "registered", "Registered"
-        LOANED = "loaned", "On Loan"
-        SUSPENDED = "suspended", "Suspended"
-        RETIRED = "retired", "Retired"
-        TRANSFERRED = "transferred", "Transferred"
+        REGISTERED = "registered", "Registrado"
+        LOANED = "loaned", "Em Loanamento"
+        SUSPENDED = "suspended", "Suspendido"
+        RETIRED = "retired", "Retirado"
+        TRANSFERRED = "transferred", "Transferido"
 
     # Player (global)
     player = models.ForeignKey(
         "players.Player",
         on_delete=models.CASCADE,
         related_name="registrations",
-        verbose_name="Player",
+        verbose_name="Jogador",
     )
     
     # Club context (tenant-scoped)
@@ -69,29 +69,29 @@ class PlayerRegistration(BaseModel):
     )
     
     # Registration Details
-    shirt_number = models.IntegerField(null=True, blank=True, verbose_name="Shirt Number")
-    joined_date = models.DateField(verbose_name="Joined Date")
-    left_date = models.DateField(null=True, blank=True, verbose_name="Left Date (if transferred)")
+    shirt_number = models.IntegerField(null=True, blank=True, verbose_name="Número de Camiseta")
+    joined_date = models.DateField(verbose_name="Data de Entrada")
+    left_date = models.DateField(null=True, blank=True, verbose_name="Data de Saída (se transferiuu)")
     
     # Status
     status = models.CharField(
         max_length=20,
         choices=RegistrationStatus.choices,
         default=RegistrationStatus.REGISTERED,
-        verbose_name="Status",
+        verbose_name="Estado",
     )
     
     # Career statistics (per club/season)
-    matches_played = models.IntegerField(default=0, verbose_name="Matches Played")
-    goals = models.IntegerField(default=0, verbose_name="Goals")
-    assists = models.IntegerField(default=0, verbose_name="Assists")
-    yellow_cards = models.IntegerField(default=0, verbose_name="Yellow Cards")
-    red_cards = models.IntegerField(default=0, verbose_name="Red Cards")
+    matches_played = models.IntegerField(default=0, verbose_name="Total de Jogos Jogados")
+    goals = models.IntegerField(default=0, verbose_name="Total de Gols Feitos")
+    assists = models.IntegerField(default=0, verbose_name="Total de Assistências")
+    yellow_cards = models.IntegerField(default=0, verbose_name="Total de Cartões Amarelos Feitos")
+    red_cards = models.IntegerField(default=0, verbose_name="Total de Cartões Vermelho Feitos")
     
     class Meta:
         ordering = ["-joined_date"]
-        verbose_name = "Player Registration"
-        verbose_name_plural = "Player Registrations"
+        verbose_name = "Jogador Registro"
+        verbose_name_plural = "Jogadores Registados"
         constraints = [
             models.UniqueConstraint(
                 fields=["player", "club", "competition"],

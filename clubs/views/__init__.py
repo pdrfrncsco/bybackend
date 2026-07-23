@@ -15,6 +15,12 @@ from clubs.views.club_views import (
     ClubMemberDetailView,
     ClubActivateView,
     ClubSuspendView,
+    ClubPublicCompetitionsView,
+    ClubPublicMatchesView,
+    ClubPublicStandingsView,
+    ClubMeCompetitionsView,
+    ClubMeMatchesView,
+    ClubMeStandingsView,
 )
 from clubs.views.club_assets_views import (
     ClubDocumentsView,
@@ -45,6 +51,12 @@ __all__ = [
     "ClubMemberDetailView",
     "ClubActivateView",
     "ClubSuspendView",
+    "ClubPublicCompetitionsView",
+    "ClubPublicMatchesView",
+    "ClubPublicStandingsView",
+    "ClubMeCompetitionsView",
+    "ClubMeMatchesView",
+    "ClubMeStandingsView",
     "ClubDocumentsView",
     "ClubDocumentDetailView",
     "ClubPublicDocumentsView",
@@ -55,3 +67,4 @@ __all__ = [
     "ClubMePlayerRegistrationRequestsView",
     "ClubMePlayerRegistrationRequestReviewView",
 ]
+

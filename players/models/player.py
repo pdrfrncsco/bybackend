@@ -36,50 +36,50 @@ class Player(BaseModel):
     """
 
     class PlayerStatus(models.TextChoices):
-        ACTIVE = "active", "Active"
-        RETIRED = "retired", "Retired"
-        BANNED = "banned", "Banned"
-        INACTIVE = "inactive", "Inactive"
+        ACTIVE = "active", "Activo"
+        RETIRED = "retired", "Retiredo"
+        BANNED = "banned", "Banido"
+        INACTIVE = "inactive", "Inactivo"
 
     class Position(models.TextChoices):
         # GK - Goalkeeper
-        GK = "gk", "Goalkeeper"
+        GK = "gk", "Guarda-redes"
         
         # Defence
-        CB = "cb", "Center Back"
-        LB = "lb", "Left Back"
-        RB = "rb", "Right Back"
-        LWB = "lwb", "Left Wing Back"
-        RWB = "rwb", "Right Wing Back"
+        CB = "cb", "Defesa Central"
+        LB = "lb", "Defesa Esquerda"
+        RB = "rb", "Defesa Direita"
+        LWB = "lwb", "Lateral Esquerda"
+        RWB = "rwb", "Lateral Direita"
         
         # Midfield
-        CM = "cm", "Central Midfielder"
-        CDM = "cdm", "Defensive Midfielder"
-        CAM = "cam", "Attacking Midfielder"
-        LM = "lm", "Left Midfielder"
-        RM = "rm", "Right Midfielder"
-        LW = "lw", "Left Winger"
-        RW = "rw", "Right Winger"
+        CM = "cm", "Meio-Campo"
+        CDM = "cdm", "Meio-Campo Defensivo"
+        CAM = "cam", "Meio-Campo Ofensivo"
+        LM = "lm", "Meio-Campo Esquerda"
+        RM = "rm", "Meio-Campo Direito"
+        LW = "lw", "Atacante Esquerda"
+        RW = "rw", "Atacante Direito"
         
         # Attack
-        ST = "st", "Striker"
-        CF = "cf", "Center Forward"
-        MULTIPLE = "multiple", "Multiple Positions"
+        ST = "st", "Avançado"
+        CF = "cf", "Centro-avante"
+        MULTIPLE = "multiple", "Varios Posições"
 
     # Personal Information
-    first_name = models.CharField(max_length=255, verbose_name="First Name")
-    last_name = models.CharField(max_length=255, verbose_name="Last Name")
+    first_name = models.CharField(max_length=255, verbose_name="Primeiro Nome")
+    last_name = models.CharField(max_length=255, verbose_name="Apelido")
     slug = models.SlugField(max_length=255, unique=True, blank=True, verbose_name="Slug")
     
     # Contact
     email = models.EmailField(null=True, blank=True, unique=True, verbose_name="Email")
-    phone = models.CharField(max_length=20, null=True, blank=True, verbose_name="Phone")
+    phone = models.CharField(max_length=20, null=True, blank=True, verbose_name="Telefone")
     
     # Physical
-    date_of_birth = models.DateField(null=True, blank=True, verbose_name="Date of Birth")
-    nationality = models.CharField(max_length=100, null=True, blank=True, verbose_name="Nationality")
-    height_cm = models.IntegerField(null=True, blank=True, verbose_name="Height (cm)")
-    weight_kg = models.IntegerField(null=True, blank=True, verbose_name="Weight (kg)")
+    date_of_birth = models.DateField(null=True, blank=True, verbose_name="Data de Nascimento")
+    nationality = models.CharField(max_length=100, null=True, blank=True, verbose_name="País")
+    height_cm = models.IntegerField(null=True, blank=True, verbose_name="Altura (cm)")
+    weight_kg = models.IntegerField(null=True, blank=True, verbose_name="Peso (kg)")
     foot = models.CharField(
         max_length=10,
         choices=[("left", "Left"), ("right", "Right"), ("both", "Both")],
@@ -95,19 +95,18 @@ class Player(BaseModel):
         default=Position.MULTIPLE,
         verbose_name="Primary Position",
     )
-    shirt_number = models.IntegerField(null=True, blank=True, verbose_name="Preferred Shirt Number")
-    
+    shirt_number = models.IntegerField(null=True, blank=True, verbose_name="Número de Camisa Preferido")
     # Profile
-    bio = models.TextField(null=True, blank=True, verbose_name="Biography")
+    bio = models.TextField(null=True, blank=True, verbose_name="Biografia")
     avatar = models.URLField(max_length=500, null=True, blank=True, verbose_name="Avatar URL")
-    is_public = models.BooleanField(default=True, verbose_name="Is Public")
+    is_public = models.BooleanField(default=True, verbose_name="É Público?")
     
     # Status
     status = models.CharField(
         max_length=20,
         choices=PlayerStatus.choices,
         default=PlayerStatus.ACTIVE,
-        verbose_name="Status",
+        verbose_name="Status do Jogador",
     )
     
     # Association with User (optional)
@@ -123,14 +122,14 @@ class Player(BaseModel):
     )
     
     # Career statistics (denormalized for fast queries)
-    total_matches = models.IntegerField(default=0, verbose_name="Total Matches Played")
-    total_goals = models.IntegerField(default=0, verbose_name="Total Goals")
-    total_assists = models.IntegerField(default=0, verbose_name="Total Assists")
+    total_matches = models.IntegerField(default=0, verbose_name="Total de Jogos Jogados")
+    total_goals = models.IntegerField(default=0, verbose_name="Total de Gols Feitos")
+    total_assists = models.IntegerField(default=0, verbose_name="Total de Assistências")
     
     class Meta:
         ordering = ["-created_at"]
-        verbose_name = "Player"
-        verbose_name_plural = "Players"
+        verbose_name = "Jogador"
+        verbose_name_plural = "Jogadores"
         indexes = [
             models.Index(fields=["slug"]),
             models.Index(fields=["status"]),
