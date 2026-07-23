@@ -346,6 +346,37 @@ class PlayerRegisterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_cannot_register_already_registered_player(self):
+        # First register the player to self.club
+        PlayerRegistration.objects.create(
+            player=self.player,
+            club=self.club,
+            tenant=self.tenant,
+            joined_date="2026-01-01",
+            status=PlayerRegistration.RegistrationStatus.REGISTERED,
+        )
+
+        # Try to register to another club
+        from clubs.models import Club
+        club2 = Club.objects.create(
+            name="Club Two",
+            slug="club-two",
+            tenant=self.tenant,
+        )
+
+        self.client.force_authenticate(user=self.org_member)
+        response = self.client.post(
+            f"/api/v1/players/{self.player.slug}/register/",
+            {
+                "club_id": str(club2.id),
+                "joined_date": "2026-02-01",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertIn("already actively registered", response.json()["message"])
+
 
 class PlayerOnboardingStatusViewTestCase(TestCase):
     """Test GET /api/v1/players/me/onboarding-status/."""

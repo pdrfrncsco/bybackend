@@ -206,18 +206,16 @@ class PlayerRegistrationService:
         exists for this player + club + competition combination.
         """
         # Check for existing active registration
-        conflict_qs = PlayerRegistration.objects.filter(
+        active_reg = PlayerRegistration.objects.filter(
             player=player,
-            club=club,
-            competition=competition,
             status__in=[
                 PlayerRegistration.RegistrationStatus.REGISTERED,
                 PlayerRegistration.RegistrationStatus.LOANED,
             ],
-        )
-        if conflict_qs.exists():
+        ).select_related("club").first()
+        if active_reg:
             raise PlayerRegistrationConflict(
-                f"{player.full_name} is already actively registered at {club.name}."
+                f"{player.full_name} is already actively registered at {active_reg.club.name}."
             )
 
         registration = PlayerRegistration.objects.create(

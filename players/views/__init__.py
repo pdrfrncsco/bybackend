@@ -34,7 +34,7 @@ from players.permissions import IsStaffOrReadOnly, CanManagePlayerRegistrations
 
 class PlayerListCreateView(APIView):
     """
-    GET:  List all active players. Supports ?position= and ?nationality= filters.
+    GET:  List all active players. Supports ?position=, ?nationality= and ?without_club= filters.
     POST: Create a new player (staff only).
     """
 
@@ -46,19 +46,20 @@ class PlayerListCreateView(APIView):
         parameters=[
             OpenApiParameter("position", OpenApiTypes.STR, description="Filter by position code (gk, cb, st, ...)"),
             OpenApiParameter("nationality", OpenApiTypes.STR, description="Filter by nationality (ISO code)"),
+            OpenApiParameter("without_club", OpenApiTypes.BOOL, description="Filter players without any active club registration"),
         ],
         responses={200: PlayerSerializer(many=True)},
     )
     def get(self, request):
         position = request.query_params.get("position")
         nationality = request.query_params.get("nationality")
+        without_club = request.query_params.get("without_club") == "true"
 
-        if position:
-            queryset = PlayerSelector.list_by_position(position)
-        elif nationality:
-            queryset = PlayerSelector.list_by_nationality(nationality)
-        else:
-            queryset = PlayerSelector.list_public_active()
+        queryset = PlayerSelector.list_players(
+            position=position,
+            nationality=nationality,
+            without_club=without_club,
+        )
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request)
@@ -183,11 +184,13 @@ class PlayerSearchView(APIView):
         summary="Search players by name",
         parameters=[
             OpenApiParameter("q", OpenApiTypes.STR, description="Search query (minimum 2 characters)"),
+            OpenApiParameter("without_club", OpenApiTypes.BOOL, description="Filter players without any active club registration"),
         ],
         responses={200: PlayerSerializer(many=True)},
     )
     def get(self, request):
         query = request.query_params.get("q", "")
+        without_club = request.query_params.get("without_club") == "true"
 
         if not query or len(query) < 2:
             return success_response(
@@ -195,7 +198,7 @@ class PlayerSearchView(APIView):
                 message="Search query too short (minimum 2 characters).",
             )
 
-        results = PlayerSelector.search(query)
+        results = PlayerSelector.search(query, without_club=without_club)
         serializer = PlayerSerializer(results, many=True)
         return success_response(data=serializer.data, message="Search completed.")
 

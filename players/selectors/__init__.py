@@ -46,14 +46,38 @@ class PlayerSelector:
     def list_public_active() -> QuerySet:
         """List all public active players."""
         return Player.objects.filter(status="active", is_public=True).order_by("-updated_at")
-    
+
     @staticmethod
-    def search(query: str) -> QuerySet:
+    def list_players(
+        *,
+        position: Optional[str] = None,
+        nationality: Optional[str] = None,
+        without_club: bool = False,
+    ) -> QuerySet:
+        """List active public players with optional filters."""
+        qs = Player.objects.filter(status="active", is_public=True)
+        if position:
+            qs = qs.filter(primary_position=position)
+        if nationality:
+            qs = qs.filter(nationality=nationality)
+        if without_club:
+            qs = qs.exclude(
+                registrations__status__in=["registered", "loaned"]
+            )
+        return qs.order_by("-updated_at")
+
+    @staticmethod
+    def search(query: str, without_club: bool = False) -> QuerySet:
         """Search players by name."""
-        return Player.objects.filter(
+        qs = Player.objects.filter(
             Q(first_name__icontains=query) | Q(last_name__icontains=query)
         ).filter(status="active", is_public=True)
-    
+        if without_club:
+            qs = qs.exclude(
+                registrations__status__in=["registered", "loaned"]
+            )
+        return qs
+
     @staticmethod
     def list_by_position(position: str) -> QuerySet:
         """List players by primary position."""
@@ -62,7 +86,7 @@ class PlayerSelector:
             status="active",
             is_public=True,
         )
-    
+
     @staticmethod
     def list_by_nationality(nationality: str) -> QuerySet:
         """List players by nationality."""

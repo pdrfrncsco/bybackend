@@ -20,6 +20,7 @@ class PlayerSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    current_club = serializers.SerializerMethodField()
     
     class Meta:
         model = Player
@@ -47,6 +48,7 @@ class PlayerSerializer(serializers.ModelSerializer):
             "total_matches",
             "total_goals",
             "total_assists",
+            "current_club",
             "created_at",
         ]
         read_only_fields = fields
@@ -68,6 +70,19 @@ class PlayerSerializer(serializers.ModelSerializer):
             return Player.PlayerStatus(obj.status).label if obj.status else ""
         except ValueError:
             return obj.status or ""
+
+    def get_current_club(self, obj: Player) -> dict | None:
+        """Return the player's current club (if registered)."""
+        current = obj.registrations.filter(status__in=["registered", "loaned"]).select_related("club").first()
+        if current:
+            return {
+                "id": current.club.id,
+                "name": current.club.name,
+                "slug": current.club.slug,
+                "registered_since": current.joined_date,
+                "shirt_number": current.shirt_number,
+            }
+        return None
 
 
 class PlayerDetailSerializer(serializers.ModelSerializer):

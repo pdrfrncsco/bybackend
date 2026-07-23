@@ -14,7 +14,7 @@ from players.serializers.player_registration_request import (
     PlayerRegistrationRequestCreateSerializer,
     PlayerRegistrationRequestSerializer,
 )
-from players.services import NoPlayerProfile, PlayerService
+from players.services import NoPlayerProfile, PlayerService, PlayerRegistrationConflict
 from players.services.player_registration_request_service import (
     DuplicatePlayerRegistrationRequest,
     PlayerRegistrationRequestService,
@@ -93,7 +93,7 @@ class PlayerMeRegistrationRequestListCreateView(APIView):
                 shirt_number=serializer.validated_data.get("shirt_number"),
                 competition=competition,
             )
-        except DuplicatePlayerRegistrationRequest as exc:
+        except (DuplicatePlayerRegistrationRequest, PlayerRegistrationConflict) as exc:
             return error_response(message=str(exc), status_code=409)
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)

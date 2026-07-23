@@ -28,6 +28,19 @@ class PlayerRegistrationRequestService:
         shirt_number: int | None = None,
         competition=None,
     ) -> PlayerRegistrationRequest:
+        # Check if player has any active registration
+        active_reg = PlayerRegistration.objects.filter(
+            player=player,
+            status__in=[
+                PlayerRegistration.RegistrationStatus.REGISTERED,
+                PlayerRegistration.RegistrationStatus.LOANED,
+            ],
+        ).select_related("club").first()
+        if active_reg:
+            raise PlayerRegistrationConflict(
+                f"{player.full_name} is already actively registered at {active_reg.club.name}."
+            )
+
         pending_qs = PlayerRegistrationRequest.objects.filter(
             player=player,
             club=club,
