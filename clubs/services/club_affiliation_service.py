@@ -82,6 +82,10 @@ class ClubAffiliationService:
             submitted_by=submitted_by,
             **kwargs,
         )
+        # Ensure a provisional club exists for the request so it can be shown immediately.
+        ClubAffiliationService._ensure_club_for_request(request_obj=request)
+        # Persist the club reference on the request (if it was set).
+        request.save(update_fields=["club"])  # type: ignore[arg-type]
         logger.info("Club affiliation request submitted: %s (%s)", request.name, request.id)
         return request
 

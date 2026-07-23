@@ -347,4 +347,18 @@ class ClubService:
             if club:
                 return club
 
+        # New fallback: pending affiliation request with a provisioned club
+        from clubs.models import ClubAffiliationRequest
+        pending_req = (
+            ClubAffiliationRequest.objects.filter(
+                submitted_by=user,
+                status=ClubAffiliationRequest.Status.PENDING,
+                club__isnull=False,
+            )
+            .select_related("club")
+            .first()
+        )
+        if pending_req:
+            return pending_req.club
+
         raise NoClubMembership()
