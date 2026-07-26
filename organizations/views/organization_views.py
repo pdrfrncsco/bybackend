@@ -498,6 +498,27 @@ class OrganizationClubsView(APIView):
         )
 
 
+class OrganizationPlayersView(APIView):
+    """
+    Retrieve players registered in clubs affiliated with a public organization.
+    """
+
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["organizations"])
+    def get(self, request, slug: str):
+        tenant = OrganizationSelector.get_by_slug(slug=slug)
+
+        if tenant is None:
+            raise OrganizationNotFound()
+
+        players = OrganizationSelector.get_players(tenant=tenant)
+        return success_response(
+            data=players,
+            message="Organization players retrieved successfully.",
+        )
+
+
 # ─────────────────────────────────────────────────────────────────────
 # Subscription Endpoints
 # ─────────────────────────────────────────────────────────────────────

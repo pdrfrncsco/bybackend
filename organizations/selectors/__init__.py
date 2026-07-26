@@ -240,3 +240,36 @@ class OrganizationSelector:
 
         clubs = ClubSelector.list_by_tenant(tenant_id=tenant.id).filter(is_public=True)
         return PublicClubSerializer(clubs, many=True).data
+
+    @staticmethod
+    def get_players(*, tenant: Tenant) -> list:
+        """
+        Retrieve players registered in clubs affiliated with an organization.
+
+        Fetches all active player registrations across all clubs belonging to
+        the tenant and returns deduplicated, serialized player data.
+        """
+        from clubs.selectors import ClubSelector
+        from players.models import PlayerRegistration
+        from players.serializers import PlayerSerializer
+
+        club_ids = ClubSelector.list_by_tenant(tenant_id=tenant.id).values_list("id", flat=True)
+
+        player_ids = (
+            PlayerRegistration.objects.filter(
+                club_id__in=club_ids,
+                status__in=["registered", "loaned"],
+            )
+            .values_list("player_id", flat=True)
+            .distinct()
+        )
+
+        from players.models import Player
+
+        players = (
+            Player.objects.filter(id__in=player_ids, status="active")
+            .prefetch_related("registrations__club")
+            .order_by("last_name", "first_name")
+        )
+
+        return PlayerSerializer(players, many=True).data
