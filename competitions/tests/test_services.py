@@ -169,3 +169,43 @@ class CompetitionServicesTestCase(TestCase):
         self.assertEqual(standing2.goals_against, 2)
         self.assertEqual(standing2.goal_difference, -1)
         self.assertEqual(standing2.position, 2)
+
+    def test_match_score_update_uses_configured_points(self):
+        """Points should follow competition config, not hardcoded 3/1/0."""
+        competition = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Cup Config",
+            competition_type="cup",
+            season="2025/26",
+            config={"pointsWin": 5, "pointsDraw": 2, "pointsLoss": 0},
+        )
+
+        for club in [self.club1, self.club2]:
+            CompetitionRegistrationService.register_club(
+                tenant=self.tenant,
+                competition=competition,
+                club=club,
+            )
+
+        match = Match.objects.create(
+            competition=competition,
+            tenant=self.tenant,
+            home_club=self.club1,
+            away_club=self.club2,
+            match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
+            round_number=1,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+
+        MatchService.update_match_score(
+            tenant=self.tenant,
+            match_id=match.id,
+            home_score=1,
+            away_score=0,
+        )
+
+        standing1 = Standing.objects.get(competition=competition, club=self.club1)
+        standing2 = Standing.objects.get(competition=competition, club=self.club2)
+
+        self.assertEqual(standing1.points, 5)
+        self.assertEqual(standing2.points, 0)

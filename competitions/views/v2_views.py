@@ -218,6 +218,10 @@ class CompetitionStandingListView(APIView):
     @extend_schema(
         tags=["competitions"],
         summary="Get standings table for a competition",
+        parameters=[
+            OpenApiParameter("group_id", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("phase", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
+        ],
         responses={200: StandingSerializer(many=True)},
     )
     def get(self, request, competition_id):
@@ -226,9 +230,13 @@ class CompetitionStandingListView(APIView):
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
+        group_id = request.query_params.get("group_id")
+        phase = request.query_params.get("phase")
         standings = StandingSelector.list_by_competition(
             tenant=competition.tenant,
             competition_id=competition_id,
+            group_id=group_id,
+            phase=phase,
         )
         serializer = StandingSerializer(standings, many=True)
         return success_response(

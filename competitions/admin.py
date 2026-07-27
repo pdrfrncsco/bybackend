@@ -45,7 +45,7 @@ class CompetitionRegulationAdmin(admin.ModelAdmin):
 
 @admin.register(Match)
 class MatchAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "match_date", "status", "tenant")
+    list_display = ("__str__", "match_date", "status", "phase", "group_id", "tenant")
     list_filter = ("status", "competition")
     search_fields = ("home_club__name", "away_club__name", "competition__name")
     readonly_fields = ("created_at", "updated_at")
@@ -94,7 +94,7 @@ class MatchStatsAdmin(admin.ModelAdmin):
 
 @admin.register(Standing)
 class StandingAdmin(admin.ModelAdmin):
-    list_display = ("club", "competition", "position", "points", "played")
+    list_display = ("club", "competition", "phase", "group_id", "position", "points", "played")
     list_filter = ("competition",)
     search_fields = ("club__name", "competition__name")
     readonly_fields = ("created_at", "updated_at")

@@ -47,6 +47,9 @@ class Match(BaseModel):
     )
     match_date = models.DateTimeField(verbose_name="Match Date/Time")
     round_number = models.IntegerField(default=1, verbose_name="Round Number")
+    round_name = models.CharField(max_length=100, null=True, blank=True, verbose_name="Round Name")
+    phase = models.CharField(max_length=50, null=True, blank=True, verbose_name="Phase")
+    group_id = models.CharField(max_length=64, null=True, blank=True, verbose_name="Group ID")
     status = models.CharField(
         max_length=20,
         choices=MatchStatus.choices,

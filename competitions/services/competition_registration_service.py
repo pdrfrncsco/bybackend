@@ -58,6 +58,8 @@ class CompetitionRegistrationService:
             competition=competition,
             club=club,
             tenant=tenant,
+            phase=None,
+            group_id=None,
             defaults={
                 "played": 0,
                 "won": 0,

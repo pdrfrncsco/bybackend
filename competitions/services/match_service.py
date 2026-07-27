@@ -37,6 +37,9 @@ class MatchService:
         away_club: Club,
         match_date: datetime,
         round_number: int = 1,
+        round_name: str | None = None,
+        phase: str | None = None,
+        group_id: str | None = None,
         venue: str = "",
     ) -> Match:
         """Create a scheduled match."""
@@ -53,6 +56,9 @@ class MatchService:
             away_club=away_club,
             match_date=match_date,
             round_number=round_number,
+            round_name=round_name,
+            phase=phase,
+            group_id=group_id,
             status=Match.MatchStatus.SCHEDULED,
             venue=venue,
         )
@@ -172,6 +178,7 @@ class MatchService:
                     away_club=away_team,
                     match_date=round_date,
                     round_number=round_number,
+                    round_name=f"Round {round_number}",
                     status=Match.MatchStatus.SCHEDULED,
                     venue=home_team.city or "",
                 )
@@ -197,6 +204,7 @@ class MatchService:
                         away_club=fl_match.home_club,
                         match_date=round_date,
                         round_number=round_number,
+                        round_name=f"Round {round_number}",
                         status=Match.MatchStatus.SCHEDULED,
                         venue=fl_match.away_club.city or "",
                     )

@@ -68,7 +68,7 @@ class MatchSelector:
         return Match.objects.filter(
             competition_id=competition_id,
             tenant=tenant
-        ).select_related("home_club", "away_club").order_by("round_number", "match_date")
+        ).select_related("home_club", "away_club").order_by("phase", "group_id", "round_number", "match_date")
 
     @staticmethod
     def list_by_club(*, tenant: Tenant, club_id) -> QuerySet:
@@ -81,10 +81,21 @@ class MatchSelector:
 
 class StandingSelector:
     @staticmethod
-    def list_by_competition(*, tenant: Tenant, competition_id) -> QuerySet:
+    def list_by_competition(
+        *,
+        tenant: Tenant,
+        competition_id,
+        group_id: str | None = None,
+        phase: str | None = None,
+    ) -> QuerySet:
         """List league table standing rows sorted by position."""
-        return Standing.objects.filter(
+        queryset = Standing.objects.filter(
             competition_id=competition_id,
             tenant=tenant
-        ).select_related("club").order_by("position", "-points", "-goal_difference", "-goals_for")
+        ).select_related("club")
+        if group_id is not None:
+            queryset = queryset.filter(group_id=group_id)
+        if phase is not None:
+            queryset = queryset.filter(phase=phase)
+        return queryset.order_by("phase", "group_id", "position", "-points", "-goal_difference", "-goals_for")
 

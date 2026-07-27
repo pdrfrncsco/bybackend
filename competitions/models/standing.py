@@ -32,6 +32,8 @@ class Standing(BaseModel):
         related_name="standings",
         verbose_name="Organization",
     )
+    phase = models.CharField(max_length=50, null=True, blank=True, verbose_name="Phase")
+    group_id = models.CharField(max_length=64, null=True, blank=True, verbose_name="Group ID")
     
     # Stats
     played = models.IntegerField(default=0, verbose_name="Matches Played")
@@ -52,8 +54,8 @@ class Standing(BaseModel):
         verbose_name_plural = "Standings"
         constraints = [
             models.UniqueConstraint(
-                fields=["competition", "club"],
-                name="unique_club_standing_per_competition",
+                fields=["tenant", "competition", "club", "phase", "group_id"],
+                name="unique_club_standing_per_competition_context",
             )
         ]
 

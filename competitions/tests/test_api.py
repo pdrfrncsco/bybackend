@@ -197,6 +197,49 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(len(response.data["data"]), 1)
         self.assertEqual(response.data["data"][0]["club_name"], "Petro de Luanda")
 
+    def test_get_standings_api_filters_by_context(self):
+        """Standings endpoint should support group and phase filters."""
+        other_club = Club.objects.create(
+            name="Interclube",
+            slug="interclube",
+            tenant=self.tenant,
+            city="Luanda",
+        )
+        CompetitionRegistrationService.register_club(
+            tenant=self.tenant,
+            competition=self.competition,
+            club=other_club,
+        )
+
+        Standing.objects.create(
+            competition=self.competition,
+            tenant=self.tenant,
+            club=self.club1,
+            group_id="A",
+            phase="group_stage",
+            points=3,
+            position=1,
+        )
+        Standing.objects.create(
+            competition=self.competition,
+            tenant=self.tenant,
+            club=other_club,
+            group_id="B",
+            phase="group_stage",
+            points=1,
+            position=1,
+        )
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get(
+            f"/api/v1/competitions/{self.competition.id}/standings/?group_id=A&phase=group_stage"
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success"], True)
+        self.assertEqual(len(response.data["data"]), 1)
+        self.assertEqual(response.data["data"][0]["club_name"], "Petro de Luanda")
+
     @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
     def test_list_competitions_filters_by_subdomain_tenant(self):
         """Public competition list should use request.tenant when subdomain is present."""

@@ -6,7 +6,6 @@ Serializers for CompetitionRegistrations, Matches, and Standings.
 
 from rest_framework import serializers
 
-from clubs.models import Club
 from competitions.models import CompetitionRegistration, Match, Standing
 from competitions.serializers.utils import get_club_logo_url
 
@@ -44,6 +43,9 @@ class MatchSerializer(serializers.ModelSerializer):
             "id",
             "competition",
             "round_number",
+            "round_name",
+            "phase",
+            "group_id",
             "home_club",
             "home_club_name",
             "home_club_logo",
@@ -83,6 +85,8 @@ class StandingSerializer(serializers.ModelSerializer):
             "id",
             "competition",
             "club",
+            "phase",
+            "group_id",
             "club_name",
             "club_logo",
             "played",
@@ -95,8 +99,10 @@ class StandingSerializer(serializers.ModelSerializer):
             "points",
             "position",
         ]
-    read_only_fields = [
+        read_only_fields = [
             "id",
+            "phase",
+            "group_id",
             "club_name",
             "club_logo",
             "played",
@@ -108,7 +114,7 @@ class StandingSerializer(serializers.ModelSerializer):
             "goal_difference",
             "points",
             "position",
-    ]
+        ]
 
     def get_club_logo(self, obj: Standing) -> str | None:
         return get_club_logo_url(obj.club)
