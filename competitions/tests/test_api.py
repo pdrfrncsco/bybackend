@@ -77,6 +77,33 @@ class CompetitionAPITestCase(TestCase):
             Match.objects.filter(competition=self.competition).count(), 2
         )  # 2 teams: 1 round * 2 legs = 2 matches
 
+    def test_generate_schedule_api_uses_knockout_draw_for_cup(self):
+        """Cup competitions should branch to knockout draw generation."""
+        cup = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Taça Nacional",
+            competition_type="cup",
+            season="2026/27",
+        )
+        for club in [self.club1, self.club2]:
+            CompetitionRegistrationService.register_club(
+                tenant=self.tenant,
+                competition=cup,
+                club=club,
+            )
+
+        response = self.client.post(
+            f"/api/v1/competitions/{cup.id}/generate-schedule/",
+            {"start_date": "2026-08-01", "seed": "fixed-seed"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success"], True)
+        self.assertEqual(len(response.data["data"]), 1)
+        self.assertEqual(response.data["data"][0]["phase"], "knockout")
+        self.assertEqual(response.data["data"][0]["round_name"], "Final")
+
     def test_create_competition_with_config_api(self):
         """POST /competitions/ should persist config in the created competition."""
         url = "/api/v1/competitions/"
@@ -239,6 +266,46 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(response.data["success"], True)
         self.assertEqual(len(response.data["data"]), 1)
         self.assertEqual(response.data["data"][0]["club_name"], "Petro de Luanda")
+
+    def test_draw_bracket_and_rounds_api(self):
+        """Draw should generate bracket data and rounds endpoints should expose it."""
+        cup = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Taça de Luanda",
+            competition_type="cup",
+            season="2026/27",
+        )
+        club3 = Club.objects.create(name="Sagrada Esperança", slug="sagrada-esperanca-api", tenant=self.tenant, city="Dundo")
+        club4 = Club.objects.create(name="Wiliete de Benguela", slug="wiliete-benguela-api", tenant=self.tenant, city="Benguela")
+
+        for club in [self.club1, self.club2, club3, club4]:
+            CompetitionRegistrationService.register_club(
+                tenant=self.tenant,
+                competition=cup,
+                club=club,
+            )
+
+        draw_response = self.client.post(
+            f"/api/v1/competitions/{cup.id}/draw/",
+            {"start_date": "2026-08-01", "seed": "fixed-seed"},
+            format="json",
+        )
+        self.assertEqual(draw_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(draw_response.data["success"], True)
+        self.assertEqual(len(draw_response.data["data"]["matches"]), 2)
+        self.assertEqual(len(draw_response.data["data"]["bracket"]["rounds"]), 1)
+
+        bracket_response = self.client.get(f"/api/v1/competitions/{cup.id}/bracket/")
+        self.assertEqual(bracket_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(bracket_response.data["success"], True)
+        self.assertEqual(len(bracket_response.data["data"]["rounds"]), 1)
+        self.assertEqual(bracket_response.data["data"]["rounds"][0]["round_name"], "Semi-finals")
+
+        rounds_response = self.client.get(f"/api/v1/competitions/{cup.id}/rounds/")
+        self.assertEqual(rounds_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(rounds_response.data["success"], True)
+        self.assertEqual(len(rounds_response.data["data"]), 1)
+        self.assertEqual(rounds_response.data["data"][0]["matches_count"], 2)
 
     @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
     def test_list_competitions_filters_by_subdomain_tenant(self):

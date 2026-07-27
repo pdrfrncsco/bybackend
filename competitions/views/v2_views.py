@@ -21,6 +21,7 @@ from competitions.exceptions import CompetitionNotFound
 from competitions.models import Competition, Match, Standing
 from competitions.selectors import CompetitionSelector, CompetitionRegistrationSelector, MatchSelector, StandingSelector
 from competitions.services.competition_registration_service import CompetitionRegistrationService, ClubAlreadyRegistered
+from competitions.services.competition_format_service import CompetitionFormatService
 from competitions.services.match_service import MatchService, MatchNotFound
 from competitions.services.standing_service import StandingService
 from competitions.serializers.v2_serializers import (
@@ -111,13 +112,22 @@ class CompetitionGenerateScheduleView(APIView):
         double_round = bool(request.data.get("double_round", True))
 
         try:
-            matches = MatchService.generate_round_robin_schedule(
-                tenant=tenant,
-                competition=competition,
-                start_date=start_date,
-                rounds_interval_days=interval,
-                double_round=double_round,
-            )
+            if competition.competition_type == "league":
+                matches = MatchService.generate_round_robin_schedule(
+                    tenant=tenant,
+                    competition=competition,
+                    start_date=start_date,
+                    rounds_interval_days=interval,
+                    double_round=double_round,
+                )
+            else:
+                matches = CompetitionFormatService.generate_draw(
+                    tenant=tenant,
+                    competition=competition,
+                    start_date=start_date,
+                    rounds_interval_days=interval,
+                    seed=request.data.get("seed"),
+                )
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
@@ -242,4 +252,103 @@ class CompetitionStandingListView(APIView):
         return success_response(
             data=serializer.data,
             message="Standings retrieved successfully.",
+        )
+
+
+class CompetitionBracketView(APIView):
+    """
+    GET: Retrieve the current bracket for cup/tournament competitions.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["competitions"], summary="Get competition bracket")
+    def get(self, request, competition_id):
+        try:
+            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+        except Competition.DoesNotExist:
+            return not_found_response(message="Competition not found.")
+
+        bracket = CompetitionFormatService.build_bracket(
+            tenant=competition.tenant,
+            competition=competition,
+        )
+        return success_response(
+            data=bracket,
+            message="Bracket retrieved successfully.",
+        )
+
+
+class CompetitionRoundsView(APIView):
+    """
+    GET: Retrieve all scheduled rounds grouped by context.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(tags=["competitions"], summary="Get competition rounds")
+    def get(self, request, competition_id):
+        try:
+            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+        except Competition.DoesNotExist:
+            return not_found_response(message="Competition not found.")
+
+        rounds = CompetitionFormatService.list_rounds(
+            tenant=competition.tenant,
+            competition=competition,
+        )
+        return success_response(
+            data=rounds,
+            message="Rounds retrieved successfully.",
+        )
+
+
+class CompetitionDrawView(APIView):
+    """
+    POST: Generate a knockout draw for cup/tournament competitions.
+    """
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    @extend_schema(
+        tags=["competitions"],
+        summary="Generate competition draw",
+        responses={201: MatchSerializer(many=True)},
+    )
+    def post(self, request, competition_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        try:
+            competition = Competition.objects.get(id=competition_id, tenant=tenant)
+        except Competition.DoesNotExist:
+            return not_found_response(message="Competition not found.")
+
+        start_date_str = request.data.get("start_date")
+        if not start_date_str:
+            return error_response(message="start_date field is required.", status_code=400)
+
+        try:
+            start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        except ValueError:
+            return error_response(message="Invalid start_date format. Use YYYY-MM-DD.", status_code=400)
+
+        try:
+            matches = CompetitionFormatService.generate_draw(
+                tenant=tenant,
+                competition=competition,
+                start_date=start_date,
+                rounds_interval_days=int(request.data.get("rounds_interval_days", 7)),
+                seed=request.data.get("seed"),
+            )
+        except Exception as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        serializer = MatchSerializer(matches, many=True)
+        return created_response(
+            data={
+                "matches": serializer.data,
+                "bracket": CompetitionFormatService.build_bracket(
+                    tenant=tenant,
+                    competition=competition,
+                ),
+            },
+            message="Draw generated successfully.",
         )

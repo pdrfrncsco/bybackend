@@ -3,6 +3,7 @@ from competitions.services.competition_registration_service import CompetitionRe
 from competitions.services.fair_play_service import FairPlayService
 from competitions.services.match_service import MatchService
 from competitions.services.ranking_service import RankingService
+from competitions.services.competition_format_service import CompetitionFormatService
 from competitions.services.regulation_service import CompetitionRegulationService
 from competitions.services.standing_service import StandingService
 
@@ -12,6 +13,7 @@ __all__ = [
     "FairPlayService",
     "MatchService",
     "RankingService",
+    "CompetitionFormatService",
     "CompetitionRegulationService",
     "StandingService",
 ]
