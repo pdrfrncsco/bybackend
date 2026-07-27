@@ -259,7 +259,7 @@ class CompetitionAPITestCase(TestCase):
 
         self.client.force_authenticate(user=None)
         response = self.client.get(
-            f"/api/v1/competitions/{self.competition.id}/standings/?group_id=A&phase=group_stage"
+            f"/api/v1/competitions/{self.competition.id}/standings/?groupId=A&phase=group_stage"
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)

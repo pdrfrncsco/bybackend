@@ -31,6 +31,14 @@ from competitions.serializers.v2_serializers import (
 )
 
 
+def _get_query_param(request, *names: str) -> str | None:
+    for name in names:
+        value = request.query_params.get(name)
+        if value is not None and value != "":
+            return value
+    return None
+
+
 class CompetitionRegisterClubView(APIView):
     """
     POST: Register a club in a competition (Organization Admin only).
@@ -156,8 +164,8 @@ class CompetitionMatchListView(APIView):
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
-        group_id = request.query_params.get("group_id")
-        phase = request.query_params.get("phase")
+        group_id = _get_query_param(request, "group_id", "groupId")
+        phase = _get_query_param(request, "phase")
         matches = MatchSelector.list_by_competition(
             tenant=competition.tenant,
             competition_id=competition_id,
@@ -234,6 +242,8 @@ class CompetitionStandingListView(APIView):
         summary="Get standings table for a competition",
         parameters=[
             OpenApiParameter("group_id", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("groupId", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("format", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
             OpenApiParameter("phase", OpenApiTypes.STR, OpenApiParameter.QUERY, required=False),
         ],
         responses={200: StandingSerializer(many=True)},
@@ -244,8 +254,8 @@ class CompetitionStandingListView(APIView):
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
-        group_id = request.query_params.get("group_id")
-        phase = request.query_params.get("phase")
+        group_id = _get_query_param(request, "group_id", "groupId")
+        phase = _get_query_param(request, "phase")
         standings = StandingSelector.list_by_competition(
             tenant=competition.tenant,
             competition_id=competition_id,
@@ -275,8 +285,8 @@ class CompetitionBracketView(APIView):
         bracket = CompetitionFormatService.build_bracket(
             tenant=competition.tenant,
             competition=competition,
-            group_id=request.query_params.get("group_id"),
-            phase=request.query_params.get("phase"),
+            group_id=_get_query_param(request, "group_id", "groupId"),
+            phase=_get_query_param(request, "phase"),
         )
         return success_response(
             data=bracket,
@@ -300,8 +310,8 @@ class CompetitionRoundsView(APIView):
         rounds = CompetitionFormatService.list_rounds(
             tenant=competition.tenant,
             competition=competition,
-            group_id=request.query_params.get("group_id"),
-            phase=request.query_params.get("phase"),
+            group_id=_get_query_param(request, "group_id", "groupId"),
+            phase=_get_query_param(request, "phase"),
         )
         return success_response(
             data=rounds,
