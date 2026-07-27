@@ -63,12 +63,23 @@ class MatchSelector:
             return None
 
     @staticmethod
-    def list_by_competition(*, tenant: Tenant, competition_id) -> QuerySet:
+    def list_by_competition(
+        *,
+        tenant: Tenant,
+        competition_id,
+        group_id: str | None = None,
+        phase: str | None = None,
+    ) -> QuerySet:
         """List all matches in a competition, ordered by round and date."""
-        return Match.objects.filter(
+        queryset = Match.objects.filter(
             competition_id=competition_id,
             tenant=tenant
-        ).select_related("home_club", "away_club").order_by("phase", "group_id", "round_number", "match_date")
+        ).select_related("home_club", "away_club")
+        if group_id is not None:
+            queryset = queryset.filter(group_id=group_id)
+        if phase is not None:
+            queryset = queryset.filter(phase=phase)
+        return queryset.order_by("phase", "group_id", "round_number", "match_date")
 
     @staticmethod
     def list_by_club(*, tenant: Tenant, club_id) -> QuerySet:

@@ -100,6 +100,14 @@ class MatchService:
         # Recalculate standings for this competition
         StandingService.recalculate_standings(tenant=tenant, competition=match.competition)
 
+        if match.competition.competition_type in {"cup", "tournament"}:
+            from competitions.services.competition_format_service import CompetitionFormatService
+
+            CompetitionFormatService.advance_knockout_rounds(
+                tenant=tenant,
+                competition=match.competition,
+            )
+
         return match
 
     @staticmethod

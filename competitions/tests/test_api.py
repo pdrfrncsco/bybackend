@@ -307,6 +307,42 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(len(rounds_response.data["data"]), 1)
         self.assertEqual(rounds_response.data["data"][0]["matches_count"], 2)
 
+    def test_draw_bracket_exposes_byes_explicitly(self):
+        """Draw bracket should include explicit byes for incomplete knockout slots."""
+        cup = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Taça com Byes",
+            competition_type="cup",
+            season="2026/27",
+        )
+        clubs = [
+            self.club1,
+            self.club2,
+            Club.objects.create(name="Sagrada Esperança", slug="sagrada-esperanca-bye", tenant=self.tenant, city="Dundo"),
+            Club.objects.create(name="Wiliete de Benguela", slug="wiliete-benguela-bye", tenant=self.tenant, city="Benguela"),
+            Club.objects.create(name="Interclube", slug="interclube-bye", tenant=self.tenant, city="Luanda"),
+        ]
+        for club in clubs:
+            CompetitionRegistrationService.register_club(
+                tenant=self.tenant,
+                competition=cup,
+                club=club,
+            )
+
+        self.client.force_authenticate(user=self.user)
+        self.client.post(
+            f"/api/v1/competitions/{cup.id}/draw/",
+            {"start_date": "2026-08-01", "seed": "fixed-seed"},
+            format="json",
+        )
+
+        bracket_response = self.client.get(f"/api/v1/competitions/{cup.id}/bracket/")
+        self.assertEqual(bracket_response.status_code, status.HTTP_200_OK)
+        first_round = bracket_response.data["data"]["rounds"][0]
+        self.assertEqual(first_round["round_number"], 1)
+        self.assertEqual(len(first_round["byes"]), 3)
+        self.assertTrue(all("club" in item for item in first_round["byes"]))
+
     @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
     def test_list_competitions_filters_by_subdomain_tenant(self):
         """Public competition list should use request.tenant when subdomain is present."""

@@ -267,3 +267,62 @@ class CompetitionServicesTestCase(TestCase):
         self.assertGreater(standing2.goal_difference, standing1.goal_difference)
         self.assertEqual(standing1.position, 1)
         self.assertEqual(standing2.position, 2)
+
+    def test_knockout_progression_creates_next_round_after_semis(self):
+        """Completing knockout matches should auto-create the next round."""
+        competition = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Cup Progression",
+            competition_type="cup",
+            season="2025/26",
+        )
+
+        clubs = [self.club1, self.club2, self.club3, self.club4]
+        for club in clubs:
+            CompetitionRegistrationService.register_club(
+                tenant=self.tenant,
+                competition=competition,
+                club=club,
+            )
+
+        from competitions.services.competition_format_service import CompetitionFormatService
+
+        CompetitionFormatService.generate_draw(
+            tenant=self.tenant,
+            competition=competition,
+            start_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
+            seed="fixed-seed",
+        )
+
+        semi_matches = list(
+            Match.objects.filter(
+                competition=competition,
+                tenant=self.tenant,
+                phase="knockout",
+                round_number=1,
+            ).order_by("created_at")
+        )
+        self.assertEqual(len(semi_matches), 2)
+
+        MatchService.update_match_score(
+            tenant=self.tenant,
+            match_id=semi_matches[0].id,
+            home_score=2,
+            away_score=0,
+        )
+        MatchService.update_match_score(
+            tenant=self.tenant,
+            match_id=semi_matches[1].id,
+            home_score=1,
+            away_score=0,
+        )
+
+        final_matches = Match.objects.filter(
+            competition=competition,
+            tenant=self.tenant,
+            phase="knockout",
+            round_number=2,
+        )
+        self.assertEqual(final_matches.count(), 1)
+        final_match = final_matches.first()
+        self.assertEqual(final_match.round_name, "Final")

@@ -156,9 +156,13 @@ class CompetitionMatchListView(APIView):
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
+        group_id = request.query_params.get("group_id")
+        phase = request.query_params.get("phase")
         matches = MatchSelector.list_by_competition(
             tenant=competition.tenant,
             competition_id=competition_id,
+            group_id=group_id,
+            phase=phase,
         )
         serializer = MatchSerializer(matches, many=True)
         return success_response(
@@ -271,6 +275,8 @@ class CompetitionBracketView(APIView):
         bracket = CompetitionFormatService.build_bracket(
             tenant=competition.tenant,
             competition=competition,
+            group_id=request.query_params.get("group_id"),
+            phase=request.query_params.get("phase"),
         )
         return success_response(
             data=bracket,
@@ -294,6 +300,8 @@ class CompetitionRoundsView(APIView):
         rounds = CompetitionFormatService.list_rounds(
             tenant=competition.tenant,
             competition=competition,
+            group_id=request.query_params.get("group_id"),
+            phase=request.query_params.get("phase"),
         )
         return success_response(
             data=rounds,
