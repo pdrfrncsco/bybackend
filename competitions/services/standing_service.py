@@ -5,6 +5,7 @@ Recalculates standing positions for competitions based on match results.
 """
 
 import logging
+from collections import defaultdict
 from django.db import transaction
 
 from core.models import Tenant
@@ -18,7 +19,6 @@ class StandingService:
     Handles recalculating standings for a competition.
     """
 
-    @staticmethod
     @transaction.atomic
     def recalculate_standings(
         *,
@@ -84,7 +84,8 @@ class StandingService:
             else:
                 finished_matches = finished_matches.filter(phase=context_phase)
 
-            for match in finished_matches:
+            context_matches = list(finished_matches)
+            for match in context_matches:
                 h_id = match.home_club_id
                 a_id = match.away_club_id
                 h_score = match.home_score
@@ -132,7 +133,12 @@ class StandingService:
                 standing.points = int(stats["points"])
                 context_standings.append(standing)
 
-            context_standings.sort(key=StandingService._standings_sort_key)
+            tiebreakers = StandingService._get_tiebreakers(competition)
+            context_standings = StandingService._sort_standings(
+                standings=context_standings,
+                matches=context_matches,
+                tiebreakers=tiebreakers,
+            )
 
             for idx, standing in enumerate(context_standings, start=1):
                 standing.position = idx
@@ -146,6 +152,121 @@ class StandingService:
             tenant.slug,
         )
         return updated_standings
+
+    def _get_tiebreakers(competition: Competition) -> list[str]:
+        config = competition.config or {}
+        tiebreakers = config.get("tiebreakers")
+        if isinstance(tiebreakers, list) and tiebreakers:
+            return [str(item) for item in tiebreakers]
+        return ["points", "goalDifference", "goalsFor"]
+
+    def _sort_standings(
+        *,
+        standings: list[Standing],
+        matches: list[Match],
+        tiebreakers: list[str],
+    ) -> list[Standing]:
+        if len(standings) <= 1 or not tiebreakers:
+            return sorted(standings, key=lambda standing: standing.club.name.lower())
+
+        primary = tiebreakers[0]
+        key_map = StandingService._build_sort_key_map(
+            standings=standings,
+            matches=matches,
+            tiebreaker=primary,
+        )
+
+        grouped: dict[tuple, list[Standing]] = defaultdict(list)
+        for standing in standings:
+            grouped[key_map[standing.id]].append(standing)
+
+        sorted_keys = sorted(grouped.keys(), reverse=True)
+        sorted_standings: list[Standing] = []
+        for key in sorted_keys:
+            bucket = grouped[key]
+            if len(bucket) == 1:
+                sorted_standings.extend(bucket)
+            else:
+                sorted_standings.extend(
+                    StandingService._sort_standings(
+                        standings=bucket,
+                        matches=matches,
+                        tiebreakers=tiebreakers[1:],
+                    )
+                )
+        return sorted_standings
+
+    @staticmethod
+    def _build_sort_key_map(
+        *,
+        standings: list[Standing],
+        matches: list[Match],
+        tiebreaker: str,
+    ) -> dict[str, tuple]:
+        if tiebreaker == "headToHead":
+            return StandingService._head_to_head_key_map(standings=standings, matches=matches)
+
+        key_map: dict[str, tuple] = {}
+        for standing in standings:
+            if tiebreaker == "points":
+                key_map[standing.id] = (standing.points,)
+            elif tiebreaker == "goalDifference":
+                key_map[standing.id] = (standing.goal_difference,)
+            elif tiebreaker == "goalsFor":
+                key_map[standing.id] = (standing.goals_for,)
+            elif tiebreaker == "wins":
+                key_map[standing.id] = (standing.won,)
+            elif tiebreaker == "draws":
+                key_map[standing.id] = (standing.drawn,)
+            elif tiebreaker == "losses":
+                key_map[standing.id] = (-standing.lost,)
+            elif tiebreaker == "played":
+                key_map[standing.id] = (-standing.played,)
+            else:
+                key_map[standing.id] = (standing.club.name.lower(),)
+        return key_map
+
+    @staticmethod
+    def _head_to_head_key_map(
+        *,
+        standings: list[Standing],
+        matches: list[Match],
+    ) -> dict[str, tuple]:
+        club_ids = {standing.club_id for standing in standings}
+        h2h_stats: dict[str, dict[str, int]] = {
+            standing.club_id: {"points": 0, "goal_difference": 0, "goals_for": 0}
+            for standing in standings
+        }
+
+        for match in matches:
+            if match.home_club_id not in club_ids or match.away_club_id not in club_ids:
+                continue
+            if match.home_score is None or match.away_score is None:
+                continue
+
+            home_stats = h2h_stats[match.home_club_id]
+            away_stats = h2h_stats[match.away_club_id]
+            home_stats["goals_for"] += match.home_score
+            home_stats["goal_difference"] += match.home_score - match.away_score
+            away_stats["goals_for"] += match.away_score
+            away_stats["goal_difference"] += match.away_score - match.home_score
+
+            if match.home_score > match.away_score:
+                home_stats["points"] += 3
+            elif match.home_score < match.away_score:
+                away_stats["points"] += 3
+            else:
+                home_stats["points"] += 1
+                away_stats["points"] += 1
+
+        return {
+            standing.id: (
+                h2h_stats[standing.club_id]["points"],
+                h2h_stats[standing.club_id]["goal_difference"],
+                h2h_stats[standing.club_id]["goals_for"],
+            )
+            for standing in standings
+        }
 
     @staticmethod
     def _resolve_contexts(
@@ -172,17 +293,4 @@ class StandingService:
                 competition=competition,
                 tenant=tenant,
             ).values_list("group_id", "phase").distinct()
-        )
-
-    @staticmethod
-    def _standings_sort_key(standing: Standing) -> tuple:
-        return (
-            -standing.points,
-            -standing.goal_difference,
-            -standing.goals_for,
-            -standing.won,
-            -standing.drawn,
-            standing.lost,
-            standing.played,
-            standing.club.name.lower(),
         )

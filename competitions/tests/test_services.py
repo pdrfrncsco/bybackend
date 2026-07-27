@@ -209,3 +209,61 @@ class CompetitionServicesTestCase(TestCase):
 
         self.assertEqual(standing1.points, 5)
         self.assertEqual(standing2.points, 0)
+
+    def test_head_to_head_tiebreaker_overrides_goal_difference(self):
+        """Head-to-head should rank teams before goal difference when configured."""
+        competition = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Tiebreak Cup",
+            competition_type="cup",
+            season="2025/26",
+            config={
+                "pointsWin": 3,
+                "pointsDraw": 1,
+                "pointsLoss": 0,
+                "tiebreakers": ["points", "headToHead", "goalDifference", "goalsFor"],
+            },
+        )
+
+        clubs = [self.club1, self.club2, self.club3, self.club4]
+        for club in clubs:
+            CompetitionRegistrationService.register_club(
+                tenant=self.tenant,
+                competition=competition,
+                club=club,
+            )
+
+        # A beats B, but B has better goal difference from other results.
+        fixtures = [
+            (self.club1, self.club2, 1, 0),
+            (self.club1, self.club3, 1, 0),
+            (self.club1, self.club4, 0, 1),
+            (self.club2, self.club3, 3, 0),
+            (self.club2, self.club4, 3, 0),
+        ]
+        for home, away, home_score, away_score in fixtures:
+            Match.objects.create(
+                competition=competition,
+                tenant=self.tenant,
+                home_club=home,
+                away_club=away,
+                match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
+                round_number=1,
+                status=Match.MatchStatus.FINISHED,
+                home_score=home_score,
+                away_score=away_score,
+            )
+
+        standings = StandingService.recalculate_standings(
+            tenant=self.tenant,
+            competition=competition,
+        )
+
+        standing1 = next(item for item in standings if item.club_id == self.club1.id)
+        standing2 = next(item for item in standings if item.club_id == self.club2.id)
+
+        self.assertEqual(standing1.points, 6)
+        self.assertEqual(standing2.points, 6)
+        self.assertGreater(standing2.goal_difference, standing1.goal_difference)
+        self.assertEqual(standing1.position, 1)
+        self.assertEqual(standing2.position, 2)
