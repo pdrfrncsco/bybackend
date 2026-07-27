@@ -1,6 +1,7 @@
 from competitions.views.competition_views import (
     CompetitionListCreateView,
     CompetitionDetailView,
+    CompetitionConfigView,
 )
 from competitions.views.v2_views import (
     CompetitionRegisterClubView,
@@ -21,6 +22,7 @@ from competitions.views.lineup_views import (
 __all__ = [
     "CompetitionListCreateView",
     "CompetitionDetailView",
+    "CompetitionConfigView",
     "CompetitionRegisterClubView",
     "CompetitionGenerateScheduleView",
     "CompetitionMatchListView",

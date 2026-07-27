@@ -10,6 +10,7 @@ from common.responses import created_response, error_response, not_found_respons
 from competitions.exceptions import CompetitionNotFound, DuplicateCompetition
 from competitions.selectors import CompetitionSelector
 from competitions.serializers import (
+    CompetitionConfigSerializer,
     CompetitionCreateSerializer,
     CompetitionSerializer,
     CompetitionUpdateSerializer,
@@ -124,4 +125,62 @@ class CompetitionDetailView(APIView):
         return success_response(
             data=CompetitionSerializer(competition).data,
             message="Competition updated successfully.",
+        )
+
+
+class CompetitionConfigView(APIView):
+    """
+    GET   → organization admin only: retrieve competition configuration.
+    PATCH → organization admin only: update competition configuration.
+    """
+
+    def get_permissions(self):
+        return [IsAuthenticated(), IsActiveAccount(), IsOrganizationAdmin()]
+
+    @extend_schema(tags=["competitions"], responses={200: CompetitionConfigSerializer})
+    def get(self, request, competition_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        try:
+            competition = CompetitionService.get_competition_for_tenant(
+                tenant=tenant,
+                competition_id=competition_id,
+            )
+        except CompetitionNotFound:
+            return not_found_response(message="Competition not found.")
+
+        return success_response(
+            data=CompetitionConfigSerializer(competition).data,
+            message="Competition configuration retrieved successfully.",
+        )
+
+    @extend_schema(
+        tags=["competitions"],
+        request=CompetitionConfigSerializer,
+        responses={200: CompetitionConfigSerializer},
+    )
+    def patch(self, request, competition_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        try:
+            competition = CompetitionService.get_competition_for_tenant(
+                tenant=tenant,
+                competition_id=competition_id,
+            )
+        except CompetitionNotFound:
+            return not_found_response(message="Competition not found.")
+
+        serializer = CompetitionConfigSerializer(competition, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        competition = CompetitionService.update_competition_config(
+            competition=competition,
+            config=serializer.validated_data.get("config", competition.config),
+        )
+
+        return success_response(
+            data=CompetitionConfigSerializer(competition).data,
+            message="Competition configuration updated successfully.",
         )

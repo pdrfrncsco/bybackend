@@ -22,6 +22,7 @@ class CompetitionService:
         competition_type: str,
         season: str,
         status: str = CompetitionStatus.DRAFT,
+        config: dict | None = None,
     ) -> Competition:
         slug = slugify(name) or "competition"
         if Competition.objects.filter(
@@ -38,6 +39,7 @@ class CompetitionService:
             competition_type=competition_type,
             season=season,
             status=status,
+            config=config or {},
         )
         logger.info("Competition created: %s (%s)", competition.name, competition.id)
         return competition
@@ -45,7 +47,7 @@ class CompetitionService:
     @staticmethod
     @transaction.atomic
     def update_competition(*, competition: Competition, **kwargs) -> Competition:
-        updatable_fields = ["name", "competition_type", "season", "status"]
+        updatable_fields = ["name", "competition_type", "season", "status", "config"]
         updated_fields = ["updated_at"]
 
         for field in updatable_fields:
@@ -59,6 +61,14 @@ class CompetitionService:
 
         competition.save(update_fields=list(dict.fromkeys(updated_fields)))
         logger.info("Competition updated: %s (%s)", competition.name, competition.id)
+        return competition
+
+    @staticmethod
+    @transaction.atomic
+    def update_competition_config(*, competition: Competition, config: dict) -> Competition:
+        competition.config = config
+        competition.save(update_fields=["config", "updated_at"])
+        logger.info("Competition config updated: %s (%s)", competition.name, competition.id)
         return competition
 
     @staticmethod

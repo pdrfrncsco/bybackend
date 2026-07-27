@@ -77,6 +77,56 @@ class CompetitionAPITestCase(TestCase):
             Match.objects.filter(competition=self.competition).count(), 2
         )  # 2 teams: 1 round * 2 legs = 2 matches
 
+    def test_create_competition_with_config_api(self):
+        """POST /competitions/ should persist config in the created competition."""
+        url = "/api/v1/competitions/"
+        payload = {
+            "name": "Taça Nacional",
+            "competition_type": "cup",
+            "season": "2026/27",
+            "status": "draft",
+            "config": {
+                "pointsWin": 3,
+                "pointsDraw": 1,
+                "pointsLoss": 0,
+            },
+        }
+
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["success"], True)
+        self.assertEqual(response.data["data"]["config"]["pointsWin"], 3)
+
+        competition = Competition.objects.get(name="Taça Nacional")
+        self.assertEqual(competition.config["pointsDraw"], 1)
+
+    def test_get_and_patch_competition_config_api(self):
+        """Competition config endpoint should retrieve and update config independently."""
+        url = f"/api/v1/competitions/{self.competition.id}/config/"
+
+        get_response = self.client.get(url)
+        self.assertEqual(get_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(get_response.data["success"], True)
+        self.assertEqual(get_response.data["data"]["config"], {})
+
+        patch_payload = {
+            "config": {
+                "pointsWin": 4,
+                "pointsDraw": 2,
+                "pointsLoss": 0,
+                "tiebreakers": ["goalDifference", "goalsFor"],
+            }
+        }
+        patch_response = self.client.patch(url, patch_payload, format="json")
+
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_response.data["success"], True)
+        self.assertEqual(patch_response.data["data"]["config"]["pointsWin"], 4)
+
+        self.competition.refresh_from_db()
+        self.assertEqual(self.competition.config["tiebreakers"], ["goalDifference", "goalsFor"])
+
     def test_list_matches_api(self):
         """Test public GET list matches endpoint."""
         # Create a mock match

@@ -46,6 +46,7 @@ class Competition(BaseModel):
         default=CompetitionStatus.DRAFT,
         verbose_name="Status",
     )
+    config = models.JSONField(default=dict, blank=True, verbose_name="Configuration")
 
     class Meta:
         ordering = ["-created_at"]

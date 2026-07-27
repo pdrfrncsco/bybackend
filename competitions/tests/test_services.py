@@ -108,6 +108,19 @@ class CompetitionServicesTestCase(TestCase):
 
         self.assertEqual(len(matches), 6)
 
+    def test_create_competition_persists_config(self):
+        """Competition creation should store config payloads."""
+        competition = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Taça Teste",
+            competition_type="cup",
+            season="2025/26",
+            config={"pointsWin": 5, "settings": {"doubleRound": False}},
+        )
+
+        self.assertEqual(competition.config["pointsWin"], 5)
+        self.assertFalse(competition.config["settings"]["doubleRound"])
+
     def test_match_score_update_recalculates_standings(self):
         """Test that updating a match score updates standings and points correctly."""
         # Register 2 clubs

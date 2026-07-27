@@ -3,6 +3,7 @@ from django.urls import path
 from competitions.views import (
     CompetitionListCreateView,
     CompetitionDetailView,
+    CompetitionConfigView,
     CompetitionRegisterClubView,
     CompetitionGenerateScheduleView,
     CompetitionMatchListView,
@@ -32,6 +33,7 @@ urlpatterns = [
     # Competition CRUD
     path("", CompetitionListCreateView.as_view(), name="competition-list-create"),
     path("<uuid:competition_id>/", CompetitionDetailView.as_view(), name="competition-detail"),
+    path("<uuid:competition_id>/config/", CompetitionConfigView.as_view(), name="competition-config"),
 
     # Phase 3 — Registration, Schedule, Matches, Standings
     path("<uuid:competition_id>/register-club/", CompetitionRegisterClubView.as_view(), name="competition-register-club"),

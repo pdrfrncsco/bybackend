@@ -19,6 +19,7 @@ class CompetitionSerializer(serializers.ModelSerializer):
             "season",
             "status",
             "status_label",
+            "config",
             "tenant",
             "created_at",
             "updated_at",
@@ -41,9 +42,11 @@ class CompetitionSerializer(serializers.ModelSerializer):
 
 
 class CompetitionCreateSerializer(serializers.ModelSerializer):
+    config = serializers.JSONField(required=False, default=dict)
+
     class Meta:
         model = Competition
-        fields = ["name", "competition_type", "season", "status"]
+        fields = ["name", "competition_type", "season", "status", "config"]
 
     def validate_competition_type(self, value: str) -> str:
         valid = {choice[0] for choice in CompetitionType.CHOICES}
@@ -51,14 +54,39 @@ class CompetitionCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Invalid competition type.")
         return value
 
+    def validate_config(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Config must be a JSON object.")
+        return value
+
 
 class CompetitionUpdateSerializer(serializers.ModelSerializer):
+    config = serializers.JSONField(required=False)
+
     class Meta:
         model = Competition
-        fields = ["name", "competition_type", "season", "status"]
+        fields = ["name", "competition_type", "season", "status", "config"]
 
     def validate_competition_type(self, value: str) -> str:
         valid = {choice[0] for choice in CompetitionType.CHOICES}
         if value not in valid:
             raise serializers.ValidationError("Invalid competition type.")
+        return value
+
+    def validate_config(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Config must be a JSON object.")
+        return value
+
+
+class CompetitionConfigSerializer(serializers.ModelSerializer):
+    config = serializers.JSONField(required=False, default=dict)
+
+    class Meta:
+        model = Competition
+        fields = ["config"]
+
+    def validate_config(self, value):
+        if not isinstance(value, dict):
+            raise serializers.ValidationError("Config must be a JSON object.")
         return value
