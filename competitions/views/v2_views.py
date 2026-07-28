@@ -204,6 +204,41 @@ class CompetitionMatchListView(APIView):
 
         home_club_id = serializer.validated_data["home_club"]
         away_club_id = serializer.validated_data["away_club"]
+        phase = serializer.validated_data.get("phase") or None
+        group_id = serializer.validated_data.get("group_id") or None
+
+        if competition.competition_type == "league":
+            if phase or group_id:
+                return error_response(
+                    message="League matches do not use phase or group fields.",
+                    status_code=400,
+                )
+            phase = None
+            group_id = None
+        elif competition.competition_type == "cup":
+            if group_id:
+                return error_response(
+                    message="Cup matches do not use group fields.",
+                    status_code=400,
+                )
+            phase = phase or "knockout"
+            if phase != "knockout":
+                return error_response(
+                    message="Cup matches must be created in the knockout phase.",
+                    status_code=400,
+                )
+            group_id = None
+        elif competition.competition_type == "tournament":
+            if phase not in {"group_stage", "knockout"}:
+                return error_response(
+                    message="Tournament matches require a valid phase.",
+                    status_code=400,
+                )
+            if phase == "group_stage" and not group_id:
+                return error_response(
+                    message="Group stage matches require a group_id.",
+                    status_code=400,
+                )
 
         try:
             home_club = Club.objects.get(id=home_club_id, tenant=tenant)
@@ -220,8 +255,8 @@ class CompetitionMatchListView(APIView):
                 match_date=serializer.validated_data["match_date"],
                 round_number=serializer.validated_data["round_number"],
                 round_name=serializer.validated_data.get("round_name") or None,
-                phase=serializer.validated_data.get("phase") or None,
-                group_id=serializer.validated_data.get("group_id") or None,
+                phase=phase,
+                group_id=group_id,
                 venue=serializer.validated_data.get("venue") or "",
                 status=serializer.validated_data.get("status", Match.MatchStatus.SCHEDULED),
             )

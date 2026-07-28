@@ -200,6 +200,26 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(str(response.data["data"]["away_club"]), str(self.club2.id))
         self.assertEqual(Match.objects.filter(competition=self.competition).count(), 1)
 
+    def test_create_match_api_rejects_league_context_fields(self):
+        """League matches should reject phase/group fields to avoid invalid context data."""
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club1)
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club2)
+
+        url = f"/api/v1/competitions/{self.competition.id}/matches/"
+        payload = {
+            "home_club": str(self.club1.id),
+            "away_club": str(self.club2.id),
+            "match_date": "2026-08-01T16:00:00Z",
+            "round_number": 2,
+            "phase": "knockout",
+            "group_id": "A",
+        }
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["success"], False)
+        self.assertIn("phase or group", response.data["message"])
+
     def test_update_match_score_api(self):
         """Test PATCH update match score and standings recalculation."""
         # Register clubs
