@@ -26,6 +26,7 @@ from competitions.services.match_service import MatchService, MatchNotFound
 from competitions.services.standing_service import StandingService
 from competitions.serializers.v2_serializers import (
     CompetitionRegistrationSerializer,
+    MatchCreateSerializer,
     MatchSerializer,
     StandingSerializer,
 )
@@ -149,8 +150,13 @@ class CompetitionGenerateScheduleView(APIView):
 class CompetitionMatchListView(APIView):
     """
     GET: Retrieve match schedule/results for a competition.
+    POST: Create a manual match inside the competition.
     """
-    permission_classes = [AllowAny]
+
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated(), IsActiveAccount(), IsOrganizationAdmin()]
 
     @extend_schema(
         tags=["competitions"],
@@ -176,6 +182,55 @@ class CompetitionMatchListView(APIView):
         return success_response(
             data=serializer.data,
             message="Matches retrieved successfully.",
+        )
+
+    @extend_schema(
+        tags=["competitions"],
+        summary="Create a manual match for a competition",
+        request=MatchCreateSerializer,
+        responses={201: MatchSerializer},
+    )
+    def post(self, request, competition_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        try:
+            competition = Competition.objects.get(id=competition_id, tenant=tenant)
+        except Competition.DoesNotExist:
+            return not_found_response(message="Competition not found.")
+
+        serializer = MatchCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        home_club_id = serializer.validated_data["home_club"]
+        away_club_id = serializer.validated_data["away_club"]
+
+        try:
+            home_club = Club.objects.get(id=home_club_id, tenant=tenant)
+            away_club = Club.objects.get(id=away_club_id, tenant=tenant)
+        except Club.DoesNotExist:
+            return not_found_response(message="Club not found.")
+
+        try:
+            match = MatchService.create_match(
+                tenant=tenant,
+                competition=competition,
+                home_club=home_club,
+                away_club=away_club,
+                match_date=serializer.validated_data["match_date"],
+                round_number=serializer.validated_data["round_number"],
+                round_name=serializer.validated_data.get("round_name") or None,
+                phase=serializer.validated_data.get("phase") or None,
+                group_id=serializer.validated_data.get("group_id") or None,
+                venue=serializer.validated_data.get("venue") or "",
+                status=serializer.validated_data.get("status", Match.MatchStatus.SCHEDULED),
+            )
+        except Exception as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return created_response(
+            data=MatchSerializer(match).data,
+            message="Match created successfully.",
         )
 
 

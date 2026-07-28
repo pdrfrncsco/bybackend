@@ -41,10 +41,23 @@ class MatchService:
         phase: str | None = None,
         group_id: str | None = None,
         venue: str = "",
+        status: str = Match.MatchStatus.SCHEDULED,
     ) -> Match:
         """Create a scheduled match."""
         if home_club.tenant != tenant or away_club.tenant != tenant or competition.tenant != tenant:
             raise PermissionError("All entities must belong to the same tenant.")
+
+        if home_club.id == away_club.id:
+            raise ValueError("Home and away clubs must be different.")
+
+        registration_filter = {
+            "competition": competition,
+            "tenant": tenant,
+        }
+        if not CompetitionRegistration.objects.filter(**registration_filter, club=home_club).exists():
+            raise ValueError(f"Club {home_club.name} is not registered in this competition.")
+        if not CompetitionRegistration.objects.filter(**registration_filter, club=away_club).exists():
+            raise ValueError(f"Club {away_club.name} is not registered in this competition.")
 
         if timezone.is_naive(match_date):
             match_date = timezone.make_aware(match_date, timezone.get_current_timezone())
@@ -59,7 +72,7 @@ class MatchService:
             round_name=round_name,
             phase=phase,
             group_id=group_id,
-            status=Match.MatchStatus.SCHEDULED,
+            status=status,
             venue=venue,
         )
 

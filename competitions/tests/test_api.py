@@ -178,6 +178,28 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(len(response.data["data"]), 1)
         self.assertEqual(response.data["data"][0]["id"], str(match.id))
 
+    def test_create_match_api(self):
+        """Test creating a manual match through the competition matches endpoint."""
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club1)
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club2)
+
+        url = f"/api/v1/competitions/{self.competition.id}/matches/"
+        payload = {
+            "home_club": str(self.club1.id),
+            "away_club": str(self.club2.id),
+            "match_date": "2026-08-01T16:00:00Z",
+            "round_number": 2,
+            "round_name": "Jornada 2",
+            "venue": "Estádio 11 de Novembro",
+        }
+        response = self.client.post(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["success"], True)
+        self.assertEqual(str(response.data["data"]["home_club"]), str(self.club1.id))
+        self.assertEqual(str(response.data["data"]["away_club"]), str(self.club2.id))
+        self.assertEqual(Match.objects.filter(competition=self.competition).count(), 1)
+
     def test_update_match_score_api(self):
         """Test PATCH update match score and standings recalculation."""
         # Register clubs

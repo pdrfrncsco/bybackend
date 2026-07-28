@@ -75,6 +75,27 @@ class MatchSerializer(serializers.ModelSerializer):
         return get_club_logo_url(obj.away_club)
 
 
+class MatchCreateSerializer(serializers.Serializer):
+    home_club = serializers.UUIDField()
+    away_club = serializers.UUIDField()
+    match_date = serializers.DateTimeField()
+    round_number = serializers.IntegerField(required=False, min_value=1, default=1)
+    round_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
+    phase = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=50)
+    group_id = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=64)
+    venue = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    status = serializers.ChoiceField(
+        choices=Match.MatchStatus.choices,
+        required=False,
+        default=Match.MatchStatus.SCHEDULED,
+    )
+
+    def validate(self, attrs):
+        if attrs["home_club"] == attrs["away_club"]:
+            raise serializers.ValidationError("Home and away clubs must be different.")
+        return attrs
+
+
 class StandingSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source="club.name", read_only=True)
     club_logo = serializers.SerializerMethodField()
