@@ -114,6 +114,20 @@ class MatchLineup(BaseModel):
         help_text="Position in formation (1-11 for starters).",
     )
 
+    # ─── Eligibility (Phase 3: Match Center) ─────────────────────────────────
+    eligible = models.BooleanField(
+        default=True,
+        verbose_name="Is Eligible",
+        help_text="Whether this player is eligible for this match.",
+    )
+    eligibility_warning = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name="Eligibility Warning",
+        help_text="Warning message if player has eligibility issues.",
+    )
+
     # ─── Stats (populated after match) ────────────────────────────────────────
     minutes_played = models.PositiveSmallIntegerField(
         null=True,

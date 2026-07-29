@@ -6,6 +6,7 @@ Endpoints:
   POST /api/v1/competitions/<competition_id>/matches/<match_id>/events/  → add event (admin)
   DELETE /api/v1/competitions/<competition_id>/matches/<match_id>/events/<event_id>/ → remove event (admin)
   GET  /api/v1/competitions/<competition_id>/stats/  → player stats leaderboard (public)
+  GET  /api/v1/matches/live/  → live matches globally
 """
 
 from rest_framework.views import APIView
@@ -21,6 +22,7 @@ from common.responses import (
 from organizations.permissions import IsOrganizationAdmin
 from organizations.services import OrganizationService
 from competitions.models import Match, MatchEvent
+from competitions.serializers.v2_serializers import MatchSerializer
 from competitions.services.match_event_service import (
     MatchEventService, MatchEventNotFound, InvalidMatchEventData
 )
@@ -167,4 +169,32 @@ class CompetitionPlayerStatsView(APIView):
         return success_response(
             data=PlayerStatsSerializer(stats, many=True).data,
             message="Player stats retrieved successfully.",
+        )
+
+
+class LiveMatchesView(APIView):
+    """
+    GET → public: list all live matches globally.
+    
+    Returns matches with status='live' or status='halftime',
+    with all related data (home/away clubs, competition).
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["match-center"],
+        summary="List live matches globally",
+        responses={200: MatchSerializer(many=True)},
+    )
+    def get(self, request):
+        matches = Match.objects.filter(
+            status__in=['live', 'halftime']
+        ).select_related(
+            'home_club', 'away_club', 'competition'
+        ).prefetch_related('events')
+        
+        serializer = MatchSerializer(matches, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Live matches retrieved successfully."
         )

@@ -16,10 +16,13 @@ class Match(BaseModel):
 
     class MatchStatus(models.TextChoices):
         SCHEDULED = "scheduled", "Agendado"
+        PRE_MATCH = "pre_match", "Pré-jogo"
         LIVE = "live", "Em Curso"
+        HALFTIME = "halftime", "Intervalo"
         FINISHED = "finished", "Concluído"
         POSTPONED = "postponed", "Adiado"
         CANCELLED = "cancelled", "Cancelado"
+        WALKOVER = "walkover", "Walkover"
 
     competition = models.ForeignKey(
         "competitions.Competition",
