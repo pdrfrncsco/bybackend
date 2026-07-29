@@ -162,6 +162,7 @@ class LineupService:
         # Update submission
         submission.formation = formation
         submission.submit(submitted_by)
+        submission.save(update_fields=["formation"])
         
         return submission
 

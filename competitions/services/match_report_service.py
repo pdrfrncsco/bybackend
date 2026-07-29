@@ -161,8 +161,14 @@ class MatchReportService:
         if goal_type not in ["normal", "penalty", "own_goal"]:
             raise GoalRecordingError(f"Invalid goal type: {goal_type}")
 
-        # Verify player belongs to club
-        if player.club_id != club.id:
+        # Verify player registration / club
+        from players.models import PlayerRegistration
+        is_registered = PlayerRegistration.objects.filter(
+            player=player,
+            club=club,
+            status__in=[PlayerRegistration.RegistrationStatus.REGISTERED, PlayerRegistration.RegistrationStatus.LOANED]
+        ).exists()
+        if not is_registered and hasattr(player, 'club_id') and player.club_id != club.id:
             raise GoalRecordingError(
                 f"Player {player.full_name} does not belong to {club.name}"
             )
@@ -428,7 +434,7 @@ class MatchReportService:
                 "id": str(match.id),
                 "home_club": match.home_club.name,
                 "away_club": match.away_club.name,
-                "scheduled_for": match.scheduled_for,
+                "scheduled_for": match.match_date,
                 "match_status": match.get_status_display(),
             },
             "report": {

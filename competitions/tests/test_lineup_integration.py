@@ -15,7 +15,7 @@ from core.models import Tenant
 from players.models import Player
 from clubs.models import Club
 from competitions.models import (
-    Competition, Match, MatchLineup, LineupSubmission, MatchReport, Goal
+    Competition, CompetitionRegistration, Match, MatchLineup, LineupSubmission, MatchReport, Goal
 )
 from competitions.services.lineup_service import (
     LineupService, LineupValidationError, PlayerNotEligible, LineupAlreadySubmitted
@@ -39,8 +39,7 @@ class TestLineupSubmission(TestCase):
         self.competition = Competition.objects.create(
             tenant=self.tenant,
             name="Test Competition",
-            description="Test",
-            season_year=2024,
+            season="2024",
         )
 
         # Create clubs
@@ -57,7 +56,8 @@ class TestLineupSubmission(TestCase):
         )
 
         # Register clubs in competition
-        self.competition.clubs.add(self.home_club, self.away_club)
+        CompetitionRegistration.objects.create(tenant=self.tenant, competition=self.competition, club=self.home_club)
+        CompetitionRegistration.objects.create(tenant=self.tenant, competition=self.competition, club=self.away_club)
 
         # Create match
         self.match = Match.objects.create(
@@ -65,121 +65,93 @@ class TestLineupSubmission(TestCase):
             competition=self.competition,
             home_club=self.home_club,
             away_club=self.away_club,
-            scheduled_for=timezone.now() + timedelta(days=1),
+            match_date=timezone.now() + timedelta(days=1),
             status=Match.MatchStatus.SCHEDULED,
         )
 
         # Create players for home club
         self.gk = Player.objects.create(
-            tenant=self.tenant,
             first_name="Goal",
             last_name="Keeper",
-            position=Player.Position.GK,
-            club=self.home_club,
+            primary_position=Player.Position.GK,
         )
 
         self.cb1 = Player.objects.create(
-            tenant=self.tenant,
             first_name="Center",
             last_name="Back1",
-            position=Player.Position.CB,
-            club=self.home_club,
+            primary_position=Player.Position.CB,
         )
 
         self.cb2 = Player.objects.create(
-            tenant=self.tenant,
             first_name="Center",
             last_name="Back2",
-            position=Player.Position.CB,
-            club=self.home_club,
+            primary_position=Player.Position.CB,
         )
 
         self.rb = Player.objects.create(
-            tenant=self.tenant,
             first_name="Right",
             last_name="Back",
-            position=Player.Position.RB,
-            club=self.home_club,
+            primary_position=Player.Position.RB,
         )
 
         self.lb = Player.objects.create(
-            tenant=self.tenant,
             first_name="Left",
             last_name="Back",
-            position=Player.Position.LB,
-            club=self.home_club,
+            primary_position=Player.Position.LB,
         )
 
         self.cm1 = Player.objects.create(
-            tenant=self.tenant,
             first_name="Central",
             last_name="Mid1",
-            position=Player.Position.CM,
-            club=self.home_club,
+            primary_position=Player.Position.CM,
         )
 
         self.cm2 = Player.objects.create(
-            tenant=self.tenant,
             first_name="Central",
             last_name="Mid2",
-            position=Player.Position.CM,
-            club=self.home_club,
+            primary_position=Player.Position.CM,
         )
 
         self.cdm = Player.objects.create(
-            tenant=self.tenant,
             first_name="Defensive",
             last_name="Mid",
-            position=Player.Position.CDM,
-            club=self.home_club,
+            primary_position=Player.Position.CDM,
         )
 
         self.rm = Player.objects.create(
-            tenant=self.tenant,
             first_name="Right",
             last_name="Mid",
-            position=Player.Position.RM,
-            club=self.home_club,
+            primary_position=Player.Position.RM,
         )
 
         self.lm = Player.objects.create(
-            tenant=self.tenant,
             first_name="Left",
             last_name="Mid",
-            position=Player.Position.LM,
-            club=self.home_club,
+            primary_position=Player.Position.LM,
         )
 
         self.st = Player.objects.create(
-            tenant=self.tenant,
             first_name="Striker",
             last_name="One",
-            position=Player.Position.ST,
-            club=self.home_club,
+            primary_position=Player.Position.ST,
         )
 
         self.sub1 = Player.objects.create(
-            tenant=self.tenant,
             first_name="Sub",
             last_name="One",
-            position=Player.Position.CM,
-            club=self.home_club,
+            primary_position=Player.Position.CM,
         )
 
         self.sub2 = Player.objects.create(
-            tenant=self.tenant,
             first_name="Sub",
             last_name="Two",
-            position=Player.Position.ST,
-            club=self.home_club,
+            primary_position=Player.Position.ST,
         )
 
         # Create user for submission
         self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
+            email="testuser@example.com",
             password="testpass123",
-            tenant=self.tenant,
         )
 
     def _create_valid_lineup(self):
@@ -570,8 +542,7 @@ class TestMatchReport(TestCase):
         self.competition = Competition.objects.create(
             tenant=self.tenant,
             name="Test Competition",
-            description="Test",
-            season_year=2024,
+            season="2024",
         )
 
         # Create clubs
@@ -587,8 +558,9 @@ class TestMatchReport(TestCase):
             slug="away-team",
         )
 
-        # Register clubs
-        self.competition.clubs.add(self.home_club, self.away_club)
+        # Register clubs in competition
+        CompetitionRegistration.objects.create(tenant=self.tenant, competition=self.competition, club=self.home_club)
+        CompetitionRegistration.objects.create(tenant=self.tenant, competition=self.competition, club=self.away_club)
 
         # Create match
         self.match = Match.objects.create(
@@ -596,32 +568,26 @@ class TestMatchReport(TestCase):
             competition=self.competition,
             home_club=self.home_club,
             away_club=self.away_club,
-            scheduled_for=timezone.now() + timedelta(days=1),
+            match_date=timezone.now() + timedelta(days=1),
             status=Match.MatchStatus.SCHEDULED,
         )
 
         # Create players
         self.home_scorer = Player.objects.create(
-            tenant=self.tenant,
             first_name="Home",
             last_name="Scorer",
-            position=Player.Position.ST,
-            club=self.home_club,
+            primary_position=Player.Position.ST,
         )
 
         self.away_scorer = Player.objects.create(
-            tenant=self.tenant,
             first_name="Away",
             last_name="Scorer",
-            position=Player.Position.ST,
-            club=self.away_club,
+            primary_position=Player.Position.ST,
         )
 
         self.user = User.objects.create_user(
-            username="testuser",
-            email="test@example.com",
+            email="testuser2@example.com",
             password="testpass123",
-            tenant=self.tenant,
         )
 
     def test_create_match_report(self):
