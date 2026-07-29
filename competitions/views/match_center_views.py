@@ -12,6 +12,7 @@ Endpoints:
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema
+from rest_framework.parsers import MultiPartParser, FormParser
 
 from accounts.permissions import IsActiveAccount
 from clubs.models import Club
@@ -198,3 +199,79 @@ class LiveMatchesView(APIView):
             data=serializer.data,
             message="Live matches retrieved successfully."
         )
+
+
+class MatchReportDocumentUploadView(APIView):
+    """
+    POST → referee/admin: upload referee report PDF document.
+    
+    Accepts multipart/form-data with a 'document' file field.
+    Stores the document in DAM and returns the URL.
+    """
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @extend_schema(
+        tags=["match-center"],
+        summary="Upload referee report document (PDF)",
+        request=None,  # No schema for multipart/form-data
+        responses={
+            201: {
+                "type": "object",
+                "properties": {
+                    "document_url": {"type": "string", "format": "uri"},
+                }
+            }
+        },
+    )
+    def post(self, request, match_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        
+        # Check file exists
+        document = request.FILES.get('document')
+        if not document:
+            return error_response(message="No document file provided")
+
+        # Validate PDF content type
+        content_type = document.content_type
+        if content_type != 'application/pdf' and not document.name.endswith('.pdf'):
+            return error_response(message="Only PDF files are accepted", status_code=400)
+
+        # Limit file size to 10MB
+        if document.size > 10 * 1024 * 1024:
+            return error_response(message="File size exceeds 10MB limit", status_code=400)
+
+        # Verify match exists and belongs to tenant
+        try:
+            match = Match.objects.select_related('home_club', 'away_club').get(
+                id=match_id,
+                tenant=tenant
+            )
+        except Match.DoesNotExist:
+            return not_found_response(message="Match not found")
+
+        # Upload to DAM (Document Asset Management)
+        from media_assets.models import MediaAsset
+        from media_assets.services import DAMService
+        
+        try:
+            # Create media asset
+            asset = MediaAsset.objects.create(
+                tenant=tenant,
+                file=document,
+                name=f"match_report_{match.id}_{document.name}",
+                mime_type=document.content_type,
+                uploaded_by=request.user,
+            )
+            
+            return success_response(
+                data={'document_url': asset.file.url},
+                message="Document uploaded successfully.",
+                status_code=201
+            )
+            
+        except Exception as e:
+            return error_response(
+                message=f"Failed to upload document: {str(e)}",
+                status_code=500
+            )

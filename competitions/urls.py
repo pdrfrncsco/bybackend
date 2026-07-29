@@ -22,6 +22,7 @@ from competitions.views.match_center_views import (
     MatchEventDeleteView,
     CompetitionPlayerStatsView,
     LiveMatchesView,
+    MatchReportDocumentUploadView,
 )
 from competitions.views.fair_play_views import (
     CompetitionSuspensionListView,
@@ -127,5 +128,11 @@ urlpatterns = [
             'post': 'update_stats'
         }),
         name="match-report-update-stats"
+    ),
+    # Phase 3 — Match report document upload
+    path(
+        "matches/<uuid:match_id>/report/document/",
+        MatchReportDocumentUploadView.as_view(),
+        name="match-report-document"
     ),
 ]

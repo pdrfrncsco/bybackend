@@ -26,6 +26,11 @@ class MatchEvent(BaseModel):
         SUBSTITUTION_OUT = "substitution_out", "Substituição (Sai)"
         PENALTY_SCORED = "penalty_scored", "Penálti Marcado"
         PENALTY_MISSED = "penalty_missed", "Penálti Falhado"
+        INJURY = "injury", "Lesão"
+        VAR_REVIEW = "var_review", "Revisão VAR"
+        KICKOFF = "kickoff", "Bola em jogo"
+        HALFTIME = "halftime", "Intervalo"
+        FULLTIME = "fulltime", "Fim de jogo"
 
     # Goals + own goals affect the scoreline
     GOAL_TYPES = {EventType.GOAL, EventType.PENALTY_SCORED}
