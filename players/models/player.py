@@ -159,5 +159,11 @@ class Player(BaseModel):
     
     def save(self, *args, **kwargs) -> None:
         if not self.slug:
-            self.slug = slugify(self.full_name)
+            base = slugify(self.full_name)
+            slug = base
+            counter = 1
+            while Player.objects.filter(slug=slug).exclude(pk=self.pk).exists():
+                slug = f"{base}-{counter}"
+                counter += 1
+            self.slug = slug
         super().save(*args, **kwargs)
