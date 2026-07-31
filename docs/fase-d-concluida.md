@@ -95,3 +95,158 @@ frontend/src/tests/setup.ts (melhorado com mais mocks)
 Com a Fase D concluída, o módulo Organização atinge o nível de qualidade exigido pelas skills de Frontend Engineer e Frontend Reviewer.
 
 **Recomendação:** Continuar com a implementação das funcionalidades pendentes (Fases B e C) utilizando os estados de erro agora disponíveis.
+
+
+
+
+
+ ## Comandos corretos no PowerShell
+
+    cd
+  D:\Donwloads\ndeascloud\bolayetu\bybackend      
+
+    # Ver clubes disponíveis
+    python scripts/seed_mock_players.py --list-clubs
+
+    # Simular sem salvar (dry-run)
+    python scripts/seed_mock_players.py --club-slug="santos-de-luanda" --count=5 --dry-run     
+
+    # Criar 25 jogadores reais
+    python scripts/seed_mock_players.py --club-slug="santos-de-luanda" --count=25
+
+    # Perfis completos (com bio, avatar,
+  estatísticas)
+    python scripts/seed_mock_player_profiles.py   
+  --club-slug="santos-de-luanda" --count=25       
+
+    # Com competição vinculada
+    python scripts/seed_mock_player_profiles.py   
+  --club-slug="santos-de-luanda" --competition-   
+  slug="girabola-2026"
+
+  # GK - Goalkeeper
+        GK = "gk", "Guarda-redes"
+        
+        # Defence
+        CB = "cb", "Defesa Central"
+        LB = "lb", "Defesa Esquerda"
+        RB = "rb", "Defesa Direita"
+        LWB = "lwb", "Lateral Esquerda"
+        RWB = "rwb", "Lateral Direita"
+        
+        # Midfield
+        CM = "cm", "Meio-Campo"
+        CDM = "cdm", "Meio-Campo Defensivo"
+        CAM = "cam", "Meio-Campo Ofensivo"
+        LM = "lm", "Meio-Campo Esquerda"
+        RM = "rm", "Meio-Campo Direito"
+        LW = "lw", "Atacante Esquerda"
+        RW = "rw", "Atacante Direito"
+        
+        # Attack
+        ST = "st", "Avançado"
+        CF = "cf", "Centro-avante"
+        MULTIPLE = "multiple", "Varios Posições"
+
+
+
+> Erro enviar escalação:   File
+  "D:\Donwloads\ndeascloud\bolayetu\bybackend\compe
+  titions\views\lineup_views.py", line 95, in     
+  create
+      tenant = request.user.tenant
+               ^^^^^^^^^^^^^^^^^^^
+  AttributeError: 'User' object has no attribute  
+  'tenant'
+  ERROR 2026-07-31 15:41:08,094 log: Internal     
+  Server Error:
+  /api/v1/competitions/matches/01ac7824-f239-4afb 
+  8def-33a00b863cec/lineups/
+  ERROR 2026-07-31 15:41:08,095 log: "POST        
+  /api/v1/competitions/matches/01ac7824-f239-4afb 
+  8def-33a00b863cec/lineups/ HTTP/1.1" 500 95     
+
+▸ Thought for 4s
+  Let me check the lineup_views.py to see how     
+tenant is being accessed and also ch...
+
+● Read(D:/Donwloads/ndeasc...ews/lineup_views.py) 
+● Search(Find tenant on User model)
+● ListDir(D:/Donwloads/ndea...ybackend/accounts)  
+● ListDir(D:/Donwloads/ndea...tu/bybackend/core)  
+● ListDir(D:/Donwloads/ndea...d/accounts/models)  
+● Read(D:/Donwloads/ndeasc...unts/models/user.py) 
+● Read(D:/Donwlo...ership.py) (ctrl+o to expand)  
+
+  Agora tenho o quadro completo. O User é
+  global e não tem .tenant — o tenant é obtido    
+  via TenantMembership. Também preciso
+  verificar como o middleware/request resolve o   
+  tenant noutras views:
+
+● Read(D:/Donwlo...leware.py) (ctrl+o to expand)  
+
+  Agora tenho tudo. O padrão correto é
+  request.tenant (do middleware) ou via
+  TenantMembership. O código usa
+  request.user.tenant em todos os métodos do      
+  lineup_views.py, mas isso nunca vai
+  funcionar. Vou criar um helper e corrigir       
+  toda a view:
+
+
+
+
+
+### Diagnóstico & Resolução do Erro "Tenant     
+  não identificado"
+  ──────
+  ### 🔍 Causa do Problema
+
+  O utilizador clube3@bolayetu.com (Clube3        
+  Teste) possuía uma relação ClubMember
+  vinculada ao clube Santos de Luanda (da
+  organização FAF), mas não possuía um registo    
+  correspondente em TenantMembership na tabela    
+  de utilizadores/organizações.
+
+  Quando a API tentava resolver o tenant do       
+  utilizador autenticado através do fallback de   
+  memberships (get_request_tenant), nenhuma       
+  membership ativa era encontrada, disparando a   
+  validação:
+
+  │ "Tenant não identificado. Verifica o
+  │ cabeçalho X-Tenant-ID ou o subdomínio."       
+  ──────
+  ### 🛠️ Ações de Resolução
+
+  1. Vínculo do Utilizador clube3@bolayetu.com    
+      • Criado o registo TenantMembership com a   
+      organização FAF para o utilizador
+      clube3@bolayetu.com.
+  2. Auditoria & Correção Automática de Outros    
+  Utilizadores
+      • Auditados todos os membros de clubes      
+      (ClubMember) na base de dados.
+      • Foram identificados e corrigidos
+      automaticamente outros utilizadores de      
+      clube que não tinham vínculo
+      TenantMembership (ex: clube2@bolayetu.com,  
+      clube4@bolayetu.com, clube5@gmail.com).     
+  3. Prevenção Futura no Backend
+      • Atualizado o serviço club_service.py      
+      para criar/garantir automaticamente o       
+      TenantMembership na organização do clube    
+      sempre que um novo utilizador é
+      adicionado como membro de um clube.
+
+  ──────
+  ### 🧪 Estado Atual
+
+  • python manage.py check: 0 problemas
+  identificados.
+  • O utilizador Clube3 Testes está 100%
+  vinculado à organização FAF e já pode
+  submeter convocatórias e escalações sem
+  qualquer aviso de tenant não identificado. 

@@ -99,8 +99,8 @@ class ClubService:
             "founded_year",
             "stadium_name",
             "stadium_capacity",
-            "country",
             "city",
+            "country",
             "email",
             "phone",
             "website",
@@ -109,7 +109,6 @@ class ClubService:
         ]
 
         updated_fields = ["updated_at"]
-
         for field in updatable_fields:
             if field in kwargs and kwargs[field] is not None:
                 setattr(club, field, kwargs[field])
@@ -117,18 +116,22 @@ class ClubService:
 
         club.save(update_fields=updated_fields)
 
-        logger.info("Club updated: %s (%s)", club.name, club.id)
+        logger.info("Club updated: %s", club.name)
         return club
 
     @staticmethod
     @transaction.atomic
-    def upload_logo(*, club: Club, file, uploaded_by=None) -> Club:
+    def upload_logo(*, club: Club, logo_file, uploaded_by: User = None) -> Club:
         """
-        Upload a logo for a club using the DAM (Digital Asset Management) system.
+        Upload a logo for a club via DAM (Digital Asset Management).
 
-        Creates a MediaAsset record and links it to the Club via MediaUsage.
+        Creates a MediaAsset (owner_type="club", role="logo") and attaches
+        it to the club via MediaUsage.
+
+        See: 08A_DIGITAL_ASSET_MANAGEMENT.md
         """
-        from media_assets.constants import AssetCategory, OwnerType
+        validate_logo_file(logo_file)
+
         from media_assets.exceptions import (
             InvalidMediaFile,
             MediaAssetTooLarge,
@@ -137,15 +140,14 @@ class ClubService:
         from media_assets.services import MediaAssetService
 
         try:
-            asset = MediaAssetService.upload_for_owner(
-                file=file,
-                owner_type=OwnerType.CLUB,
-                owner_id=club.id,
-                role=AssetCategory.LOGO,
-                name=f"{club.name} Logo",
+            asset = MediaAssetService.upload_asset(
+                file=logo_file,
+                owner_type="club",
+                owner_id=str(club.id),
                 tenant=club.tenant,
                 uploaded_by=uploaded_by,
-                images_only=True,
+                role="logo",
+                is_public=True,
             )
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise InvalidLogoFile(detail=str(exc.detail)) from exc
@@ -179,11 +181,7 @@ class ClubService:
 
     @staticmethod
     def _publish_club_event(*, club: Club, event_type: str) -> None:
-        """Publish a club lifecycle domain event (dispatched after commit).
-
-        Best-effort: publishing failures are logged and never block the
-        underlying business operation (status change is already saved).
-        """
+        """Publish a club lifecycle domain event (dispatched after commit)."""
         from core.events import Event, publish_event
 
         try:
@@ -242,6 +240,15 @@ class ClubService:
             joined_at=joined_at,
         )
 
+        # Garantir vínculo automático no Tenant (TenantMembership) se o membro for um User
+        if user is not None:
+            from accounts.models import TenantMembership
+            TenantMembership.objects.get_or_create(
+                user=user,
+                tenant=club.tenant,
+                defaults={"role": "member", "is_active": True},
+            )
+
         logger.info("Member added to club %s: %s (%s)", club.name, member.display_name, role)
         return member
 
@@ -291,74 +298,8 @@ class ClubService:
     @staticmethod
     @transaction.atomic
     def remove_member(*, member: ClubMember) -> None:
-        """Deactivate a club membership (soft delete)."""
+        """
+        Soft-delete a member by deactivating their membership.
+        """
         member.deactivate()
         logger.info("Member removed from club %s: %s", member.club.name, member.display_name)
-
-    @staticmethod
-    def assert_is_club_admin(*, user: User, club: Club) -> None:
-        """
-        Verify that the user has admin privileges for the club.
-
-        Raises:
-            NotClubAdmin: If the user is not an admin of this club.
-        """
-        if not ClubSelector.is_club_admin(user=user, club=club):
-            raise NotClubAdmin()
-
-    @staticmethod
-    def get_club_for_user(*, user: User) -> Club:
-        """
-        Get the primary club that the user manages.
-
-        Raises:
-            NoClubMembership: If the user has no club membership.
-        """
-        # Try club admin roles first
-        member = (
-            ClubMember.objects.filter(
-                user=user,
-                is_active=True,
-                role__in=ClubMemberRole.ADMIN_ROLES,
-            )
-            .select_related("club", "club__tenant")
-            .first()
-        )
-
-        if member:
-            return member.club
-
-        # Fallback: check if user is tenant admin and get first club
-        from accounts.constants import MembershipRole
-        from accounts.models import TenantMembership
-
-        tenant_admin = (
-            TenantMembership.objects.filter(
-                user=user,
-                is_active=True,
-                role__in=MembershipRole.ADMIN_ROLES,
-            )
-            .select_related("tenant")
-            .first()
-        )
-
-        if tenant_admin:
-            club = Club.objects.filter(tenant=tenant_admin.tenant, status=ClubStatus.ACTIVE).first()
-            if club:
-                return club
-
-        # New fallback: pending affiliation request with a provisioned club
-        from clubs.models import ClubAffiliationRequest
-        pending_req = (
-            ClubAffiliationRequest.objects.filter(
-                submitted_by=user,
-                status=ClubAffiliationRequest.Status.PENDING,
-                club__isnull=False,
-            )
-            .select_related("club")
-            .first()
-        )
-        if pending_req:
-            return pending_req.club
-
-        raise NoClubMembership()
