@@ -303,3 +303,51 @@ class ClubService:
         """
         member.deactivate()
         logger.info("Member removed from club %s: %s", member.club.name, member.display_name)
+
+    @staticmethod
+    def get_club_for_user(*, user: User) -> Club:
+        """
+        Retrieve the club that a user belongs to.
+
+        Args:
+            user: The user to look up.
+
+        Returns:
+            Club instance that the user belongs to.
+
+        Raises:
+            NoClubMembership: If the user is not an active member of any club.
+        """
+        # Try to find an active club membership for the user
+        membership = ClubMember.objects.filter(
+            user=user,
+            is_active=True
+        ).select_related("club").first()
+
+        if not membership:
+            raise NoClubMembership()
+
+        return membership.club
+
+    @staticmethod
+    def assert_is_club_admin(*, user: User, club: Club) -> None:
+        """
+        Verify that a user is a club administrator for the given club.
+
+        Args:
+            user: The user to verify.
+            club: The club to check.
+
+        Raises:
+            NotClubAdmin: If the user is not a club administrator.
+        """
+        # Check if user has an active membership with admin role
+        is_admin = ClubMember.objects.filter(
+            user=user,
+            club=club,
+            is_active=True,
+            role__in=["president", "manager", "coach"]  # Admin roles
+        ).exists()
+
+        if not is_admin:
+            raise NotClubAdmin()

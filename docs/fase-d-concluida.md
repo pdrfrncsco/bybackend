@@ -112,7 +112,7 @@ Com a Fase D concluída, o módulo Organização atinge o nível de qualidade ex
     python scripts/seed_mock_players.py --club-slug="santos-de-luanda" --count=5 --dry-run     
 
     # Criar 25 jogadores reais
-    python scripts/seed_mock_players.py --club-slug="santos-de-luanda" --count=25
+    python scripts/seed_mock_players.py --club-slug="santos-de-luanda" --count=18
 
     # Perfis completos (com bio, avatar,
   estatísticas)

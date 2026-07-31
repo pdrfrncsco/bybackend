@@ -289,11 +289,13 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
     position_label = serializers.SerializerMethodField()
     jersey_number = serializers.IntegerField(source="shirt_number", read_only=True)
     joined_at = serializers.DateField(source="joined_date", read_only=True)
+    player_id = serializers.SerializerMethodField()
 
     class Meta:
         model = ClubMember  # Keep for backward compatibility, but fields come from PlayerRegistration
         fields = [
             "id",
+            "player_id",
             "display_name",
             "jersey_number",
             "position",
@@ -301,6 +303,12 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
             "joined_at",
         ]
         read_only_fields = fields
+
+    def get_player_id(self, obj) -> str | None:
+        """Returns the Player UUID for lineup submission."""
+        if hasattr(obj, "player") and obj.player:
+            return str(obj.player.id)
+        return None
 
     def get_display_name(self, obj) -> str:
         """Returns the player's full name from the PlayerRegistration."""

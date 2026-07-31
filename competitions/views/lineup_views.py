@@ -457,7 +457,10 @@ class MatchReportViewSet(viewsets.ModelViewSet):
             match = match_qs.get()
 
             # Player is global — sem filtro de tenant
-            player = Player.objects.get(id=serializer.validated_data['player_id'])
+            try:
+                player = Player.objects.get(id=serializer.validated_data['player_id'])
+            except Player.DoesNotExist:
+                return error_response(message="Player not found.", status_code=404)
 
             club_qs = Club.objects.filter(id=serializer.validated_data['club_id'])
             if tenant:

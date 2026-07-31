@@ -17,6 +17,7 @@ from datetime import date
 
 from core.models import Tenant
 from players.models import Player
+from players.services import PlayerNotFound
 from clubs.models import Club
 from competitions.models import Match, MatchLineup, LineupSubmission
 from competitions.services.fair_play_service import FairPlayService
@@ -119,9 +120,21 @@ class LineupService:
         # Validate lineup
         LineupService._validate_lineup(players)
         
+        # Get all player IDs from the lineup
+        player_ids = [player_entry["player_id"] for player_entry in players]
+        
+        # Fetch all players at once to check existence and avoid multiple queries
+        players_queryset = Player.objects.filter(id__in=player_ids)
+        players_by_id = {str(player.id): player for player in players_queryset}
+        
+        # Check if all players exist
+        missing_player_ids = [player_id for player_id in player_ids if str(player_id) not in players_by_id]
+        if missing_player_ids:
+            raise PlayerNotFound(f"Players not found: {missing_player_ids}")
+        
         # Check player eligibility
         for player_entry in players:
-            player = Player.objects.get(id=player_entry["player_id"])
+            player = players_by_id[str(player_entry["player_id"])]
             is_eligible, reason = FairPlayService.is_player_eligible(
                 tenant=tenant,
                 player=player,
@@ -142,7 +155,7 @@ class LineupService:
         # Create lineup entries
         lineup_entries = []
         for entry in players:
-            player = Player.objects.get(id=entry["player_id"])
+            player = players_by_id[str(entry["player_id"])]
             
             lineup_entry = MatchLineup.objects.create(
                 tenant=tenant,

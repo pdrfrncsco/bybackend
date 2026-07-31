@@ -24,6 +24,7 @@ from competitions.services.lineup_service import (
 
 class PlayerBasicSerializer(serializers.ModelSerializer):
     """Basic player info for lineup display."""
+    position = serializers.CharField(source='primary_position', read_only=True)
 
     class Meta:
         model = Player
@@ -150,14 +151,18 @@ class LineupSubmissionDetailSerializer(serializers.ModelSerializer):
 
     def get_starters(self, obj):
         """Get starters from the lineup."""
-        starters = obj.lineup_entries.filter(
+        starters = MatchLineup.objects.filter(
+            match=obj.match,
+            club=obj.club,
             status=MatchLineup.LineupStatus.STARTER
         ).select_related('player').order_by('formation_position')
         return MatchLineupPlayerSerializer(starters, many=True).data
 
     def get_substitutes(self, obj):
         """Get substitutes from the lineup."""
-        substitutes = obj.lineup_entries.filter(
+        substitutes = MatchLineup.objects.filter(
+            match=obj.match,
+            club=obj.club,
             status=MatchLineup.LineupStatus.SUBSTITUTE
         ).select_related('player').order_by('shirt_number')
         return MatchLineupPlayerSerializer(substitutes, many=True).data
