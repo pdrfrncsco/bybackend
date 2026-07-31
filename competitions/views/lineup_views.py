@@ -28,13 +28,55 @@ from clubs.models import Club
 from players.models import Player
 
 
+# ─── Tenant Helper ────────────────────────────────────────────────────────────
+
+def get_request_tenant(request):
+    """
+    Resolve o tenant a partir do request de forma robusta.
+
+    Estratégia (por prioridade):
+      1. request.tenant  — injetado pelo TenantMiddleware (subdomain)
+      2. Header X-Tenant-ID — útil para clientes API que passam o UUID do tenant
+      3. TenantMembership  — primeira membership ativa do utilizador autenticado
+
+    Retorna None se nenhuma estratégia tiver sucesso.
+    """
+    # 1. Middleware (subdomain resolve)
+    tenant = getattr(request, "tenant", None)
+    if tenant is not None:
+        return tenant
+
+    # 2. Header explícito (X-Tenant-ID: <uuid>)
+    tenant_id = request.headers.get("X-Tenant-ID") or request.META.get("HTTP_X_TENANT_ID")
+    if tenant_id:
+        from core.models import Tenant
+        try:
+            return Tenant.objects.get(id=tenant_id)
+        except (Tenant.DoesNotExist, Exception):
+            pass
+
+    # 3. Primeira membership ativa do utilizador
+    if request.user and request.user.is_authenticated:
+        from accounts.models import TenantMembership
+        membership = (
+            TenantMembership.objects
+            .filter(user=request.user, is_active=True)
+            .select_related("tenant")
+            .first()
+        )
+        if membership:
+            return membership.tenant
+
+    return None
+
+
 # ─── Lineup Submission Viewset ─────────────────────────────────────────────
 
 
 class LineupSubmissionViewSet(viewsets.ModelViewSet):
     """
     API endpoints for match lineup management.
-    
+
     - POST /competitions/matches/{match_id}/lineups/
         Submit lineup for a club
     - GET /competitions/matches/{match_id}/lineups/
@@ -46,22 +88,24 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
     - POST /competitions/matches/{match_id}/lineups/{club_id}/lock/
         Lock a lineup (no further changes)
     """
-    
+
     permission_classes = [IsAuthenticated]
     pagination_class = StandardPagination
-    
+
     def get_queryset(self):
         """Filter lineups by tenant and match."""
-        tenant = self.request.user.tenant
+        tenant = get_request_tenant(self.request)
         match_id = self.kwargs.get('match_id')
-        
-        queryset = LineupSubmission.objects.filter(
-            tenant=tenant,
-            match_id=match_id
-        ).select_related('match', 'club', 'submitted_by')
-        
-        return queryset
-    
+
+        qs = LineupSubmission.objects.select_related('match', 'club', 'submitted_by')
+
+        if tenant:
+            qs = qs.filter(tenant=tenant, match_id=match_id)
+        else:
+            qs = qs.filter(match_id=match_id)
+
+        return qs
+
     def get_serializer_class(self):
         """Return appropriate serializer based on action."""
         if self.action == 'create':
@@ -69,14 +113,15 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         elif self.action == 'retrieve':
             return LineupSubmissionDetailSerializer
         return LineupSubmissionSerializer
-    
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         """
         Submit a lineup for a club in a match.
-        
+
         Expected request body:
         {
+            "club_id": "uuid",          ← optional if only one club per user
             "formation": "4-3-3",
             "players": [
                 {
@@ -92,26 +137,32 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
             ]
         }
         """
-        tenant = request.user.tenant
-        match_id = self.kwargs.get('match_id')
-        
-        # Get match
-        match = get_object_or_404(Match, id=match_id, tenant=tenant)
-        
-        # Get club from request (from header or determine from user)
-        club_id = request.data.get('club_id') or request.user.club_id
-        if not club_id:
+        tenant = get_request_tenant(request)
+        if tenant is None:
             return Response(
-                {"error": "Club not specified and user not associated with a club"},
+                {"error": "Tenant não identificado. Verifica o cabeçalho X-Tenant-ID ou o subdomínio."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        match_id = self.kwargs.get('match_id')
+
+        # Get match
+        match = get_object_or_404(Match, id=match_id, tenant=tenant)
+
+        # Get club_id from request body or from user's club context
+        club_id = request.data.get('club_id')
+        if not club_id:
+            return Response(
+                {"error": "club_id é obrigatório no corpo do pedido."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         club = get_object_or_404(Club, id=club_id, tenant=tenant)
-        
+
         # Validate input
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         try:
             # Submit lineup using service
             submission = LineupService.submit_lineup(
@@ -122,17 +173,17 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
                 formation=serializer.validated_data.get('formation', ''),
                 submitted_by=request.user
             )
-            
+
             # Return created lineup
             response_serializer = LineupSubmissionDetailSerializer(submission)
             return Response(
                 response_serializer.data,
                 status=status.HTTP_201_CREATED
             )
-        
+
         except LineupAlreadySubmitted:
             return Response(
-                {"error": "Lineup is locked and cannot be changed"},
+                {"error": "A escalação está bloqueada e não pode ser alterada."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except LineupValidationError as e:
@@ -145,90 +196,98 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
+
     def retrieve(self, request, *args, **kwargs):
         """Get lineup for a specific club in a match."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
         club_id = self.kwargs.get('pk')  # club_id in URL
-        
+
+        qs = LineupSubmission.objects.filter(match_id=match_id, club_id=club_id)
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+
         try:
-            submission = LineupSubmission.objects.get(
-                tenant=tenant,
-                match_id=match_id,
-                club_id=club_id
-            )
+            submission = qs.get()
         except LineupSubmission.DoesNotExist:
             return Response(
-                {"error": "Lineup not found"},
+                {"error": "Escalação não encontrada"},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
+
         serializer = self.get_serializer(submission)
         return Response(serializer.data)
-    
+
     def list(self, request, *args, **kwargs):
         """Get all lineups for a match."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
-        
+
+        match_qs = Match.objects.filter(id=match_id)
+        if tenant:
+            match_qs = match_qs.filter(tenant=tenant)
+
         try:
-            match = Match.objects.get(id=match_id, tenant=tenant)
+            match = match_qs.get()
         except Match.DoesNotExist:
             return Response(
-                {"error": "Match not found"},
+                {"error": "Jogo não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
-        
-        # Get both lineups
-        lineups = LineupSubmission.objects.filter(
-            tenant=tenant,
-            match=match
-        ).select_related('club', 'match')
-        
-        serializer = self.get_serializer(lineups, many=True)
+
+        lineups_qs = LineupSubmission.objects.filter(match=match).select_related('club', 'match')
+        if tenant:
+            lineups_qs = lineups_qs.filter(tenant=tenant)
+
+        serializer = self.get_serializer(lineups_qs, many=True)
         return Response({
             "match_id": str(match.id),
             "match_str": str(match),
             "lineups": serializer.data
         })
-    
+
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def confirm(self, request, *args, **kwargs):
         """Confirm a submitted lineup."""
-        tenant = request.user.tenant
-        match_id = self.kwargs.get('match_id')
-        club_id = request.data.get('club_id')
-        
-        if not club_id:
+        tenant = get_request_tenant(request)
+        if tenant is None:
             return Response(
-                {"error": "club_id is required"},
+                {"error": "Tenant não identificado."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        match_id = self.kwargs.get('match_id')
+        club_id = request.data.get('club_id')
+
+        if not club_id:
+            return Response(
+                {"error": "club_id é obrigatório"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         try:
             match = Match.objects.get(id=match_id, tenant=tenant)
             club = Club.objects.get(id=club_id, tenant=tenant)
-            
+
             submission = LineupService.confirm_lineup(
                 tenant=tenant,
                 match=match,
                 club=club,
                 confirmed_by=request.user
             )
-            
+
             serializer = LineupSubmissionDetailSerializer(submission)
             return Response(serializer.data)
-        
+
         except Match.DoesNotExist:
             return Response(
-                {"error": "Match not found"},
+                {"error": "Jogo não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Club.DoesNotExist:
             return Response(
-                {"error": "Club not found"},
+                {"error": "Clube não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
         except LineupValidationError as e:
@@ -236,36 +295,38 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
                 {"error": str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-    
+
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def lock(self, request, *args, **kwargs):
         """Lock all lineups for a match."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
+        if tenant is None:
+            return Response(
+                {"error": "Tenant não identificado."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         match_id = self.kwargs.get('match_id')
-        
+
         try:
             match = Match.objects.get(id=match_id, tenant=tenant)
-            
+
             LineupService.lock_all_lineups(
                 tenant=tenant,
                 match=match
             )
-            
-            submissions = LineupSubmission.objects.filter(
-                tenant=tenant,
-                match=match
-            )
-            
+
+            submissions = LineupSubmission.objects.filter(tenant=tenant, match=match)
             serializer = self.get_serializer(submissions, many=True)
             return Response({
-                "message": "All lineups locked",
+                "message": "Todas as escalações bloqueadas",
                 "lineups": serializer.data
             })
-        
+
         except Match.DoesNotExist:
             return Response(
-                {"error": "Match not found"},
+                {"error": "Jogo não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -276,7 +337,7 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
 class MatchReportViewSet(viewsets.ModelViewSet):
     """
     API endpoints for match reports and statistics.
-    
+
     - GET /competitions/matches/{match_id}/report/
         Get match report (lineups, goals, stats)
     - POST /competitions/matches/{match_id}/report/create/
@@ -286,40 +347,43 @@ class MatchReportViewSet(viewsets.ModelViewSet):
     - POST /competitions/matches/{match_id}/report/update-stats/
         Update team statistics
     """
-    
+
     permission_classes = [IsAuthenticated]
     serializer_class = MatchReportSerializer
-    
+
     def get_queryset(self):
         """Filter reports by tenant and match."""
-        tenant = self.request.user.tenant
+        tenant = get_request_tenant(self.request)
         match_id = self.kwargs.get('match_id')
-        
-        return MatchReport.objects.filter(
-            match_id=match_id,
-            match__tenant=tenant
-        ).select_related('match')
-    
+
+        qs = MatchReport.objects.select_related('match').filter(match_id=match_id)
+        if tenant:
+            qs = qs.filter(match__tenant=tenant)
+        return qs
+
     @action(detail=False, methods=['get'])
     def get_report(self, request, *args, **kwargs):
         """Get match report with lineups, goals, and statistics."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
-        
+
+        match_qs = Match.objects.filter(id=match_id)
+        if tenant:
+            match_qs = match_qs.filter(tenant=tenant)
+
         try:
-            match = Match.objects.get(id=match_id, tenant=tenant)
-            
+            match = match_qs.get()
+
             # Get or create report
             report, _ = MatchReport.objects.get_or_create(match=match)
-            
+
             # Get lineups
-            lineups = LineupSubmission.objects.filter(
-                tenant=tenant,
-                match=match
-            ).select_related('club')
-            
+            lineups_qs = LineupSubmission.objects.filter(match=match).select_related('club')
+            if tenant:
+                lineups_qs = lineups_qs.filter(tenant=tenant)
+
             serializer = self.get_serializer(report)
-            
+
             return Response({
                 "match": {
                     "id": str(match.id),
@@ -328,76 +392,81 @@ class MatchReportViewSet(viewsets.ModelViewSet):
                     "scheduled_for": match.scheduled_for,
                 },
                 "report": serializer.data,
-                "lineups": LineupSubmissionDetailSerializer(
-                    lineups, many=True
-                ).data
+                "lineups": LineupSubmissionDetailSerializer(lineups_qs, many=True).data
             })
-        
+
         except Match.DoesNotExist:
             return Response(
-                {"error": "Match not found"},
+                {"error": "Jogo não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
-    
+
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def create_report(self, request, *args, **kwargs):
         """Create or update match report."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
-        
+
+        match_qs = Match.objects.filter(id=match_id)
+        if tenant:
+            match_qs = match_qs.filter(tenant=tenant)
+
         try:
-            match = Match.objects.get(id=match_id, tenant=tenant)
-            
+            match = match_qs.get()
+
             serializer = MatchReportInputSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            
+
             report, created = MatchReport.objects.get_or_create(match=match)
-            
+
             report.home_score = serializer.validated_data['home_score']
             report.away_score = serializer.validated_data['away_score']
-            
+
             if 'match_duration' in serializer.validated_data:
                 report.match_duration = serializer.validated_data['match_duration']
-            
+
             report.save()
-            
+
             response_serializer = self.get_serializer(report)
             return Response(
                 response_serializer.data,
                 status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
             )
-        
+
         except Match.DoesNotExist:
             return Response(
-                {"error": "Match not found"},
+                {"error": "Jogo não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
-    
+
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def add_goal(self, request, *args, **kwargs):
         """Record a goal in the match."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
-        
+
         serializer = GoalInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
+
         try:
-            match = Match.objects.get(id=match_id, tenant=tenant)
-            player = Player.objects.get(
-                id=serializer.validated_data['player_id'],
-                tenant=tenant
-            )
-            club = Club.objects.get(
-                id=serializer.validated_data['club_id'],
-                tenant=tenant
-            )
-            
+            match_qs = Match.objects.filter(id=match_id)
+            if tenant:
+                match_qs = match_qs.filter(tenant=tenant)
+            match = match_qs.get()
+
+            # Player is global — sem filtro de tenant
+            player = Player.objects.get(id=serializer.validated_data['player_id'])
+
+            club_qs = Club.objects.filter(id=serializer.validated_data['club_id'])
+            if tenant:
+                club_qs = club_qs.filter(tenant=tenant)
+            club = club_qs.get()
+
             # Get or create report
             report, _ = MatchReport.objects.get_or_create(match=match)
-            
+
             # Create goal
             goal = Goal.objects.create(
                 match=match,
@@ -406,68 +475,71 @@ class MatchReportViewSet(viewsets.ModelViewSet):
                 minute=serializer.validated_data['minute'],
                 goal_type=serializer.validated_data['goal_type'],
             )
-            
+
             if 'assist_player_id' in serializer.validated_data:
                 try:
                     assist_player = Player.objects.get(
-                        id=serializer.validated_data['assist_player_id'],
-                        tenant=tenant
+                        id=serializer.validated_data['assist_player_id']
                     )
                     goal.assist_player = assist_player
                     goal.save()
                 except Player.DoesNotExist:
                     pass
-            
+
             response_serializer = GoalSerializer(goal)
             return Response(
                 response_serializer.data,
                 status=status.HTTP_201_CREATED
             )
-        
+
         except (Match.DoesNotExist, Player.DoesNotExist, Club.DoesNotExist):
             return Response(
-                {"error": "Match, player, or club not found"},
+                {"error": "Jogo, jogador ou clube não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )
-    
+
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def update_stats(self, request, *args, **kwargs):
         """Update team statistics for the match."""
-        tenant = request.user.tenant
+        tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
-        
+
         club_id = request.data.get('club_id')
         if not club_id:
             return Response(
-                {"error": "club_id is required"},
+                {"error": "club_id é obrigatório"},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         try:
-            match = Match.objects.get(id=match_id, tenant=tenant)
-            club = Club.objects.get(id=club_id, tenant=tenant)
-            
-            stats, created = MatchStats.objects.get_or_create(
-                match=match,
-                club=club
-            )
-            
+            match_qs = Match.objects.filter(id=match_id)
+            if tenant:
+                match_qs = match_qs.filter(tenant=tenant)
+            match = match_qs.get()
+
+            club_qs = Club.objects.filter(id=club_id)
+            if tenant:
+                club_qs = club_qs.filter(tenant=tenant)
+            club = club_qs.get()
+
+            stats, created = MatchStats.objects.get_or_create(match=match, club=club)
+
             # Update fields from request
             for field in ['possession', 'shots_on_goal', 'shots_off_goal',
                          'passes', 'passes_accuracy', 'fouls',
                          'yellow_cards', 'red_cards', 'corner_kicks']:
                 if field in request.data:
                     setattr(stats, field, request.data[field])
-            
+
             stats.save()
-            
+
             from competitions.serializers import MatchStatsSerializer
             serializer = MatchStatsSerializer(stats)
             return Response(serializer.data)
-        
+
         except (Match.DoesNotExist, Club.DoesNotExist):
             return Response(
-                {"error": "Match or club not found"},
+                {"error": "Jogo ou clube não encontrado"},
                 status=status.HTTP_404_NOT_FOUND
             )

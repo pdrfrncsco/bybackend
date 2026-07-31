@@ -98,12 +98,12 @@ class LineupSubmissionSerializer(serializers.ModelSerializer):
         model = LineupSubmission
         fields = [
             'id', 'match', 'club', 'formation', 'status', 'status_display',
-            'submitted_at', 'submitted_by', 'confirmed_at', 'locked_at',
-            'lineup_players', 'created_at', 'updated_at'
+            'submitted_at', 'submitted_by', 'confirmed_at', 'confirmed_by',
+            'lineup_players', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'match', 'club', 'submitted_at', 'confirmed_at',
-            'locked_at', 'lineup_players', 'created_at', 'updated_at'
+            'confirmed_by', 'lineup_players', 'created_at', 'updated_at'
         ]
 
 
@@ -143,7 +143,7 @@ class LineupSubmissionDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'match', 'match_str', 'club', 'club_name',
             'formation', 'status', 'status_display',
-            'submitted_at', 'confirmed_at', 'locked_at',
+            'submitted_at', 'confirmed_at', 'confirmed_by',
             'starters', 'substitutes'
         ]
         read_only_fields = fields
