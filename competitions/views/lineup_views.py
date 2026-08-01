@@ -7,7 +7,7 @@ REST API endpoints for matches, lineups, and match reports.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -91,6 +91,12 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
 
     permission_classes = [IsAuthenticated]
     pagination_class = StandardPagination
+
+    def get_permissions(self):
+        """Allow unauthenticated read access for lineups on public match pages."""
+        if self.action in ['list', 'retrieve']:
+            return [AllowAny()]
+        return super().get_permissions()
 
     def get_queryset(self):
         """Filter lineups by tenant and match."""
@@ -351,6 +357,12 @@ class MatchReportViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = MatchReportSerializer
 
+    def get_permissions(self):
+        """Allow unauthenticated read access for match reports on public pages."""
+        if self.action in ['get_report', 'list', 'retrieve']:
+            return [AllowAny()]
+        return super().get_permissions()
+
     def get_queryset(self):
         """Filter reports by tenant and match."""
         tenant = get_request_tenant(self.request)
@@ -389,7 +401,7 @@ class MatchReportViewSet(viewsets.ModelViewSet):
                     "id": str(match.id),
                     "home_club": match.home_club.name,
                     "away_club": match.away_club.name,
-                    "scheduled_for": match.scheduled_for,
+                    "scheduled_for": match.match_date,
                 },
                 "report": serializer.data,
                 "lineups": LineupSubmissionDetailSerializer(lineups_qs, many=True).data
