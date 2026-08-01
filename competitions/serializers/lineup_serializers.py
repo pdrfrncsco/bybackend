@@ -89,11 +89,13 @@ class LineupSubmissionSerializer(serializers.ModelSerializer):
         source='get_status_display',
         read_only=True
     )
-    lineup_players = MatchLineupPlayerSerializer(
-        source='lineup_entries',
-        many=True,
-        read_only=True
-    )
+    lineup_players = serializers.SerializerMethodField()
+
+    def get_lineup_players(self, obj):
+        """Return all MatchLineup entries for this submission's match and club."""
+        from competitions.models import MatchLineup
+        entries = MatchLineup.objects.filter(match=obj.match, club=obj.club).select_related('player').order_by('-status', 'formation_position', 'shirt_number')
+        return MatchLineupPlayerSerializer(entries, many=True).data
 
     class Meta:
         model = LineupSubmission
