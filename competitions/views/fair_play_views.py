@@ -73,9 +73,8 @@ class CompetitionSuspensionListView(APIView):
         tenant = OrganizationService.get_organization_for_user(user=request.user)
         OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
         
-        try:
-            competition = Competition.objects.get(id=competition_id, tenant=tenant)
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id, tenant=tenant)
+        if competition is None:
             return not_found_response(message="Competition not found.")
         
         serializer = CreateSuspensionSerializer(data=request.data)
@@ -256,8 +255,8 @@ class TopScorersRankingView(APIView):
         competition_id = request.query_params.get("competition_id")
         limit = int(request.query_params.get("limit", 20))
         
-        # For public access, we need tenant_id
-        # For authenticated access, get tenant from user
+        # Determine tenant: prefer authenticated user -> explicit tenant_id -> infer from competition_id
+        tenant = None
         if request.user.is_authenticated:
             tenant = OrganizationService.get_organization_for_user(user=request.user)
         elif tenant_id:
@@ -266,14 +265,19 @@ class TopScorersRankingView(APIView):
                 tenant = Tenant.objects.get(id=tenant_id)
             except Tenant.DoesNotExist:
                 return error_response(message="Invalid tenant_id.", status_code=400)
+        elif competition_id:
+            # Try to infer tenant by resolving competition without tenant scope
+            competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+            if competition is None:
+                return not_found_response(message="Competition not found.")
+            tenant = competition.tenant
         else:
             return error_response(message="tenant_id is required for public access.", status_code=400)
         
         competition = None
         if competition_id:
-            try:
-                competition = Competition.objects.get(id=competition_id, tenant=tenant)
-            except Competition.DoesNotExist:
+            competition = CompetitionSelector.get_by_id_public(competition_id=competition_id, tenant=tenant)
+            if competition is None:
                 return not_found_response(message="Competition not found.")
         
         ranking = RankingService.get_top_scorers(

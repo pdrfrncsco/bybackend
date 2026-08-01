@@ -57,9 +57,8 @@ class CompetitionRegisterClubView(APIView):
         tenant = OrganizationService.get_organization_for_user(user=request.user)
         OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
 
-        try:
-            competition = Competition.objects.get(id=competition_id, tenant=tenant)
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id, tenant=tenant)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
         club_id = request.data.get("club")
@@ -194,9 +193,8 @@ class CompetitionMatchListView(APIView):
         tenant = OrganizationService.get_organization_for_user(user=request.user)
         OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
 
-        try:
-            competition = Competition.objects.get(id=competition_id, tenant=tenant)
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id, tenant=tenant)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
         serializer = MatchCreateSerializer(data=request.data)
