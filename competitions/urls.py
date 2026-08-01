@@ -37,34 +37,34 @@ from competitions.views.fair_play_views import (
 urlpatterns = [
     # Competition CRUD
     path("", CompetitionListCreateView.as_view(), name="competition-list-create"),
-    path("<uuid:competition_id>/", CompetitionDetailView.as_view(), name="competition-detail"),
-    path("<uuid:competition_id>/config/", CompetitionConfigView.as_view(), name="competition-config"),
+    path("<str:competition_id>/", CompetitionDetailView.as_view(), name="competition-detail"),
+    path("<str:competition_id>/config/", CompetitionConfigView.as_view(), name="competition-config"),
 
     # Phase 3 — Registration, Schedule, Matches, Standings
-    path("<uuid:competition_id>/register-club/", CompetitionRegisterClubView.as_view(), name="competition-register-club"),
-    path("<uuid:competition_id>/generate-schedule/", CompetitionGenerateScheduleView.as_view(), name="competition-generate-schedule"),
-    path("<uuid:competition_id>/draw/", CompetitionDrawView.as_view(), name="competition-draw"),
-    path("<uuid:competition_id>/matches/", CompetitionMatchListView.as_view(), name="competition-match-list"),
-    path("<uuid:competition_id>/standings/", CompetitionStandingListView.as_view(), name="competition-standing-list"),
-    path("<uuid:competition_id>/bracket/", CompetitionBracketView.as_view(), name="competition-bracket"),
-    path("<uuid:competition_id>/rounds/", CompetitionRoundsView.as_view(), name="competition-rounds"),
-    path("<uuid:competition_id>/regulations/", CompetitionRegulationListCreateView.as_view(), name="competition-regulation-list-create"),
-    path("<uuid:competition_id>/regulations/<uuid:regulation_id>/", CompetitionRegulationDetailView.as_view(), name="competition-regulation-detail"),
+    path("<str:competition_id>/register-club/", CompetitionRegisterClubView.as_view(), name="competition-register-club"),
+    path("<str:competition_id>/generate-schedule/", CompetitionGenerateScheduleView.as_view(), name="competition-generate-schedule"),
+    path("<str:competition_id>/draw/", CompetitionDrawView.as_view(), name="competition-draw"),
+    path("<str:competition_id>/matches/", CompetitionMatchListView.as_view(), name="competition-match-list"),
+    path("<str:competition_id>/standings/", CompetitionStandingListView.as_view(), name="competition-standing-list"),
+    path("<str:competition_id>/bracket/", CompetitionBracketView.as_view(), name="competition-bracket"),
+    path("<str:competition_id>/rounds/", CompetitionRoundsView.as_view(), name="competition-rounds"),
+    path("<str:competition_id>/regulations/", CompetitionRegulationListCreateView.as_view(), name="competition-regulation-list-create"),
+    path("<str:competition_id>/regulations/<uuid:regulation_id>/", CompetitionRegulationDetailView.as_view(), name="competition-regulation-detail"),
     path("matches/<uuid:match_id>/", MatchScoreUpdateView.as_view(), name="match-score-update"),
 
     # Phase 4 — Match Center (súmula + player stats)
-    path("<uuid:competition_id>/matches/<uuid:match_id>/events/", MatchEventListCreateView.as_view(), name="match-event-list-create"),
-    path("<uuid:competition_id>/matches/<uuid:match_id>/events/<uuid:event_id>/", MatchEventDeleteView.as_view(), name="match-event-delete"),
-    path("<uuid:competition_id>/stats/", CompetitionPlayerStatsView.as_view(), name="competition-player-stats"),
+    path("<str:competition_id>/matches/<uuid:match_id>/events/", MatchEventListCreateView.as_view(), name="match-event-list-create"),
+    path("<str:competition_id>/matches/<uuid:match_id>/events/<uuid:event_id>/", MatchEventDeleteView.as_view(), name="match-event-delete"),
+    path("<str:competition_id>/stats/", CompetitionPlayerStatsView.as_view(), name="competition-player-stats"),
 
     # Phase 3 — Live matches (global endpoint)
     path("matches/live/", LiveMatchesView.as_view(), name="live-matches"),
 
     # Phase 2.4 — Fair Play & Suspensions
-    path("<uuid:competition_id>/suspensions/", CompetitionSuspensionListView.as_view(), name="competition-suspensions"),
-    path("<uuid:competition_id>/eligibility/<uuid:player_id>/", PlayerEligibilityView.as_view(), name="player-eligibility"),
+    path("<str:competition_id>/suspensions/", CompetitionSuspensionListView.as_view(), name="competition-suspensions"),
+    path("<str:competition_id>/eligibility/<uuid:player_id>/", PlayerEligibilityView.as_view(), name="player-eligibility"),
     path("suspensions/<uuid:suspension_id>/cancel/", PlayerSuspensionCancelView.as_view(), name="suspension-cancel"),
-    path("<uuid:competition_id>/fair-play-ranking/", CompetitionFairPlayRankingView.as_view(), name="fair-play-ranking"),
+    path("<str:competition_id>/fair-play-ranking/", CompetitionFairPlayRankingView.as_view(), name="fair-play-ranking"),
 
     # Phase 2.4 — Rankings
     path("rankings/top-scorers/", TopScorersRankingView.as_view(), name="top-scorers-ranking"),
