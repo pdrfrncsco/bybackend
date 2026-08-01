@@ -26,6 +26,7 @@ Endpoints:
 
 import logging
 
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -341,7 +342,7 @@ class ClubPublicListView(APIView):
 
 class ClubPublicDetailView(APIView):
     """
-    Retrieve details of a public club by slug.
+    Retrieve details of a public club by slug or UUID.
     """
 
     permission_classes = [AllowAny]
@@ -355,13 +356,21 @@ class ClubPublicDetailView(APIView):
         tenant = getattr(request, "tenant", None)
         if tenant:
             try:
-                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+                club = Club.objects.select_related("tenant").get(
+                    Q(slug=slug) | Q(id=slug),  # Accept both slug and UUID
+                    tenant=tenant,
+                    is_public=True
+                )
             except Club.DoesNotExist:
                 raise ClubNotFound()
         else:
+            # Try by slug first, then by UUID
             club = ClubSelector.get_by_slug(slug=slug)
             if club is None:
-                raise ClubNotFound()
+                try:
+                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
+                except Club.DoesNotExist:
+                    raise ClubNotFound()
 
         serializer = PublicClubSerializer(club)
         return success_response(
@@ -371,7 +380,7 @@ class ClubPublicDetailView(APIView):
 
 
 class ClubKpisView(APIView):
-    """Retrieve KPI statistics for a public club."""
+    """Retrieve KPI statistics for a public club by slug or UUID."""
 
     permission_classes = [AllowAny]
 
@@ -380,13 +389,20 @@ class ClubKpisView(APIView):
         tenant = getattr(request, "tenant", None)
         if tenant:
             try:
-                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+                club = Club.objects.select_related("tenant").get(
+                    Q(slug=slug) | Q(id=slug),
+                    tenant=tenant,
+                    is_public=True
+                )
             except Club.DoesNotExist:
                 raise ClubNotFound()
         else:
             club = ClubSelector.get_by_slug(slug=slug)
             if club is None:
-                raise ClubNotFound()
+                try:
+                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
+                except Club.DoesNotExist:
+                    raise ClubNotFound()
 
         kpis = ClubSelector.get_kpis(club=club)
         serializer = ClubKpisSerializer(kpis)
@@ -397,7 +413,7 @@ class ClubKpisView(APIView):
 
 
 class ClubSquadView(APIView):
-    """Retrieve the squad (players) for a public club."""
+    """Retrieve the squad (players) for a public club by slug or UUID."""
 
     permission_classes = [AllowAny]
 
@@ -406,13 +422,20 @@ class ClubSquadView(APIView):
         tenant = getattr(request, "tenant", None)
         if tenant:
             try:
-                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+                club = Club.objects.select_related("tenant").get(
+                    Q(slug=slug) | Q(id=slug),
+                    tenant=tenant,
+                    is_public=True
+                )
             except Club.DoesNotExist:
                 raise ClubNotFound()
         else:
             club = ClubSelector.get_by_slug(slug=slug)
             if club is None:
-                raise ClubNotFound()
+                try:
+                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
+                except Club.DoesNotExist:
+                    raise ClubNotFound()
 
         squad = ClubSelector.get_squad(club=club)
         serializer = ClubSquadMemberSerializer(squad, many=True)
@@ -423,7 +446,7 @@ class ClubSquadView(APIView):
 
 
 class ClubStaffView(APIView):
-    """Retrieve the staff for a public club."""
+    """Retrieve the staff for a public club by slug or UUID."""
 
     permission_classes = [AllowAny]
 
@@ -432,13 +455,20 @@ class ClubStaffView(APIView):
         tenant = getattr(request, "tenant", None)
         if tenant:
             try:
-                club = Club.objects.select_related("tenant").get(slug=slug, tenant=tenant, is_public=True)
+                club = Club.objects.select_related("tenant").get(
+                    Q(slug=slug) | Q(id=slug),
+                    tenant=tenant,
+                    is_public=True
+                )
             except Club.DoesNotExist:
                 raise ClubNotFound()
         else:
             club = ClubSelector.get_by_slug(slug=slug)
             if club is None:
-                raise ClubNotFound()
+                try:
+                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
+                except Club.DoesNotExist:
+                    raise ClubNotFound()
 
         staff = ClubSelector.get_staff(club=club)
         serializer = ClubStaffSerializer(staff, many=True)
