@@ -17,6 +17,7 @@ from organizations.services import OrganizationService
 from players.models import Player
 from clubs.models import Club
 from competitions.models import Competition, PlayerSuspension, CompetitionRanking
+from competitions.selectors import CompetitionSelector
 from competitions.services.fair_play_service import FairPlayService, SuspensionAlreadyExists
 from competitions.services.ranking_service import RankingService
 from competitions.serializers.fair_play_serializers import (
@@ -48,11 +49,8 @@ class CompetitionSuspensionListView(APIView):
         responses={200: PlayerSuspensionSerializer(many=True)},
     )
     def get(self, request, competition_id):
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
         
         suspensions = FairPlayService.get_suspended_players_for_competition(
@@ -124,11 +122,8 @@ class PlayerEligibilityView(APIView):
         responses={200: PlayerEligibilitySerializer},
     )
     def get(self, request, competition_id, player_id):
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
         
         try:
@@ -207,11 +202,8 @@ class CompetitionFairPlayRankingView(APIView):
         responses={200: FairPlayRankingSerializer(many=True)},
     )
     def get(self, request, competition_id):
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
         
         ranking = FairPlayService.get_fair_play_ranking_for_competition(

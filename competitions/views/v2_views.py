@@ -166,18 +166,15 @@ class CompetitionMatchListView(APIView):
     )
     def get(self, request, competition_id):
         # Resolve tenant implicitly from competition
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
         group_id = _get_query_param(request, "group_id", "groupId")
         phase = _get_query_param(request, "phase")
         matches = MatchSelector.list_by_competition(
             tenant=competition.tenant,
-            competition_id=competition_id,
+            competition_id=competition.id,
             group_id=group_id,
             phase=phase,
         )
@@ -342,18 +339,15 @@ class CompetitionStandingListView(APIView):
         responses={200: StandingSerializer(many=True)},
     )
     def get(self, request, competition_id):
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
         group_id = _get_query_param(request, "group_id", "groupId")
         phase = _get_query_param(request, "phase")
         standings = StandingSelector.list_by_competition(
             tenant=competition.tenant,
-            competition_id=competition_id,
+            competition_id=competition.id,
             group_id=group_id,
             phase=phase,
         )
@@ -372,11 +366,8 @@ class CompetitionBracketView(APIView):
 
     @extend_schema(tags=["competitions"], summary="Get competition bracket")
     def get(self, request, competition_id):
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
         bracket = CompetitionFormatService.build_bracket(
@@ -399,19 +390,24 @@ class CompetitionRoundsView(APIView):
 
     @extend_schema(tags=["competitions"], summary="Get competition rounds")
     def get(self, request, competition_id):
-        try:
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
-        rounds = CompetitionFormatService.list_rounds(
-            tenant=competition.tenant,
-            competition=competition,
-            group_id=_get_query_param(request, "group_id", "groupId"),
-            phase=_get_query_param(request, "phase"),
-        )
+        try:
+            rounds = CompetitionFormatService.list_rounds(
+                tenant=competition.tenant,
+                competition=competition,
+                group_id=_get_query_param(request, "group_id", "groupId"),
+                phase=_get_query_param(request, "phase"),
+            )
+        except Exception as exc:
+            # Be defensive: catch validation errors coming from UUID coercion elsewhere
+            from django.core.exceptions import ValidationError
+            if isinstance(exc, (ValidationError, ValueError)):
+                return error_response(message=str(exc), status_code=400)
+            raise
+
         return success_response(
             data=rounds,
             message="Rounds retrieved successfully.",

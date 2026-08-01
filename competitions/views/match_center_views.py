@@ -18,6 +18,8 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from accounts.permissions import IsActiveAccount
 from clubs.models import Club
 from players.models import Player
+from competitions.models import Competition
+from competitions.selectors import CompetitionSelector
 from common.responses import (
     success_response, created_response, not_found_response, error_response
 )
@@ -50,10 +52,11 @@ class MatchEventListCreateView(APIView):
         responses={200: MatchEventSerializer(many=True)},
     )
     def get(self, request, competition_id, match_id):
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
+            return not_found_response(message="Competition not found.")
         try:
-            match = Match.objects.select_related("tenant").get(
-                id=match_id, competition_id=competition_id
-            )
+            match = Match.objects.select_related("tenant").get(id=match_id, competition_id=competition.id)
         except Match.DoesNotExist:
             return not_found_response(message="Match not found.")
 
@@ -74,8 +77,11 @@ class MatchEventListCreateView(APIView):
     def post(self, request, competition_id, match_id):
         tenant = OrganizationService.get_organization_for_user(user=request.user)
 
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
+            return not_found_response(message="Competition not found.")
         try:
-            match = Match.objects.get(id=match_id, competition_id=competition_id, tenant=tenant)
+            match = Match.objects.get(id=match_id, competition_id=competition.id, tenant=tenant)
         except Match.DoesNotExist:
             return not_found_response(message="Match not found.")
 
@@ -158,17 +164,13 @@ class CompetitionPlayerStatsView(APIView):
         responses={200: PlayerStatsSerializer(many=True)},
     )
     def get(self, request, competition_id):
-        try:
-            from competitions.models import Competition
-            competition = Competition.objects.select_related("tenant").get(
-                Q(slug=competition_id) | Q(id=competition_id)
-            )
-        except Competition.DoesNotExist:
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
             return not_found_response(message="Competition not found.")
 
         stats = MatchEventService.get_player_stats_for_competition(
             tenant=competition.tenant,
-            competition_id=competition_id,
+            competition_id=competition.id,
         )
         return success_response(
             data=PlayerStatsSerializer(stats, many=True).data,
