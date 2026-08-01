@@ -27,13 +27,36 @@ class CompetitionSelector:
 
     @staticmethod
     def get_by_id_public(*, competition_id, tenant: Tenant | None = None) -> Competition | None:
-        """Public selector: get a competition by ID, scoped by tenant when provided."""
+        """
+        Public selector: get a competition by ID (UUID string) or slug.
+        
+        Args:
+            competition_id: Either a UUID string (e.g., "a1b2c3d4-...") or a slug (e.g., "cup-2026")
+            tenant: Optional tenant filter for scoped queries
+            
+        Returns:
+            Competition instance or None if not found
+        """
         try:
             queryset = Competition.objects.select_related("tenant")
             if tenant is not None:
                 queryset = queryset.filter(tenant=tenant)
-            return queryset.get(id=competition_id)
-        except Competition.DoesNotExist:
+            
+            # Try slug first (most common case)
+            try:
+                return queryset.get(slug=competition_id)
+            except Competition.DoesNotExist:
+                pass
+            
+            # If slug not found, try as UUID
+            # Django's UUIDField handles UUID string conversion automatically
+            try:
+                return queryset.get(id=competition_id)
+            except (Competition.DoesNotExist, ValueError):
+                # ValueError raised if competition_id is not a valid UUID string
+                return None
+                
+        except Exception:
             return None
 
 class CompetitionRegistrationSelector:

@@ -4,6 +4,7 @@ BOLAYETU — Fair Play & Ranking Views
 API views for player suspensions, eligibility checks, and rankings.
 """
 
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -32,7 +33,7 @@ from competitions.serializers.fair_play_serializers import (
 
 class CompetitionSuspensionListView(APIView):
     """
-    GET: List all active suspensions for a competition.
+    GET: List all active suspensions for a competition by ID or slug.
     POST: Create a manual suspension (Organization Admin only).
     """
     
@@ -48,7 +49,9 @@ class CompetitionSuspensionListView(APIView):
     )
     def get(self, request, competition_id):
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
         
@@ -111,7 +114,7 @@ class CompetitionSuspensionListView(APIView):
 
 class PlayerEligibilityView(APIView):
     """
-    GET: Check if a player is eligible to play in a competition.
+    GET: Check if a player is eligible to play in a competition by ID or slug.
     """
     permission_classes = [AllowAny]
 
@@ -122,7 +125,9 @@ class PlayerEligibilityView(APIView):
     )
     def get(self, request, competition_id, player_id):
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
         
@@ -192,7 +197,7 @@ class PlayerSuspensionCancelView(APIView):
 
 class CompetitionFairPlayRankingView(APIView):
     """
-    GET: Get fair play ranking for a competition.
+    GET: Get fair play ranking for a competition by ID or slug.
     """
     permission_classes = [AllowAny]
 
@@ -203,7 +208,9 @@ class CompetitionFairPlayRankingView(APIView):
     )
     def get(self, request, competition_id):
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
         

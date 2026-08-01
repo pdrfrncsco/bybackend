@@ -9,6 +9,7 @@ Endpoints:
   GET  /api/v1/matches/live/  → live matches globally
 """
 
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema
@@ -146,7 +147,7 @@ class MatchEventDeleteView(APIView):
 
 class CompetitionPlayerStatsView(APIView):
     """
-    GET → public: player stats leaderboard for a competition.
+    GET → public: player stats leaderboard for a competition by ID or slug.
     (goals, cards, appearances sorted by goals desc)
     """
     permission_classes = [AllowAny]
@@ -159,7 +160,9 @@ class CompetitionPlayerStatsView(APIView):
     def get(self, request, competition_id):
         try:
             from competitions.models import Competition
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 

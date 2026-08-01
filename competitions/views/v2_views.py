@@ -6,6 +6,7 @@ and retrieving standings.
 """
 
 from datetime import datetime
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema, OpenApiParameter
@@ -149,7 +150,7 @@ class CompetitionGenerateScheduleView(APIView):
 
 class CompetitionMatchListView(APIView):
     """
-    GET: Retrieve match schedule/results for a competition.
+    GET: Retrieve match schedule/results for a competition by ID or slug.
     POST: Create a manual match inside the competition.
     """
 
@@ -166,7 +167,9 @@ class CompetitionMatchListView(APIView):
     def get(self, request, competition_id):
         # Resolve tenant implicitly from competition
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
@@ -323,7 +326,7 @@ class MatchScoreUpdateView(APIView):
 
 class CompetitionStandingListView(APIView):
     """
-    GET: Retrieve the standings/league table for a competition.
+    GET: Retrieve the standings/league table for a competition by ID or slug.
     """
     permission_classes = [AllowAny]
 
@@ -340,7 +343,9 @@ class CompetitionStandingListView(APIView):
     )
     def get(self, request, competition_id):
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
@@ -361,14 +366,16 @@ class CompetitionStandingListView(APIView):
 
 class CompetitionBracketView(APIView):
     """
-    GET: Retrieve the current bracket for cup/tournament competitions.
+    GET: Retrieve the current bracket for cup/tournament competitions by ID or slug.
     """
     permission_classes = [AllowAny]
 
     @extend_schema(tags=["competitions"], summary="Get competition bracket")
     def get(self, request, competition_id):
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 
@@ -386,14 +393,16 @@ class CompetitionBracketView(APIView):
 
 class CompetitionRoundsView(APIView):
     """
-    GET: Retrieve all scheduled rounds grouped by context.
+    GET: Retrieve all scheduled rounds grouped by context by ID or slug.
     """
     permission_classes = [AllowAny]
 
     @extend_schema(tags=["competitions"], summary="Get competition rounds")
     def get(self, request, competition_id):
         try:
-            competition = Competition.objects.select_related("tenant").get(id=competition_id)
+            competition = Competition.objects.select_related("tenant").get(
+                Q(slug=competition_id) | Q(id=competition_id)
+            )
         except Competition.DoesNotExist:
             return not_found_response(message="Competition not found.")
 

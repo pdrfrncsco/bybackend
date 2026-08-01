@@ -64,6 +64,28 @@ class Competition(BaseModel):
 
     def save(self, *args, **kwargs) -> None:
         if not self.slug:
+            # Generate base slug from name
             base = slugify(self.name) or "competition"
             self.slug = base
+            
+            # Ensure uniqueness per tenant+season by checking for collisions
+            counter = 1
+            original_slug = base
+            
+            while (
+                Competition.objects.filter(
+                    tenant=self.tenant,
+                    slug=self.slug,
+                    season=self.season
+                ).exclude(id=self.id).exists()
+            ):
+                # If collision, append counter to make unique
+                self.slug = f"{original_slug}-{counter}"
+                counter += 1
+                
+                # Safety limit to prevent infinite loop
+                if counter > 100:
+                    self.slug = f"{original_slug}-{self.id}"
+                    break
+                
         super().save(*args, **kwargs)

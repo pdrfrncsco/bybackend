@@ -1,5 +1,6 @@
 import logging
 
+from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
@@ -75,7 +76,7 @@ class CompetitionListCreateView(APIView):
 
 class CompetitionDetailView(APIView):
     """
-    GET   → public: retrieve a competition by ID.
+    GET   → public: retrieve a competition by ID or slug.
     PATCH → org admin only: update competition fields.
     """
 
@@ -86,9 +87,11 @@ class CompetitionDetailView(APIView):
 
     @extend_schema(tags=["competitions"], responses={200: CompetitionSerializer})
     def get(self, request, competition_id):
+        tenant = getattr(request, "tenant", None)
+        # Use selector that now accepts both slug and UUID
         competition = CompetitionSelector.get_by_id_public(
             competition_id=competition_id,
-            tenant=getattr(request, "tenant", None),
+            tenant=tenant,
         )
         if competition is None:
             return not_found_response(message="Competition not found.")
