@@ -8,6 +8,7 @@ from competitions.models.match_report import MatchReport, Goal, MatchStats
 from competitions.models.player_suspension import PlayerSuspension
 from competitions.models.regulation import CompetitionRegulation
 from competitions.models.standing import Standing
+from competitions.models.tactical_positions import TacticalPositions
 
 __all__ = [
     "Competition",
@@ -23,4 +24,5 @@ __all__ = [
     "PlayerSuspension",
     "CompetitionRegulation",
     "Standing",
+    "TacticalPositions",
 ]

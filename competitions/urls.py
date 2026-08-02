@@ -135,4 +135,11 @@ urlpatterns = [
         MatchReportDocumentUploadView.as_view(),
         name="match-report-document"
     ),
+
+    # Tactical positions for a match (GET/POST)
+    path(
+        "matches/<uuid:match_id>/tactical_positions/",
+        __import__('competitions.views.tactical_views', fromlist=['TacticalPositionsViewSet']).TacticalPositionsViewSet.as_view({'get': 'retrieve', 'post': 'create'}),
+        name="tactical-positions"
+    ),
 ]
