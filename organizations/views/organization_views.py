@@ -57,6 +57,9 @@ from organizations.serializers import (
     PublicOrganizationSerializer,
     SubscriptionResponseSerializer,
 )
+
+# Import lineup serializer for pending submissions API
+from competitions.serializers import LineupSubmissionDetailSerializer
 from organizations.services import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -517,6 +520,50 @@ class OrganizationPlayersView(APIView):
             data=players,
             message="Organization players retrieved successfully.",
         )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# Pending lineups for Organization (admin)
+# ─────────────────────────────────────────────────────────────────────
+
+class OrganizationPendingLineupsView(APIView):
+    """
+    Retrieve pending lineup submissions for competitions owned by the authenticated organization.
+
+    GET /api/v1/organizations/me/lineups/pending/
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    @extend_schema(tags=["organizations"], responses={200: LineupSubmissionDetailSerializer(many=True)})
+    def get(self, request):
+        from competitions.models import LineupSubmission
+        from common.pagination import StandardPagination
+
+        # Resolve tenant and permissions
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        # Query pending submissions
+        qs = LineupSubmission.objects.filter(
+            tenant=tenant,
+            status=LineupSubmission.SubmissionStatus.SUBMITTED,
+        ).select_related('match__competition', 'match', 'club', 'submitted_by').order_by('-submitted_at')
+
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(qs, request)
+
+        # Build lightweight response with competition info
+        results = []
+        for submission in page:
+            serializer = LineupSubmissionDetailSerializer(submission)
+            data = serializer.data
+            comp = getattr(submission.match, 'competition', None)
+            data['competition_id'] = str(comp.id) if comp else None
+            data['competition_name'] = comp.name if comp else None
+            results.append(data)
+
+        return paginator.get_paginated_response(results)
 
 
 # ─────────────────────────────────────────────────────────────────────
