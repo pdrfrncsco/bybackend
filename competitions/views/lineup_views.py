@@ -345,7 +345,10 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def confirm(self, request, *args, **kwargs):
-        """Confirm a submitted lineup."""
+        """Confirm a submitted lineup.
+
+        Permissions: only organization admins, club managers/coaches/assistant_coaches, or superusers may confirm.
+        """
         tenant = get_request_tenant(request)
         if tenant is None:
             return Response(
@@ -365,6 +368,36 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         try:
             match = Match.objects.get(id=match_id, tenant=tenant)
             club = Club.objects.get(id=club_id, tenant=tenant)
+
+            # Permission check: superuser OR organization admin OR club manager/coach/assistant_coach
+            is_allowed = request.user.is_superuser
+
+            if not is_allowed:
+                try:
+                    from organizations.services import OrganizationService
+
+                    # organization admin check (will raise if no membership)
+                    org_tenant = OrganizationService.get_organization_for_user(user=request.user)
+                    OrganizationService.assert_is_organization_admin(user=request.user, tenant=org_tenant)
+                    is_allowed = True
+                except Exception:
+                    is_allowed = False
+
+            if not is_allowed:
+                from clubs.models import ClubMember
+
+                is_allowed = ClubMember.objects.filter(
+                    club_id=club_id,
+                    user=request.user,
+                    is_active=True,
+                    role__in=["manager", "coach", "assistant_coach"]
+                ).exists()
+
+            if not is_allowed:
+                return Response(
+                    {"error": "Usuário não autorizado a confirmar esta escalação."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
             submission = LineupService.confirm_lineup(
                 tenant=tenant,
@@ -395,7 +428,11 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def lock(self, request, *args, **kwargs):
-        """Lock all lineups for a match."""
+        """Lock lineups for a match.
+
+        If 'club_id' is provided in the body, lock only that club's lineup (requires club permission).
+        If no 'club_id' is provided, lock all lineups for the match (requires org-admin or superuser).
+        """
         tenant = get_request_tenant(request)
         if tenant is None:
             return Response(
@@ -404,9 +441,62 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
             )
 
         match_id = self.kwargs.get('match_id')
+        club_id = request.data.get('club_id')
 
         try:
             match = Match.objects.get(id=match_id, tenant=tenant)
+
+            if club_id:
+                # Lock a single club lineup — allow club managers/coaches or org admins
+                try:
+                    club = Club.objects.get(id=club_id, tenant=tenant)
+                except Club.DoesNotExist:
+                    return Response({"error": "Clube não encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+                is_allowed = request.user.is_superuser
+                if not is_allowed:
+                    try:
+                        from organizations.services import OrganizationService
+                        org_tenant = OrganizationService.get_organization_for_user(user=request.user)
+                        OrganizationService.assert_is_organization_admin(user=request.user, tenant=org_tenant)
+                        is_allowed = True
+                    except Exception:
+                        is_allowed = False
+
+                if not is_allowed:
+                    from clubs.models import ClubMember
+                    is_allowed = ClubMember.objects.filter(
+                        club_id=club_id,
+                        user=request.user,
+                        is_active=True,
+                        role__in=["manager", "coach", "assistant_coach"]
+                    ).exists()
+
+                if not is_allowed:
+                    return Response({"error": "Usuário não autorizado a bloquear esta escalação."}, status=status.HTTP_403_FORBIDDEN)
+
+                submission = LineupService.lock_lineup(
+                    tenant=tenant,
+                    match=match,
+                    club=club
+                )
+
+                serializer = LineupSubmissionDetailSerializer(submission)
+                return Response({"message": "Escalação bloqueada", "lineup": serializer.data})
+
+            # No club_id — lock all lineups (org-level action)
+            is_allowed = request.user.is_superuser
+            if not is_allowed:
+                try:
+                    from organizations.services import OrganizationService
+                    org_tenant = OrganizationService.get_organization_for_user(user=request.user)
+                    OrganizationService.assert_is_organization_admin(user=request.user, tenant=org_tenant)
+                    is_allowed = True
+                except Exception:
+                    is_allowed = False
+
+            if not is_allowed:
+                return Response({"error": "Usuário não autorizado a bloquear todas as escalações deste jogo."}, status=status.HTTP_403_FORBIDDEN)
 
             LineupService.lock_all_lineups(
                 tenant=tenant,
