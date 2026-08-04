@@ -102,11 +102,13 @@ class LineupSubmissionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'match', 'club', 'formation', 'status', 'status_display',
             'submitted_at', 'submitted_by', 'confirmed_at', 'confirmed_by',
+            'reviewed_at', 'reviewed_by', 'review_notes',
             'lineup_players', 'notes', 'created_at', 'updated_at'
         ]
         read_only_fields = [
             'id', 'match', 'club', 'submitted_at', 'confirmed_at',
-            'confirmed_by', 'lineup_players', 'created_at', 'updated_at'
+            'confirmed_by', 'reviewed_at', 'reviewed_by', 'review_notes',
+            'lineup_players', 'created_at', 'updated_at'
         ]
 
 
@@ -138,6 +140,7 @@ class LineupSubmissionDetailSerializer(serializers.ModelSerializer):
         source='get_status_display',
         read_only=True
     )
+    reviewed_by_email = serializers.CharField(source='reviewed_by.email', read_only=True)
     starters = serializers.SerializerMethodField()
     substitutes = serializers.SerializerMethodField()
 
@@ -147,6 +150,7 @@ class LineupSubmissionDetailSerializer(serializers.ModelSerializer):
             'id', 'match', 'match_str', 'club', 'club_name',
             'formation', 'status', 'status_display',
             'submitted_at', 'confirmed_at', 'confirmed_by',
+            'reviewed_at', 'reviewed_by', 'reviewed_by_email', 'review_notes',
             'starters', 'substitutes'
         ]
         read_only_fields = fields
@@ -168,6 +172,13 @@ class LineupSubmissionDetailSerializer(serializers.ModelSerializer):
             status=MatchLineup.LineupStatus.SUBSTITUTE
         ).select_related('player').order_by('shirt_number')
         return MatchLineupPlayerSerializer(substitutes, many=True).data
+
+
+class LineupSubmissionReviewSerializer(serializers.Serializer):
+    """Serializer for approving or rejecting a lineup submission."""
+
+    approve = serializers.BooleanField()
+    review_notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 # ─── Match Report Serializers ──────────────────────────────────────────────

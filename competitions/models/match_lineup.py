@@ -213,6 +213,7 @@ class LineupSubmission(BaseModel):
         PENDING = "pending", "Pendente"
         SUBMITTED = "submitted", "Submetida"
         CONFIRMED = "confirmed", "Confirmada"
+        REJECTED = "rejected", "Rejeitada"
         LOCKED = "locked", "Bloqueada"
 
     tenant = models.ForeignKey(
@@ -275,6 +276,24 @@ class LineupSubmission(BaseModel):
         related_name="lineup_submissions_confirmed",
         verbose_name="Confirmed By",
     )
+    reviewed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Reviewed At",
+    )
+    reviewed_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lineup_submissions_reviewed",
+        verbose_name="Reviewed By",
+    )
+    review_notes = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Review Notes",
+    )
 
     notes = models.TextField(
         blank=True,
@@ -309,6 +328,37 @@ class LineupSubmission(BaseModel):
         self.confirmed_at = timezone.now()
         self.confirmed_by = user
         self.save(update_fields=["status", "confirmed_at", "confirmed_by", "updated_at"])
+
+    def review(self, user, approve: bool, review_notes: str = "") -> None:
+        """Review the lineup submission and approve or reject it."""
+        self.reviewed_at = timezone.now()
+        self.reviewed_by = user
+        self.review_notes = review_notes
+
+        if approve:
+            self.status = self.SubmissionStatus.CONFIRMED
+            self.confirmed_at = self.reviewed_at
+            self.confirmed_by = user
+            update_fields = [
+                "status",
+                "confirmed_at",
+                "confirmed_by",
+                "reviewed_at",
+                "reviewed_by",
+                "review_notes",
+                "updated_at",
+            ]
+        else:
+            self.status = self.SubmissionStatus.REJECTED
+            update_fields = [
+                "status",
+                "reviewed_at",
+                "reviewed_by",
+                "review_notes",
+                "updated_at",
+            ]
+
+        self.save(update_fields=update_fields)
 
     def lock(self) -> None:
         """Lock the lineup (no further changes allowed)."""
