@@ -59,7 +59,7 @@ from organizations.serializers import (
 )
 
 # Import lineup serializer for pending submissions API
-from competitions.serializers import LineupSubmissionDetailSerializer
+from competitions.serializers import LineupSubmissionDetailSerializer, LineupSubmissionReviewSerializer
 from organizations.services import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -564,6 +564,53 @@ class OrganizationPendingLineupsView(APIView):
             results.append(data)
 
         return paginator.get_paginated_response(results)
+
+
+class OrganizationPendingLineupReviewView(APIView):
+    """
+    Review a pending lineup submission for the authenticated organization.
+
+    PATCH /api/v1/organizations/me/lineups/pending/<submission_id>/review/
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    @extend_schema(tags=["organizations"], request=LineupSubmissionReviewSerializer, responses={200: LineupSubmissionDetailSerializer})
+    def patch(self, request, submission_id):
+        from competitions.models import LineupSubmission
+        from competitions.services.lineup_service import LineupService, LineupValidationError
+
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        try:
+            submission = LineupSubmission.objects.select_related("match", "club", "reviewed_by", "confirmed_by").get(
+                id=submission_id,
+                tenant=tenant,
+                status=LineupSubmission.SubmissionStatus.SUBMITTED,
+            )
+        except LineupSubmission.DoesNotExist:
+            return error_response(message="Lineup submission not found.", status_code=404)
+
+        serializer = LineupSubmissionReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            submission = LineupService.review_lineup_submission(
+                tenant=tenant,
+                match=submission.match,
+                club=submission.club,
+                reviewed_by=request.user,
+                approve=serializer.validated_data["approve"],
+                review_notes=serializer.validated_data.get("review_notes", ""),
+            )
+        except LineupValidationError as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return success_response(
+            data=LineupSubmissionDetailSerializer(submission).data,
+            message="Lineup submission reviewed successfully.",
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ from organizations.views import (
     OrganizationClubRequestsView,
     OrganizationClubRequestReviewView,
     OrganizationPendingLineupsView,
+    OrganizationPendingLineupReviewView,
 )
 
 urlpatterns = [
@@ -39,6 +40,7 @@ urlpatterns = [
     path("me/members/", OrganizationMembersView.as_view(), name="organization-members"),
     path("me/members/<uuid:membership_id>/", OrganizationMemberDetailView.as_view(), name="organization-member-detail"),
     path("me/lineups/pending/", OrganizationPendingLineupsView.as_view(), name="organization-pending-lineups"),
+    path("me/lineups/pending/<uuid:submission_id>/review/", OrganizationPendingLineupReviewView.as_view(), name="organization-pending-lineup-review"),
 
     # Public — Organization Discovery
     path("public/", OrganizationPublicListView.as_view(), name="organization-public-list"),

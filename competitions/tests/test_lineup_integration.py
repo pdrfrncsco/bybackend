@@ -417,6 +417,51 @@ class TestLineupSubmission(TestCase):
 
         assert confirmed.status == LineupSubmission.SubmissionStatus.CONFIRMED
 
+    def test_review_lineup_submission(self):
+        """Test approving and rejecting a submitted lineup."""
+        players = self._create_valid_lineup()
+
+        LineupService.submit_lineup(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            players=players,
+            submitted_by=self.user,
+        )
+
+        approved = LineupService.review_lineup_submission(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            reviewed_by=self.user,
+            approve=True,
+            review_notes="Tudo certo.",
+        )
+
+        assert approved.status == LineupSubmission.SubmissionStatus.CONFIRMED
+        assert approved.review_notes == "Tudo certo."
+        assert approved.reviewed_by == self.user
+
+        LineupService.submit_lineup(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            players=players,
+            submitted_by=self.user,
+        )
+
+        rejected = LineupService.review_lineup_submission(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            reviewed_by=self.user,
+            approve=False,
+            review_notes="Corrigir o banco.",
+        )
+
+        assert rejected.status == LineupSubmission.SubmissionStatus.REJECTED
+        assert rejected.review_notes == "Corrigir o banco."
+
     def test_lock_lineup(self):
         """Test locking a confirmed lineup."""
         players = self._create_valid_lineup()

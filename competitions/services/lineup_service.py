@@ -363,8 +363,37 @@ class LineupService:
             raise LineupValidationError(
                 f"Cannot confirm lineup with status '{submission.get_status_display()}'"
             )
-        
+
         submission.confirm(confirmed_by)
+        return submission
+
+    @staticmethod
+    @transaction.atomic
+    def review_lineup_submission(
+        *,
+        tenant: Tenant,
+        match: Match,
+        club: Club,
+        reviewed_by=None,
+        approve: bool,
+        review_notes: str = "",
+    ) -> LineupSubmission:
+        """Review a submitted lineup and approve or reject it."""
+        try:
+            submission = LineupSubmission.objects.get(
+                tenant=tenant,
+                match=match,
+                club=club,
+            )
+        except LineupSubmission.DoesNotExist:
+            raise LineupValidationError("Lineup has not been submitted yet")
+
+        if submission.status != LineupSubmission.SubmissionStatus.SUBMITTED:
+            raise LineupValidationError(
+                f"Cannot review lineup with status '{submission.get_status_display()}'"
+            )
+
+        submission.review(reviewed_by, approve=approve, review_notes=review_notes)
         return submission
 
     @staticmethod
