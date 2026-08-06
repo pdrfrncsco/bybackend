@@ -113,12 +113,23 @@ class PlayerService:
         Update player profile fields.
 
         Only updates fields that are explicitly provided.
+        Coerces date_of_birth to a date object if passed as a string.
         """
         allowed_fields = {
             "first_name", "last_name", "date_of_birth", "nationality",
             "primary_position", "email", "phone", "height_cm", "weight_kg",
             "foot", "bio", "avatar", "status", "is_public",
         }
+
+        # Coerce date_of_birth string → date (defensive, in case callers pass a raw string)
+        if "date_of_birth" in kwargs and isinstance(kwargs["date_of_birth"], str):
+            try:
+                kwargs["date_of_birth"] = date.fromisoformat(kwargs["date_of_birth"])
+            except ValueError:
+                raise ValueError(
+                    f"Invalid date_of_birth format '{kwargs['date_of_birth']}'. Expected YYYY-MM-DD."
+                )
+
         updated = []
         for field, value in kwargs.items():
             if field in allowed_fields:

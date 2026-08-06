@@ -152,9 +152,16 @@ class Player(BaseModel):
         if not self.date_of_birth:
             return None
         from datetime import date
+        dob = self.date_of_birth
+        # Defensive: handle cases where dob is stored / passed as a string
+        if isinstance(dob, str):
+            try:
+                dob = date.fromisoformat(dob)
+            except ValueError:
+                return None
         today = date.today()
-        return today.year - self.date_of_birth.year - (
-            (today.month, today.day) < (self.date_of_birth.month, self.date_of_birth.day)
+        return today.year - dob.year - (
+            (today.month, today.day) < (dob.month, dob.day)
         )
     
     def save(self, *args, **kwargs) -> None:

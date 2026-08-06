@@ -116,6 +116,17 @@ class PlayerMeView(APIView):
         }
         payload = {k: v for k, v in request.data.items() if k in allowed}
 
+        # Coerce date_of_birth string (e.g. "1995-05-15") → date object
+        if "date_of_birth" in payload and isinstance(payload["date_of_birth"], str):
+            from datetime import date as _date
+            try:
+                payload["date_of_birth"] = _date.fromisoformat(payload["date_of_birth"])
+            except ValueError:
+                return error_response(
+                    message="Invalid date_of_birth format. Expected YYYY-MM-DD.",
+                    status_code=400,
+                )
+
         try:
             player = PlayerService.update_player(player, **payload)
         except Exception as exc:
