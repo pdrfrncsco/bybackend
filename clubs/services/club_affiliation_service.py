@@ -45,18 +45,8 @@ class ClubAffiliationService:
                 is_verified=False,
             )
 
-        if club.status != ClubStatus.ACTIVE:
-            club = ClubService.activate(club=club)
-
-        if request_obj.submitted_by_id:
-            ClubMember.objects.update_or_create(
-                club=club,
-                user=request_obj.submitted_by,
-                defaults={
-                    "role": ClubMemberRole.PRESIDENT,
-                    "is_active": True,
-                },
-            )
+        # Do not auto-activate or assign membership upon request submission.
+        # Activation and membership assignment should occur only after an admin approves the request.
 
         if request_obj.club_id != club.id:
             request_obj.club = club
@@ -69,6 +59,7 @@ class ClubAffiliationService:
         *,
         tenant: Tenant,
         submitted_by: User | None = None,
+        is_draft: bool = False,
         **kwargs,
     ) -> ClubAffiliationRequest:
         if ClubAffiliationRequest.objects.filter(
@@ -77,16 +68,30 @@ class ClubAffiliationService:
         ).exists():
             raise DuplicateClubAffiliationRequest()
 
+        status = ClubAffiliationRequest.Status.DRAFT if is_draft else ClubAffiliationRequest.Status.PENDING
+
         request = ClubAffiliationRequest.objects.create(
             tenant=tenant,
             submitted_by=submitted_by,
+            status=status,
             **kwargs,
         )
-        # Ensure a provisional club exists for the request so it can be shown immediately.
+        # Ensure a provisional club exists for the request so it can be shown / edited by the submitter.
         ClubAffiliationService._ensure_club_for_request(request_obj=request)
+        # If this is a draft, give the submitter admin membership on the provisional club
+        if is_draft and request.submitted_by_id:
+            ClubMember.objects.update_or_create(
+                club=request.club,
+                user=request.submitted_by,
+                defaults={
+                    "role": ClubMemberRole.PRESIDENT,
+                    "is_active": True,
+                },
+            )
+
         # Persist the club reference on the request (if it was set).
         request.save(update_fields=["club"])  # type: ignore[arg-type]
-        logger.info("Club affiliation request submitted: %s (%s)", request.name, request.id)
+        logger.info("Club affiliation request created (draft=%s): %s (%s)", is_draft, request.name, request.id)
         return request
 
     @staticmethod
@@ -98,8 +103,21 @@ class ClubAffiliationService:
         approve: bool,
         review_notes: str = "",
     ) -> ClubAffiliationRequest:
+        # Repair case: already approved but missing club reference
         if request_obj.status == ClubAffiliationRequest.Status.APPROVED and request_obj.club_id is None:
-            ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
+            club = ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
+            # Activate and assign membership if needed
+            if club.status != ClubStatus.ACTIVE:
+                ClubService.activate(club=club)
+            if request_obj.submitted_by_id:
+                ClubMember.objects.update_or_create(
+                    club=club,
+                    user=request_obj.submitted_by,
+                    defaults={
+                        "role": ClubMemberRole.PRESIDENT,
+                        "is_active": True,
+                    },
+                )
             request_obj.save(update_fields=["club", "updated_at"])
             logger.info("Approved club affiliation request repaired: %s", request_obj.id)
             return request_obj
@@ -116,7 +134,20 @@ class ClubAffiliationService:
             if existing_club is not None and request_obj.club_id not in (None, existing_club.id):
                 raise DuplicateClubName()
 
-            ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
+            club = ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
+            # Activate the club and assign the submitter as president
+            if club.status != ClubStatus.ACTIVE:
+                ClubService.activate(club=club)
+            if request_obj.submitted_by_id:
+                ClubMember.objects.update_or_create(
+                    club=club,
+                    user=request_obj.submitted_by,
+                    defaults={
+                        "role": ClubMemberRole.PRESIDENT,
+                        "is_active": True,
+                    },
+                )
+
             request_obj.status = ClubAffiliationRequest.Status.APPROVED
         else:
             request_obj.status = ClubAffiliationRequest.Status.REJECTED

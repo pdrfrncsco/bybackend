@@ -12,6 +12,7 @@ from common.models import BaseModel
 
 class ClubAffiliationRequest(BaseModel):
     class Status(models.TextChoices):
+        DRAFT = "draft", "Rascunho"
         PENDING = "pending", "Pendente"
         APPROVED = "approved", "Aprovado"
         REJECTED = "rejected", "Rejeitado"

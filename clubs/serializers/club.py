@@ -22,6 +22,9 @@ class ClubSerializer(serializers.ModelSerializer):
     status_label = serializers.SerializerMethodField()
     tenant_name = serializers.SerializerMethodField()
     tenant_slug = serializers.SerializerMethodField()
+    # Expose affiliation request summary (if any) so frontend can show banners/CTA
+    affiliation_request_status = serializers.SerializerMethodField()
+    affiliation_request_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Club
@@ -50,6 +53,8 @@ class ClubSerializer(serializers.ModelSerializer):
             "is_verified",
             "status",
             "status_label",
+            "affiliation_request_status",
+            "affiliation_request_id",
             "created_at",
             "updated_at",
         ]
@@ -61,6 +66,8 @@ class ClubSerializer(serializers.ModelSerializer):
             "status_label",
             "tenant_name",
             "tenant_slug",
+            "affiliation_request_status",
+            "affiliation_request_id",
             "created_at",
             "updated_at",
         ]
@@ -94,6 +101,21 @@ class ClubSerializer(serializers.ModelSerializer):
     def get_tenant_slug(self, obj: Club) -> str:
         return obj.tenant.slug if obj.tenant else ""
 
+
+    def get_affiliation_request_status(self, obj: Club) -> str | None:
+        # Return the linked affiliation request status if present (draft, pending, approved, rejected)
+        try:
+            req = getattr(obj, 'affiliation_request', None)
+            return req.status if req is not None else None
+        except Exception:
+            return None
+
+    def get_affiliation_request_id(self, obj: Club) -> str | None:
+        try:
+            req = getattr(obj, 'affiliation_request', None)
+            return str(req.id) if req is not None else None
+        except Exception:
+            return None
 
 class ClubCreateSerializer(serializers.ModelSerializer):
     """

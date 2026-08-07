@@ -69,6 +69,8 @@ class ClubAffiliationRequestCreateSerializer(serializers.Serializer):
     secondary_color = serializers.CharField(max_length=7, required=False, default="#94D3C1")
     stadium_name = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     stadium_capacity = serializers.IntegerField(required=False, allow_null=True)
+    # If true, create a draft (provisional) affiliation request and provisional club that is not visible to org admins until submitted
+    is_draft = serializers.BooleanField(required=False, default=False)
 
 
 class ClubAffiliationRequestReviewSerializer(serializers.Serializer):
