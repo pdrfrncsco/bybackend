@@ -108,6 +108,21 @@ class PlayerService:
             user_id=user_id,
         )
 
+        # Backfill PlayerContact using provided email/phone for gradual migration.
+        try:
+            from players.services.player_contact_service import PlayerContactService
+
+            contact_payload = {}
+            if email:
+                contact_payload['primary_email'] = email
+            if phone:
+                contact_payload['mobile_phone'] = phone
+            if contact_payload:
+                PlayerContactService.upsert_contact(player=player, data=contact_payload)
+        except Exception:
+            # Avoid failing player creation if contact service not available
+            logger.exception("Failed to upsert PlayerContact for newly created player %s", player.id)
+
         logger.info("Player created: %s (id=%s)", player.full_name, player.id)
         return player
 

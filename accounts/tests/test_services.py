@@ -51,7 +51,7 @@ class AuthServiceTest(TestCase):
         self.assertIsNotNone(player)
         self.assertEqual(player.first_name, "Ana")
         self.assertEqual(player.last_name, "Mendes")
-        self.assertEqual(player.email, "player@bolayetu.com")
+        self.assertEqual(player.contact_email, "player@bolayetu.com")
         self.assertFalse(player.is_public)
 
     def test_registration_club_does_not_create_tenant_scoped_club(self):
