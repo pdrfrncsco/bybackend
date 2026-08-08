@@ -7,6 +7,13 @@ from players.models.player_video import PlayerVideo
 from players.models.player_document import PlayerDocument
 from players.models.player_achievement import PlayerAchievement
 
+# New models (Phase 1)
+from players.models.identity import PlayerIdentityDocument
+from players.models.contact import PlayerContact, EmergencyContact
+from players.models.guardian import LegalGuardian
+from players.models.external_id import PlayerExternalId
+from players.models.privacy import PlayerPrivacySettings
+
 __all__ = [
     "Player",
     "PlayerRegistration",
@@ -14,4 +21,11 @@ __all__ = [
     "PlayerVideo",
     "PlayerDocument",
     "PlayerAchievement",
+    # Phase 1 additions
+    "PlayerIdentityDocument",
+    "PlayerContact",
+    "EmergencyContact",
+    "LegalGuardian",
+    "PlayerExternalId",
+    "PlayerPrivacySettings",
 ]

@@ -1,0 +1,10 @@
+"""Domain event type constants for the players module."""
+
+PLAYER_CREATED = "players.player.created"
+PLAYER_ONBOARDING_COMPLETED = "players.player.onboarding_completed"
+PLAYER_VERIFIED = "players.player.verified"
+PLAYER_DOCUMENT_UPLOADED = "players.player.document.uploaded"
+PLAYER_DOCUMENT_VERIFIED = "players.player.document.verified"
+PLAYER_STATUS_CHANGED = "players.player.status.changed"
+PLAYER_REGISTRATION_CREATED = "players.player.registration.created"
+PLAYER_TRANSFERRED = "players.player.transferred"

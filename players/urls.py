@@ -58,6 +58,15 @@ from players.views.player_achievement_views import (
     PlayerAchievementDetailView,
     PlayerAchievementVerifyView,
 )
+from players.views.player_identity_views import (
+    PlayerIdentityDocumentListView,
+    PlayerIdentityDocumentDetailView,
+    PlayerIdentityDocumentVerifyView,
+)
+from players.views.player_contact_views import (
+    PlayerContactView,
+    PlayerEmergencyContactListCreateView,
+)
 
 urlpatterns = [
     # Player CRUD
@@ -120,5 +129,33 @@ urlpatterns = [
         "<slug:slug>/achievements/<uuid:achievement_id>/verify/",
         PlayerAchievementVerifyView.as_view(),
         name="player-achievement-verify",
+    ),
+
+    # Phase 1: Identity & Contact endpoints
+    path(
+        "<slug:slug>/identity-documents/",
+        PlayerIdentityDocumentListView.as_view(),
+        name="player-identity-document-list",
+    ),
+    path(
+        "<slug:slug>/identity-documents/<uuid:document_id>/",
+        PlayerIdentityDocumentDetailView.as_view(),
+        name="player-identity-document-detail",
+    ),
+    path(
+        "<slug:slug>/identity-documents/<uuid:document_id>/verify/",
+        PlayerIdentityDocumentVerifyView.as_view(),
+        name="player-identity-document-verify",
+    ),
+
+    path(
+        "<slug:slug>/contact/",
+        PlayerContactView.as_view(),
+        name="player-contact",
+    ),
+    path(
+        "<slug:slug>/emergency-contacts/",
+        PlayerEmergencyContactListCreateView.as_view(),
+        name="player-emergency-contact-list-create",
     ),
 ]

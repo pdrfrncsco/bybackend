@@ -67,6 +67,14 @@ class Player(BaseModel):
         MULTIPLE = "multiple", "Varios Posições"
 
     # Personal Information
+    global_id = models.CharField(max_length=32, unique=True, editable=False, verbose_name="Global ID")
+
+    def _generate_global_id(self) -> str:
+        """Generate a short unique global id for a Player (BY-PLY-...)."""
+        import uuid
+        return f"BY-PLY-{uuid.uuid4().hex[:16].upper()}"
+
+    # Personal Information
     first_name = models.CharField(max_length=255, verbose_name="Primeiro Nome")
     last_name = models.CharField(max_length=255, verbose_name="Apelido")
     slug = models.SlugField(max_length=255, unique=True, blank=True, verbose_name="Slug")
@@ -165,6 +173,17 @@ class Player(BaseModel):
         )
     
     def save(self, *args, **kwargs) -> None:
+        # Ensure a stable, unique global_id exists (immutable after creation)
+        if not getattr(self, 'global_id', None):
+            self.global_id = self._generate_global_id()
+            # Defensive: ensure uniqueness (very unlikely to collide)
+            counter = 0
+            base = self.global_id
+            while Player.objects.filter(global_id=self.global_id).exclude(pk=self.pk).exists():
+                counter += 1
+                self.global_id = f"{base}-{counter}"
+
+        # Ensure unique slug derived from full name
         if not self.slug:
             base = slugify(self.full_name)
             slug = base
