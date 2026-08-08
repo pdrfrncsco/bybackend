@@ -1,4 +1,4 @@
-# Plano de Melhorias — Módulo PLAYER
+V# Plano de Melhorias — Módulo PLAYER
 **Bolayetu Backend · Roadmap MVP por Fases**
 _Gerado com base no repositório atual + Arquitetura_do_Modulo_PLAYER.md_
 

@@ -41,6 +41,11 @@ class PlayerRegistrationConflict(Exception):
     pass
 
 
+class GuardianConsentRequired(Exception):
+    """Raised when attempting to register a minor without a guardian consent."""
+    pass
+
+
 # Import stats sync service for external use
 from players.services.stats_sync_service import StatsSyncService
 
@@ -228,6 +233,19 @@ class PlayerRegistrationService:
             raise PlayerRegistrationConflict(
                 f"{player.full_name} is already actively registered at {active_reg.club.name}."
             )
+
+        # Guardian consent check for minors
+        try:
+            is_minor = player.is_minor
+        except Exception:
+            is_minor = False
+
+        if is_minor:
+            has_guardian = player.legal_guardians.filter(consent_status="given").exists()
+            if not has_guardian:
+                raise GuardianConsentRequired(
+                    "Player is a minor and requires a legal guardian with consent before registration."
+                )
 
         registration = PlayerRegistration.objects.create(
             player=player,

@@ -42,6 +42,7 @@ class PlayerSerializer(serializers.ModelSerializer):
             "shirt_number",
             "bio",
             "avatar",
+            "profile_photo_url",
             "is_public",
             "status",
             "status_label",
@@ -123,6 +124,7 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
             "shirt_number",
             "bio",
             "avatar",
+            "profile_photo_url",
             "is_public",
             "status",
             "status_label",
@@ -186,6 +188,9 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
             }
             for registration in registrations
         ]
+
+    def get_profile_photo_url(self, obj: Player) -> str | None:
+        return obj.profile_photo_url
     
     def get_videos(self, obj: Player) -> list:
         """Return player's published videos."""

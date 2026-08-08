@@ -106,6 +106,15 @@ class Player(BaseModel):
     shirt_number = models.IntegerField(null=True, blank=True, verbose_name="Número de Camisa Preferido")
     # Profile
     bio = models.TextField(null=True, blank=True, verbose_name="Biografia")
+    # New: reference to media asset for profile photo (preferred). Keep `avatar` URL for backwards-compatibility.
+    profile_photo = models.ForeignKey(
+        "media_assets.MediaAsset",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="players_profile_photo",
+        verbose_name="Profile Photo",
+    )
     avatar = models.URLField(max_length=500, null=True, blank=True, verbose_name="Avatar URL")
     is_public = models.BooleanField(default=True, verbose_name="É Público?")
     
@@ -153,6 +162,38 @@ class Player(BaseModel):
     def full_name(self) -> str:
         """Return player's full name."""
         return f"{self.first_name} {self.last_name}".strip()
+
+    @property
+    def contact_email(self) -> str | None:
+        """Prefer PlayerContact.primary_email when present, fallback to deprecated email field."""
+        try:
+            contact = getattr(self, 'contact', None)
+            if contact and contact.primary_email:
+                return contact.primary_email
+        except Exception:
+            pass
+        return self.email
+
+    @property
+    def contact_phone(self) -> str | None:
+        """Prefer PlayerContact.mobile_phone when present, fallback to deprecated phone field."""
+        try:
+            contact = getattr(self, 'contact', None)
+            if contact and contact.mobile_phone:
+                return contact.mobile_phone
+        except Exception:
+            pass
+        return self.phone
+
+    @property
+    def profile_photo_url(self) -> str | None:
+        """Return the public URL of profile photo if available, else fallback to avatar URL."""
+        try:
+            if self.profile_photo:
+                return getattr(self.profile_photo, 'public_url', None)
+        except Exception:
+            pass
+        return self.avatar
     
     @property
     def age(self) -> int | None:
@@ -171,7 +212,13 @@ class Player(BaseModel):
         return today.year - dob.year - (
             (today.month, today.day) < (dob.month, dob.day)
         )
-    
+
+    @property
+    def is_minor(self) -> bool:
+        """Return True if player is a minor (<18 years)."""
+        age = self.age
+        return age is not None and age < 18
+
     def save(self, *args, **kwargs) -> None:
         # Ensure a stable, unique global_id exists (immutable after creation)
         if not getattr(self, 'global_id', None):
