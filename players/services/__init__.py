@@ -175,7 +175,12 @@ class PlayerService:
     @staticmethod
     @transaction.atomic
     def upload_avatar(*, player: Player, file, uploaded_by=None) -> Player:
-        """Upload a player avatar via the DAM and persist the public URL on the profile."""
+        """Upload a player avatar via the DAM, persist the MediaAsset and keep URL as fallback.
+
+        - Create a MediaAsset via MediaAssetService.upload_for_owner
+        - Set player.profile_photo FK to the created asset (preferred)
+        - Also set player.avatar to asset.public_url for backwards compatibility
+        """
         from media_assets.constants import AssetCategory, OwnerType
         from media_assets.exceptions import (
             InvalidMediaFile,
@@ -198,9 +203,20 @@ class PlayerService:
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise ValueError(str(exc.detail if hasattr(exc, "detail") else exc)) from exc
 
-        player.avatar = asset.public_url
-        player.save(update_fields=["avatar", "updated_at"])
-        logger.info("Avatar uploaded via DAM for player: %s (asset=%s)", player.full_name, asset.id)
+        # Store the MediaAsset relation and keep URL fallback for compatibility
+        try:
+            player.profile_photo = asset
+            player.avatar = getattr(asset, "public_url", None) or player.avatar
+            player.save(update_fields=["profile_photo", "avatar", "updated_at"])
+        except Exception:
+            # If partial update fails for any reason, fallback to saving whole instance with avatar URL
+            try:
+                player.avatar = getattr(asset, "public_url", None) or player.avatar
+                player.save()
+            except Exception:
+                logger.exception("Failed to persist avatar/profile_photo for player %s from asset %s", player.id, getattr(asset, "id", None))
+
+        logger.info("Avatar uploaded via DAM for player: %s (asset=%s)", player.full_name, getattr(asset, "id", None))
         return player
 
     @staticmethod

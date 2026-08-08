@@ -353,6 +353,89 @@
 
 
 
+Auditoria concluída (resumo dos achados):
+
+Usos diretos de campos a migrar
+
+• player.email / player.phone
+• Já substituídos em código Python (propriedades contact_email/contact_phone) — ver alterações recentes.
+• Remaining explicit references found in tests/admin/migrations only:
+• players/admin.py: search_fields includes "email", "phone" (needs update).
+• players/migrations/0001_initial.py: schema includes email/phone (migration artifacts — keep).
+• players/migrations/0001_initial.py and later migrations reference "email"/"phone" (do not edit migrations).
+• accounts/tests/test_services.py updated earlier to use contact_email.
+• player.avatar / avatar exposures
+• players/services.PlayerService.upload_avatar uses player.avatar (sets URL) — should be updated to set profile_photo and profile_photo_url logic (or keep fallback).
+• players/views: endpoints accept avatar in create/update payloads (players/views/init.py and player_me_views.py) — update to accept profile_photo (asset UUID) and/or avatar URL with deprecation.
+• serializers: players/serializers include "avatar" in PlayerSerializer and PlayerDetailSerializer — already retained; added profile_photo_url field.
+• analytics.selectors and dashboard code reference player__avatar in query results — update to use profile_photo relation or fallback.
+
+Files (high priority to change)
+
+• bybackend/players/views/init.py (player create/update payload includes email/phone/avatar)
+• bybackend/players/services/init.py (upload_avatar uses avatar URL)
+• bybackend/players/admin.py (search_fields, list_display includes email/phone/avatar)
+• bybackend/players/serializers/init.py (includes avatar field — already kept; ensure docs show deprecation)
+• bybackend/analytics/selectors.py and analytics/selectors/dashboard.py (use profile_photo)
+• bybackend/players/views/player_me_views.py (avatar upload endpoint)
+• Any frontend/back-office clients (not in repo) that consume API fields "email","phone","avatar" — must be notified.
+
+Actions recommended next (ordered)
+
+1. Add deprecation warnings in serializers and API docs for fields: email, phone, avatar (1–2 days).
+2. Update avatar upload flow:
+• Prefer accepting asset UUID (existing DAM) and set profile_photo FK.
+• Keep setting avatar URL as fallback for backwards compat for 2 sprints.
+3. Update services to populate profile_photo when uploading via DAM (change PlayerService.upload_avatar to set profile_photo FK and profile_photo_url accordingly).
+4. Update analytics selectors to include profile_photo.public_url as avatar fallback.
+5. Remove fields from admin display/search later.
+6. After 2-sprint compatibility window and client updates, create migration to drop columns player.email, player.phone, player.avatar.
+7. Run full test-suite and staging migration tests.
+
+Next immediate task I can perform now (pick one):
+
+• A) Update PlayerService.upload_avatar to create MediaAsset and set profile_photo FK instead of storing URL, and keep avatar as fallback. Then run tests.  
+• B) Add deprecation warnings to Player serializers and update OpenAPI (drf-spectacular) annotations.  
+• C) Update analytics selectors to prefer profile_photo.public_url.  
+• D) Generate a detailed change-list (file-by-file patch) for developers and release notes.
+
+Qual prefere que eu faça primeiro? (A/B/C/D)
+
+Compaction completed 
+A new checkpoint has been added to your session.
+Use /session checkpoints 1 to view the compaction summary.
+A
+Reading the Player service and Player model to locate the upload_avatar implementation and profile_photo fields so the service can be updated safely. Running parallel file reads for the two files.
+
+Read __init__.py 346 lines read
+Read player.py 242 lines read
+
+Updating PlayerService.upload_avatar to set profile_photo FK and keep avatar fallback; then run the players test suite to verify no regressions. Applying edit and running pytest for players.
+
+Edit __init__.py +32 -4
+
+Read __init__.py 374 lines read
+
+Edit __init__.py +7 -19
+
+Shell Run players tests with pytest 4 lines…
+python -m pytest players -q
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   Agora vou criar a migration para os novos modelos:
 ● Shell cd backend && python manage.py makemigrations competitions --name
