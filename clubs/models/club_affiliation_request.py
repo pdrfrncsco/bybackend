@@ -82,3 +82,50 @@ class ClubAffiliationRequest(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.name} → {self.tenant.name}"
+
+
+# Signal: Repair APPROVED requests created/edited directly in admin
+def _repair_approved_affiliation_request(sender, instance: "ClubAffiliationRequest", created, **kwargs):
+    """Ensure that an APPROVED request has a club and assign submitter as president.
+
+    This covers cases where an admin marks a request APPROVED directly in Django admin
+    and doesn't ensure the club/membership objects. It mirrors ClubAffiliationService.review_request
+    behaviour for repair.
+    """
+    # Avoid import cycles
+    if instance.status != ClubAffiliationRequest.Status.APPROVED:
+        return
+
+    try:
+        from clubs.services.club_affiliation_service import ClubAffiliationService
+        from clubs.services.club_service import ClubService
+        from clubs.models import ClubMember
+        from clubs.constants import ClubMemberRole, ClubStatus
+    except Exception:
+        return
+
+    # If club exists and membership already set, nothing to do
+    try:
+        if instance.club_id is None:
+            club = ClubAffiliationService._ensure_club_for_request(request_obj=instance)
+            # Activate and assign membership
+            if club.status != ClubStatus.ACTIVE:
+                ClubService.activate(club=club)
+            if instance.submitted_by_id:
+                ClubMember.objects.update_or_create(
+                    club=club,
+                    user=instance.submitted_by,
+                    defaults={
+                        "role": ClubMemberRole.PRESIDENT,
+                        "is_active": True,
+                    },
+                )
+            instance.club = club
+            instance.save(update_fields=["club", "updated_at"])  # type: ignore[arg-type]
+    except Exception:
+        # Swallow errors to avoid breaking admin save; errors are logged elsewhere.
+        return
+
+
+from django.db.models.signals import post_save
+post_save.connect(_repair_approved_affiliation_request, sender=ClubAffiliationRequest)

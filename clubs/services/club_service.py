@@ -322,7 +322,7 @@ class ClubService:
         membership = ClubMember.objects.filter(
             user=user,
             is_active=True
-        ).select_related("club").first()
+        ).select_related("club", "club__affiliation_request", "club__tenant").first()
 
         if not membership:
             raise NoClubMembership()
