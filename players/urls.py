@@ -71,6 +71,7 @@ from players.views.player_contact_views import (
 from players.views.player_career_views import PlayerCareerListView
 from players.views.player_statistics_views import PlayerStatisticsListView
 from players.views.player_football_profile_views import PlayerFootballProfileView
+from players.views.player_invite_views import InvitePlayerView
 
 urlpatterns = [
     # Player CRUD
@@ -162,6 +163,12 @@ urlpatterns = [
         "<slug:slug>/emergency-contacts/",
         PlayerEmergencyContactListCreateView.as_view(),
         name="player-emergency-contact-list-create",
+    ),
+    # Invite endpoint (admin)
+    path(
+        "invite/",
+        InvitePlayerView.as_view(),
+        name="player-invite",
     ),
     # Phase 2: Career timeline
     path(

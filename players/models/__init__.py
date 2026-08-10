@@ -17,6 +17,7 @@ from players.models.guardian import LegalGuardian
 from players.models.external_id import PlayerExternalId
 from players.models.privacy import PlayerPrivacySettings
 from players.models.onboarding import PlayerOnboardingStatus
+from players.models.invite import PlayerInvite
 
 __all__ = [
     "Player",
