@@ -33,7 +33,10 @@ class PlayerIdentityDocumentListView(APIView):
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
-        if player_can_view_all_content(request, player):
+        from players.permissions.player_permissions import CanViewPlayerDocuments
+
+        can_view_documents = CanViewPlayerDocuments().has_object_permission(request, self, player)
+        if can_view_documents:
             docs = player.identity_documents.all()
         else:
             docs = player.identity_documents.filter(verification_status="verified")
@@ -86,7 +89,14 @@ class PlayerIdentityDocumentDetailView(APIView):
         except Exception:
             return error_response(message="Document not found.", status_code=404)
 
-        if doc.verification_status != "verified" and not player_can_view_all_content(request, player):
+        from players.permissions.player_permissions import CanViewPlayerDocuments
+
+        can_view_documents = CanViewPlayerDocuments().has_object_permission(request, self, player)
+        if can_view_documents:
+            serializer = PlayerIdentityDocumentSerializer(doc)
+            return success_response(data=serializer.data)
+
+        if doc.verification_status != "verified":
             return error_response(message="Document not found.", status_code=404)
 
         serializer = PlayerIdentityDocumentSerializer(doc)

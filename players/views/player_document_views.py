@@ -59,7 +59,11 @@ class PlayerDocumentListView(APIView):
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
-        if player_can_view_all_content(request, player):
+        # Evaluate privacy: if allowed by PlayerPrivacySettings, show all documents
+        from players.permissions.player_permissions import CanViewPlayerDocuments
+
+        can_view_documents = CanViewPlayerDocuments().has_object_permission(request, self, player)
+        if can_view_documents:
             documents = player.documents.all()
         else:
             documents = player.documents.filter(
@@ -174,13 +178,20 @@ class PlayerDocumentDetailView(APIView):
         except PlayerDocument.DoesNotExist:
             return error_response(message="Document not found.", status_code=404)
 
-        if document.is_private and not player_can_view_all_content(request, player):
+        # Use privacy permission to decide if non-public / unverified documents can be viewed
+        from players.permissions.player_permissions import CanViewPlayerDocuments
+
+        can_view_documents = CanViewPlayerDocuments().has_object_permission(request, self, player)
+
+        if can_view_documents:
+            serializer = PlayerDocumentSerializer(document)
+            return success_response(data=serializer.data)
+
+        # If not permitted by privacy settings, fall back to public visibility rules
+        if document.is_private:
             return error_response(message="Document not found.", status_code=404)
 
-        if (
-            document.status != PlayerDocument.DocumentStatus.VERIFIED
-            and not player_can_view_all_content(request, player)
-        ):
+        if document.status != PlayerDocument.DocumentStatus.VERIFIED:
             return error_response(message="Document not found.", status_code=404)
 
         serializer = PlayerDocumentSerializer(document)

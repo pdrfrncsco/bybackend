@@ -20,9 +20,16 @@ class PlayerContactView(APIView):
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
+        from players.permissions.player_permissions import CanViewPlayerContact
+
         contact = getattr(player, "contact", None)
         if not contact:
             return success_response(data=None, message="No contact info.")
+
+        # Enforce privacy for contact info
+        can_view_contact = CanViewPlayerContact().has_object_permission(request, self, player)
+        if not can_view_contact:
+            return error_response(message="Contact not found.", status_code=404)
 
         serializer = PlayerContactSerializer(contact)
         return success_response(data=serializer.data)
@@ -58,7 +65,15 @@ class PlayerEmergencyContactListCreateView(APIView):
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
+        from players.permissions.player_permissions import CanViewPlayerContact
+
         contacts = player.emergency_contacts.all()
+
+        # Emergency contacts considered contact info; restrict by contact_visibility
+        can_view_contact = CanViewPlayerContact().has_object_permission(request, self, player)
+        if not can_view_contact:
+            return error_response(message="Contact not found.", status_code=404)
+
         serializer = EmergencyContactSerializer(contacts, many=True)
         return success_response(data=serializer.data)
 
