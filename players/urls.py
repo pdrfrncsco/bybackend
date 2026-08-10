@@ -67,6 +67,8 @@ from players.views.player_contact_views import (
     PlayerContactView,
     PlayerEmergencyContactListCreateView,
 )
+from players.views.player_career_views import PlayerCareerListView
+from players.views.player_statistics_views import PlayerStatisticsListView
 
 urlpatterns = [
     # Player CRUD
@@ -157,5 +159,22 @@ urlpatterns = [
         "<slug:slug>/emergency-contacts/",
         PlayerEmergencyContactListCreateView.as_view(),
         name="player-emergency-contact-list-create",
+    ),
+    # Phase 2: Career timeline
+    path(
+        "<slug:slug>/career/",
+        PlayerCareerListView.as_view(),
+        name="player-career-list",
+    ),
+    # Season statistics
+    path(
+        "<slug:slug>/statistics/",
+        PlayerStatisticsListView.as_view(),
+        name="player-statistics-list",
+    ),
+    path(
+        "<slug:slug>/statistics/<str:season>/",
+        PlayerStatisticsListView.as_view(),
+        name="player-statistics-season",
     ),
 ]

@@ -6,6 +6,8 @@ from players.models.player_registration_request import PlayerRegistrationRequest
 from players.models.player_video import PlayerVideo
 from players.models.player_document import PlayerDocument
 from players.models.player_achievement import PlayerAchievement
+from players.models.career import PlayerCareer
+from players.models.statistics import PlayerSeasonStatistics
 
 # New models (Phase 1)
 from players.models.identity import PlayerIdentityDocument
@@ -21,6 +23,8 @@ __all__ = [
     "PlayerVideo",
     "PlayerDocument",
     "PlayerAchievement",
+    "PlayerCareer",
+    "PlayerSeasonStatistics",
     # Phase 1 additions
     "PlayerIdentityDocument",
     "PlayerContact",

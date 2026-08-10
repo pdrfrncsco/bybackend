@@ -136,7 +136,27 @@ class PlayerRegistrationSelector:
     
     @staticmethod
     def list_career(player_id) -> QuerySet:
-        """List a player's entire career history."""
+        """List a player's entire career history (registrations)."""
         return PlayerRegistration.objects.filter(
             player_id=player_id
         ).select_related("club", "competition").order_by("-joined_date")
+
+    @staticmethod
+    def get_career_entries(player_id):
+        """Return PlayerCareer entries for a player, if the model exists."""
+        try:
+            from players.models import PlayerCareer
+            return PlayerCareer.objects.filter(player_id=player_id).select_related("club", "competition").order_by("-season", "-appearances")
+        except Exception:
+            # If PlayerCareer model/migration not applied, fall back to registrations
+            return PlayerRegistration.objects.filter(player_id=player_id).select_related("club", "competition").order_by("-joined_date")
+
+    @staticmethod
+    def get_season_statistics(player_id):
+        """Return season statistics for a player (PlayerSeasonStatistics if available)."""
+        try:
+            from players.models import PlayerSeasonStatistics
+            return PlayerSeasonStatistics.objects.filter(player_id=player_id).select_related("club", "competition").order_by("-season")
+        except Exception:
+            # If not available, return empty queryset from PlayerRegistration for compatibility
+            return PlayerRegistration.objects.none()
