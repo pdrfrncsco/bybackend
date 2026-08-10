@@ -71,7 +71,7 @@ from players.views.player_contact_views import (
 from players.views.player_career_views import PlayerCareerListView
 from players.views.player_statistics_views import PlayerStatisticsListView
 from players.views.player_football_profile_views import PlayerFootballProfileView
-from players.views.player_invite_views import InvitePlayerView
+from players.views.player_invite_views import InvitePlayerView, RedeemInviteView
 
 urlpatterns = [
     # Player CRUD
@@ -169,6 +169,11 @@ urlpatterns = [
         "invite/",
         InvitePlayerView.as_view(),
         name="player-invite",
+    ),
+    path(
+        "invite/redeem/",
+        RedeemInviteView.as_view(),
+        name="player-invite-redeem",
     ),
     # Phase 2: Career timeline
     path(
