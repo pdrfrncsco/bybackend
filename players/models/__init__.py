@@ -16,6 +16,7 @@ from players.models.contact import PlayerContact, EmergencyContact
 from players.models.guardian import LegalGuardian
 from players.models.external_id import PlayerExternalId
 from players.models.privacy import PlayerPrivacySettings
+from players.models.onboarding import PlayerOnboardingStatus
 
 __all__ = [
     "Player",
