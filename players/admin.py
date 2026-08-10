@@ -64,21 +64,22 @@ class PlayerAdmin(admin.ModelAdmin):
         "primary_position",
         "status",
         "nationality",
-        "email",
         "user",
     )
     list_filter = ("status", "primary_position", "nationality", "foot")
-    search_fields = ("first_name", "last_name", "slug", "email", "phone")
+    search_fields = ("first_name", "last_name", "slug")
     readonly_fields = (
         "id",
         "slug",
+        "global_id",
         "created_at",
         "updated_at",
         "total_matches",
         "total_goals",
         "total_assists",
+        "profile_photo_url",
     )
-    raw_id_fields = ("user",)
+    raw_id_fields = ("user", "profile_photo")
     inlines = (
         PlayerRegistrationInline,
         PlayerVideoInline,
@@ -93,9 +94,18 @@ class PlayerAdmin(admin.ModelAdmin):
                     "first_name",
                     "last_name",
                     "slug",
+                    "global_id",
+                )
+            },
+        ),
+        (
+            "Contact (DEPRECATED — use PlayerContact model)",
+            {
+                "fields": (
                     "email",
                     "phone",
-                )
+                ),
+                "description": "⚠️ DEPRECATED: Email and phone are moved to PlayerContact. Migrate to /api/v1/players/{id}/contacts/ endpoint.",
             },
         ),
         (
@@ -124,8 +134,11 @@ class PlayerAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "bio",
+                    "profile_photo",
+                    "profile_photo_url",
                     "avatar",
-                )
+                ),
+                "description": "Use 'profile_photo' (media asset) for new uploads. 'avatar' URL is deprecated — use 'profile_photo_url' property.",
             },
         ),
         (
@@ -133,6 +146,7 @@ class PlayerAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "status",
+                    "is_public",
                     "user",
                 )
             },

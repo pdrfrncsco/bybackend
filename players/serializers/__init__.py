@@ -14,6 +14,11 @@ class PlayerSerializer(serializers.ModelSerializer):
     Public player profile serializer.
     
     Used for: GET /api/v1/players/ (list), GET /api/v1/players/{id}/ (detail)
+    
+    DEPRECATION NOTICE (Compatibility window: 2 sprints):
+    - 'email': Use PlayerContact.primary_email via /api/v1/players/{id}/contacts/ instead.
+    - 'phone': Use PlayerContact.mobile_phone via /api/v1/players/{id}/contacts/ instead.
+    - 'avatar': Use 'profile_photo_url' instead (which references media asset).
     """
     
     age = serializers.SerializerMethodField()
@@ -91,6 +96,11 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
     Extended player profile with career summary, videos, documents, and achievements.
     
     Used for: GET /api/v1/players/{id}/ (when ?expand=detail)
+    
+    DEPRECATION NOTICE (Compatibility window: 2 sprints):
+    - 'email': Use PlayerContact.primary_email via /api/v1/players/{id}/contacts/ instead.
+    - 'phone': Use PlayerContact.mobile_phone via /api/v1/players/{id}/contacts/ instead.
+    - 'avatar': Use 'profile_photo_url' instead (which references media asset).
     """
     
     age = serializers.SerializerMethodField()

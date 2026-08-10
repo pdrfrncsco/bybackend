@@ -69,6 +69,15 @@ class PlayerListCreateView(APIView):
     @extend_schema(
         tags=["players"],
         summary="Create a player (staff only)",
+        description="""
+        Create a new global player profile.
+        
+        DEPRECATION NOTICE:
+        - 'email' and 'phone' fields are deprecated. Use POST /api/v1/players/{id}/contacts/ to manage contact info separately.
+        - 'avatar' field is deprecated. Use POST /api/v1/players/{id}/avatar/ with file upload to set profile_photo.
+        
+        Compatibility window: 2 sprints (ends September 2026).
+        """,
         request=PlayerSerializer,
         responses={201: PlayerSerializer},
     )
@@ -149,6 +158,15 @@ class PlayerDetailUpdateView(APIView):
     @extend_schema(
         tags=["players"],
         summary="Update player profile (staff only)",
+        description="""
+        Update player profile fields.
+        
+        DEPRECATION NOTICE:
+        - 'email' and 'phone' fields are deprecated. Use PATCH /api/v1/players/{id}/contacts/ to manage contact info separately.
+        - 'avatar' field is deprecated. Use POST /api/v1/players/{id}/avatar/ with file upload to set profile_photo.
+        
+        Compatibility window: 2 sprints (ends September 2026).
+        """,
         request=PlayerSerializer,
         responses={200: PlayerSerializer},
     )

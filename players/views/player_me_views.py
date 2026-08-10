@@ -91,6 +91,14 @@ class PlayerMeView(APIView):
     @extend_schema(
         tags=["players"],
         summary="Update my player profile",
+        description="""
+        Update player profile fields.
+        
+        DEPRECATION NOTICE:
+        - 'email' and 'phone' fields are deprecated. Use PATCH /api/v1/players/{id}/contacts/ instead.
+        
+        Compatibility window: 2 sprints (ends September 2026).
+        """,
         request=PlayerSerializer,
         responses={200: PlayerSerializer},
     )
@@ -162,6 +170,17 @@ class PlayerAvatarView(APIView):
     @extend_schema(
         tags=["players"],
         summary="Upload player avatar",
+        description="""
+        Upload a player avatar image.
+        
+        This endpoint creates/updates:
+        - profile_photo: MediaAsset FK (preferred, new)
+        - avatar: URL field (deprecated, for backwards compatibility)
+        
+        Use profile_photo_url property to get current photo URL (prefers asset, falls back to URL).
+        
+        Compatibility window: 2 sprints (ends September 2026). After that, avatar URL field will be removed.
+        """,
         responses={200: PlayerSerializer},
     )
     def post(self, request, slug: str | None = None):
