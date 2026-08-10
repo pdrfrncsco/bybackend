@@ -5,11 +5,11 @@ Provides methods to rebuild or compute PlayerCareer entries from existing
 registrations and match events. This service is intentionally simple for Phase 2
 and can be extended to integrate with Match Center event streams.
 """
-from typing import Optional
-
+from typing import Set
 from django.db import transaction
 
 from players.models import PlayerCareer, PlayerRegistration
+from players.events.types import publish_player_career_updated
 
 
 class PlayerCareerService:
@@ -25,6 +25,9 @@ class PlayerCareerService:
         # Remove existing career rows for the player
         PlayerCareer.objects.filter(player=player).delete()
 
+        # Track seasons affected for event payload
+        seasons_affected: Set[str] = set()
+
         # Aggregate registrations into career rows by club+season+competition
         regs = PlayerRegistration.objects.filter(player=player).select_related("club", "competition")
         for reg in regs:
@@ -34,6 +37,9 @@ class PlayerCareerService:
                 season = getattr(reg, "season", None) or (getattr(reg.competition, "season", None) if reg.competition else None)
             except Exception:
                 season = None
+
+            if season is not None:
+                seasons_affected.add(str(season))
 
             # Build or update a career row
             career, _ = PlayerCareer.objects.get_or_create(
@@ -53,6 +59,13 @@ class PlayerCareerService:
             career.goals = reg.goals or career.goals
             career.assists = reg.assists or career.assists
             career.save()
+
+        # Publish domain event to signal career rebuild
+        try:
+            publish_player_career_updated(player.id, sorted(list(seasons_affected)))
+        except Exception:
+            # Do not fail rebuild if event publish has issues; log if logging available
+            pass
 
         return True
 

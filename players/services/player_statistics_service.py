@@ -11,6 +11,7 @@ from datetime import date
 from django.db import transaction
 
 from players.models import PlayerSeasonStatistics, PlayerRegistration
+from players.events.types import publish_player_season_statistics_updated
 
 
 class PlayerStatisticsService:
@@ -25,6 +26,9 @@ class PlayerStatisticsService:
         """
         # Remove existing stats
         PlayerSeasonStatistics.objects.filter(player=player).delete()
+
+        # Track seasons affected
+        seasons_affected = set()
 
         # Aggregate data per (club, season, competition)
         buckets = defaultdict(lambda: {
@@ -47,6 +51,9 @@ class PlayerStatisticsService:
                 season = getattr(reg, "season", None) or (reg.joined_date.year if reg.joined_date else None)
             except Exception:
                 season = None
+
+            if season is not None:
+                seasons_affected.add(str(season))
 
             key = (getattr(reg.club, "id", None), season, getattr(reg.competition, "id", None))
 
@@ -75,6 +82,14 @@ class PlayerStatisticsService:
                 shots=agg.get("shots", 0),
                 shots_on_target=agg.get("shots_on_target", 0),
             )
+
+        # Publish domain event
+        try:
+            publish_player_season_statistics_updated(player.id, sorted(list(seasons_affected)))
+        except Exception:
+            # don't fail rebuild on event publish problems
+            pass
+
         return True
 
     @staticmethod

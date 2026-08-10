@@ -18,6 +18,8 @@ from django.utils.text import slugify
 
 from players.models import Player, PlayerRegistration
 
+from players.events.types import publish_player_created, publish_player_registration_created
+
 logger = logging.getLogger("players")
 
 
@@ -124,6 +126,14 @@ class PlayerService:
             logger.exception("Failed to upsert PlayerContact for newly created player %s", player.id)
 
         logger.info("Player created: %s (id=%s)", player.full_name, player.id)
+
+        # Emit PlayerCreated domain event (best-effort)
+        try:
+            publish_player_created(player.id, player.slug, player.full_name, user_id=user_id)
+        except Exception:
+            # Don't fail creation on event publish issues
+            logger.exception("Failed to publish PlayerCreated event for %s", player.id)
+
         return player
 
     @staticmethod
@@ -292,6 +302,20 @@ class PlayerRegistrationService:
             "Player registered: %s → %s (id=%s)",
             player.full_name, club.name, registration.id
         )
+
+        # Publish domain event (best-effort) so other subsystems can react
+        try:
+            publish_player_registration_created(
+                registration.id,
+                player.id,
+                getattr(club, "id", None),
+                getattr(competition, "id", None) if competition else None,
+                joined_date.isoformat() if joined_date else None,
+                tenant_id=getattr(tenant, "id", None) if tenant else None,
+            )
+        except Exception:
+            logger.exception("Failed to publish PlayerRegistrationCreated for registration %s", registration.id)
+
         return registration
 
     @staticmethod
