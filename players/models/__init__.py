@@ -8,6 +8,7 @@ from players.models.player_document import PlayerDocument
 from players.models.player_achievement import PlayerAchievement
 from players.models.career import PlayerCareer
 from players.models.statistics import PlayerSeasonStatistics
+from players.models.football_profile import PlayerFootballProfile
 
 # New models (Phase 1)
 from players.models.identity import PlayerIdentityDocument
@@ -25,6 +26,7 @@ __all__ = [
     "PlayerAchievement",
     "PlayerCareer",
     "PlayerSeasonStatistics",
+    "PlayerFootballProfile",
     # Phase 1 additions
     "PlayerIdentityDocument",
     "PlayerContact",

@@ -1,12 +1,14 @@
 """
 BOLAYETU — Player Stats Sync Service
 
-Automatically synchronizes player statistics from MatchEvents to PlayerRegistration.
+Automatically synchronizes player statistics from MatchEvents to PlayerRegistration,
+and cascades updates to PlayerSeasonStatistics and PlayerFootballProfile.
 
 Architecture:
     - Called by MatchEventService after event creation/deletion
     - Updates PlayerRegistration stats (per club/season)
-    - Propagates totals to global Player entity
+    - Rebuilds PlayerSeasonStatistics (per club/season)
+    - Propagates totals to global Player entity and FootballProfile
     - Uses atomic transactions to ensure consistency
 """
 
@@ -14,7 +16,7 @@ import logging
 from typing import Optional
 
 from django.db import transaction
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum
 
 from players.models import Player, PlayerRegistration
 from competitions.models import Match, MatchEvent
@@ -87,7 +89,10 @@ class StatsSyncService:
         # Recalculate stats from all events for this registration
         StatsSyncService._recalculate_registration_stats(registration)
         
-        # Propagate totals to global Player
+        # Rebuild PlayerSeasonStatistics from registrations
+        StatsSyncService._rebuild_season_statistics(player, registration)
+        
+        # Propagate totals to global Player and FootballProfile
         StatsSyncService._update_player_totals(player)
         
         logger.info(
@@ -100,11 +105,14 @@ class StatsSyncService:
     @staticmethod
     def _recalculate_registration_stats(registration: PlayerRegistration) -> None:
         """
-        Recalculate all stats for a PlayerRegistration from MatchEvents.
+        Recalculate all stats for a PlayerRegistration from MatchEvents and MatchLineup.
         
-        Stats are derived from events in matches where:
-            - The match competition matches the registration competition (if set)
-            - The player's club is participating
+        Stats are derived from:
+            - MatchEvents: goals, cards, own goals
+            - MatchLineup: minutes_played, starts
+            - Matches where:
+                - The match competition matches the registration competition (if set)
+                - The player's club is participating
         """
         player = registration.player
         club = registration.club
@@ -170,6 +178,22 @@ class StatsSyncService:
         
         matches_played = len(matches_with_events)
         
+        # Aggregate minutes_played and starts from MatchLineup
+        from competitions.models import MatchLineup
+        lineups = MatchLineup.objects.filter(
+            player=player,
+            club=club,
+            match_id__in=match_ids,
+        )
+        
+        total_minutes = 0
+        starts = 0
+        for lineup in lineups:
+            if lineup.minutes_played:
+                total_minutes += lineup.minutes_played
+            if lineup.status == MatchLineup.LineupStatus.STARTER:
+                starts += 1
+        
         # Update registration
         registration.goals = goals
         registration.yellow_cards = yellow_cards
@@ -180,22 +204,22 @@ class StatsSyncService:
         ])
         
         logger.debug(
-            "Updated registration stats for %s at %s: %d matches, %d goals, %d YC, %d RC",
-            player.full_name, club.name, matches_played, goals, yellow_cards, red_cards
+            "Updated registration stats for %s at %s: %d matches, %d goals, %d YC, %d RC, %d min, %d starts",
+            player.full_name, club.name, matches_played, goals, yellow_cards, red_cards, total_minutes, starts
         )
 
     @staticmethod
     def _update_player_totals(player: Player) -> None:
         """
-        Update denormalized totals on the global Player entity.
+        Update denormalized totals on the global Player entity and FootballProfile.
         
         Aggregates all registrations to compute:
             - total_matches
             - total_goals
             - total_assists
-        """
-        from django.db.models import Sum
         
+        Also propagates to PlayerFootballProfile if it exists.
+        """
         totals = PlayerRegistration.objects.filter(player=player).aggregate(
             total_matches=Sum("matches_played"),
             total_goals=Sum("goals"),
@@ -207,10 +231,38 @@ class StatsSyncService:
         player.total_assists = totals["total_assists"] or 0
         player.save(update_fields=["total_matches", "total_goals", "total_assists"])
         
+        # Also update FootballProfile if it exists
+        try:
+            from players.models import PlayerFootballProfile
+            profile = PlayerFootballProfile.objects.filter(player=player).first()
+            if profile:
+                profile.total_matches = player.total_matches
+                profile.total_goals = player.total_goals
+                profile.total_assists = player.total_assists
+                profile.save(update_fields=["total_matches", "total_goals", "total_assists"])
+                logger.debug("Updated FootballProfile totals for %s", player.full_name)
+        except Exception as e:
+            logger.warning("Could not update FootballProfile for %s: %s", player.full_name, e)
+        
         logger.debug(
             "Updated player totals for %s: %d matches, %d goals, %d assists",
             player.full_name, player.total_matches, player.total_goals, player.total_assists
         )
+
+    @staticmethod
+    def _rebuild_season_statistics(player: Player, registration: PlayerRegistration = None) -> None:
+        """
+        Rebuild PlayerSeasonStatistics for a player after registration stats change.
+        
+        If a specific registration is provided, only that season/club combo is updated.
+        Otherwise, the entire player's stats are rebuilt.
+        """
+        try:
+            from players.services.player_statistics_service import PlayerStatisticsService
+            PlayerStatisticsService.rebuild_for_player(player)
+            logger.debug("Rebuilt season statistics for player %s", player.full_name)
+        except Exception as e:
+            logger.warning("Could not rebuild season statistics for %s: %s", player.full_name, e)
 
     @staticmethod
     @transaction.atomic
@@ -225,6 +277,7 @@ class StatsSyncService:
         for registration in registrations:
             StatsSyncService._recalculate_registration_stats(registration)
         
+        StatsSyncService._rebuild_season_statistics(player)
         StatsSyncService._update_player_totals(player)
         
         logger.info("Force-synced all stats for player %s", player.full_name)

@@ -69,6 +69,7 @@ from players.views.player_contact_views import (
 )
 from players.views.player_career_views import PlayerCareerListView
 from players.views.player_statistics_views import PlayerStatisticsListView
+from players.views.player_football_profile_views import PlayerFootballProfileView
 
 urlpatterns = [
     # Player CRUD
@@ -165,6 +166,12 @@ urlpatterns = [
         "<slug:slug>/career/",
         PlayerCareerListView.as_view(),
         name="player-career-list",
+    ),
+    # Football profile (Phase 2)
+    path(
+        "<slug:slug>/football-profile/",
+        PlayerFootballProfileView.as_view(),
+        name="player-football-profile",
     ),
     # Season statistics
     path(

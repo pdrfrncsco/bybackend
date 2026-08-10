@@ -255,7 +255,7 @@ O modelo actual provavelmente precisa de:
 - [ ] `CanViewPlayerMedical`, `CanViewPlayerContract`, `CanViewPlayerContact`, etc.
 
 ---
-
+1
 ### FASE 2 — Football Identity (Registo + Carreira)
 **Objetivo:** Implementar correctamente o ciclo de registo do jogador num clube, historial de carreira e estatísticas por temporada.
 

@@ -26,7 +26,17 @@ class PlayerSerializer(serializers.ModelSerializer):
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
     current_club = serializers.SerializerMethodField()
-    
+
+    # Prefer values from PlayerFootballProfile when present
+    primary_position = serializers.SerializerMethodField()
+    shirt_number = serializers.SerializerMethodField()
+    height_cm = serializers.SerializerMethodField()
+    weight_kg = serializers.SerializerMethodField()
+    foot = serializers.SerializerMethodField()
+    total_matches = serializers.SerializerMethodField()
+    total_goals = serializers.SerializerMethodField()
+    total_assists = serializers.SerializerMethodField()
+
     class Meta:
         model = Player
         fields = [
@@ -58,18 +68,59 @@ class PlayerSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
-    
+
+    def _fp(self, obj: Player):
+        """Return football_profile or None (defensive)."""
+        try:
+            return getattr(obj, "football_profile", None)
+        except Exception:
+            return None
+
     def get_age(self, obj: Player) -> int | None:
         return obj.age
     
     def get_full_name(self, obj: Player) -> str:
         return obj.full_name
     
+    def get_primary_position(self, obj: Player) -> str | None:
+        fp = self._fp(obj)
+        return fp.primary_position if fp and fp.primary_position else obj.primary_position
+
+    def get_shirt_number(self, obj: Player) -> int | None:
+        fp = self._fp(obj)
+        return fp.shirt_number if fp and fp.shirt_number is not None else obj.shirt_number
+
+    def get_height_cm(self, obj: Player) -> int | None:
+        fp = self._fp(obj)
+        return fp.height_cm if fp and fp.height_cm is not None else obj.height_cm
+
+    def get_weight_kg(self, obj: Player) -> int | None:
+        fp = self._fp(obj)
+        return fp.weight_kg if fp and fp.weight_kg is not None else obj.weight_kg
+
+    def get_foot(self, obj: Player) -> str | None:
+        fp = self._fp(obj)
+        return fp.foot if fp and fp.foot else obj.foot
+
+    def get_total_matches(self, obj: Player) -> int:
+        fp = self._fp(obj)
+        return fp.total_matches if fp is not None else obj.total_matches
+
+    def get_total_goals(self, obj: Player) -> int:
+        fp = self._fp(obj)
+        return fp.total_goals if fp is not None else obj.total_goals
+
+    def get_total_assists(self, obj: Player) -> int:
+        fp = self._fp(obj)
+        return fp.total_assists if fp is not None else obj.total_assists
+
     def get_position_label(self, obj: Player) -> str:
         try:
-            return Player.Position(obj.primary_position).label if obj.primary_position else ""
-        except ValueError:
-            return obj.primary_position or ""
+            # Prefer label for resolved primary_position
+            primary = self.get_primary_position(obj)
+            return Player.Position(primary).label if primary else ""
+        except Exception:
+            return primary or ""
     
     def get_status_label(self, obj: Player) -> str:
         try:
@@ -112,7 +163,17 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
     videos = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
     achievements = serializers.SerializerMethodField()
-    
+
+    # Prefer football_profile values
+    primary_position = serializers.SerializerMethodField()
+    shirt_number = serializers.SerializerMethodField()
+    height_cm = serializers.SerializerMethodField()
+    weight_kg = serializers.SerializerMethodField()
+    foot = serializers.SerializerMethodField()
+    total_matches = serializers.SerializerMethodField()
+    total_goals = serializers.SerializerMethodField()
+    total_assists = serializers.SerializerMethodField()
+
     class Meta:
         model = Player
         fields = [
@@ -150,18 +211,57 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
         read_only_fields = fields
-    
+
+    def _fp(self, obj: Player):
+        try:
+            return getattr(obj, "football_profile", None)
+        except Exception:
+            return None
+
     def get_age(self, obj: Player) -> int | None:
         return obj.age
     
     def get_full_name(self, obj: Player) -> str:
         return obj.full_name
-    
+
+    def get_primary_position(self, obj: Player) -> str | None:
+        fp = self._fp(obj)
+        return fp.primary_position if fp and fp.primary_position else obj.primary_position
+
+    def get_shirt_number(self, obj: Player) -> int | None:
+        fp = self._fp(obj)
+        return fp.shirt_number if fp and fp.shirt_number is not None else obj.shirt_number
+
+    def get_height_cm(self, obj: Player) -> int | None:
+        fp = self._fp(obj)
+        return fp.height_cm if fp and fp.height_cm is not None else obj.height_cm
+
+    def get_weight_kg(self, obj: Player) -> int | None:
+        fp = self._fp(obj)
+        return fp.weight_kg if fp and fp.weight_kg is not None else obj.weight_kg
+
+    def get_foot(self, obj: Player) -> str | None:
+        fp = self._fp(obj)
+        return fp.foot if fp and fp.foot else obj.foot
+
+    def get_total_matches(self, obj: Player) -> int:
+        fp = self._fp(obj)
+        return fp.total_matches if fp is not None else obj.total_matches
+
+    def get_total_goals(self, obj: Player) -> int:
+        fp = self._fp(obj)
+        return fp.total_goals if fp is not None else obj.total_goals
+
+    def get_total_assists(self, obj: Player) -> int:
+        fp = self._fp(obj)
+        return fp.total_assists if fp is not None else obj.total_assists
+
     def get_position_label(self, obj: Player) -> str:
         try:
-            return Player.Position(obj.primary_position).label if obj.primary_position else ""
-        except ValueError:
-            return obj.primary_position or ""
+            primary = self.get_primary_position(obj)
+            return Player.Position(primary).label if primary else ""
+        except Exception:
+            return primary or ""
     
     def get_status_label(self, obj: Player) -> str:
         try:
@@ -181,7 +281,7 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
                 "shirt_number": current.shirt_number,
             }
         return None
-    
+
     def get_career_history(self, obj: Player) -> list:
         """Return player's career registrations."""
         registrations = obj.registrations.select_related("club").order_by("-joined_date")
