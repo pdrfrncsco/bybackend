@@ -51,6 +51,11 @@ class GuardianConsentRequired(Exception):
 # Import stats sync service for external use
 from players.services.stats_sync_service import StatsSyncService
 
+# Phase 3 services
+from players.services.agent_service import PlayerAgentService, AgentError, AgentRelationshipError
+from players.services.training_service import PlayerTrainingHistoryService, TrainingHistoryError
+from players.services.transfer_service import PlayerTransferService, TransferError
+
 
 class PlayerService:
     """

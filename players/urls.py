@@ -85,6 +85,12 @@ from players.views.player_agent_views import (
     PlayerAgentRelationshipListCreateView,
     PlayerAgentRelationshipDetailView,
 )
+from players.views.player_training_views import (
+    PlayerTrainingHistoryListCreateView,
+    PlayerTrainingHistoryDetailView,
+    PlayerTrainingHistoryVerifyView,
+    PlayerTrainingCompensationDataView,
+)
 
 urlpatterns = [
     # Player CRUD
@@ -261,5 +267,27 @@ urlpatterns = [
         "agents/<uuid:id>/",
         AgentDetailView.as_view(),
         name="agent-detail",
+    ),
+
+    # Phase 3: Training history (EPP/Solidarity Contribution)
+    path(
+        "<uuid:player_id>/training-history/",
+        PlayerTrainingHistoryListCreateView.as_view(),
+        name="player-training-history-list-create",
+    ),
+    path(
+        "<uuid:player_id>/training-history/<uuid:id>/",
+        PlayerTrainingHistoryDetailView.as_view(),
+        name="player-training-history-detail",
+    ),
+    path(
+        "<uuid:player_id>/training-history/<uuid:id>/verify/",
+        PlayerTrainingHistoryVerifyView.as_view(),
+        name="player-training-history-verify",
+    ),
+    path(
+        "<uuid:player_id>/training-compensation/",
+        PlayerTrainingCompensationDataView.as_view(),
+        name="player-training-compensation",
     ),
 ]

@@ -28,6 +28,14 @@ PLAYER_INVITE_REDEEMED = "players.player.invite.redeemed"
 PLAYER_CONTRACT_SIGNED = "players.player.contract.signed"
 PLAYER_CONTRACT_RENEWED = "players.player.contract.renewed"
 PLAYER_CONTRACT_TERMINATED = "players.player.contract.terminated"
+PLAYER_TRANSFER_REQUESTED = "players.player.transfer.requested"
+PLAYER_RELEASED = "players.player.released"
+PLAYER_LOAN_STARTED = "players.player.loan.started"
+PLAYER_LOAN_ENDED = "players.player.loan.ended"
+PLAYER_AGENT_LINKED = "players.player.agent.linked"
+PLAYER_AGENT_UNLINKED = "players.player.agent.unlinked"
+PLAYER_TRAINING_ADDED = "players.player.training.added"
+PLAYER_TRAINING_VERIFIED = "players.player.training.verified"
 
 
 def _publish(event_type: str, payload: Dict[str, Any], origin: Optional[str] = None, tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> None:
@@ -103,3 +111,82 @@ def publish_player_contract_terminated(contract_id: str, player_id: str, club_id
         "reason": reason,
     }
     _publish(PLAYER_CONTRACT_TERMINATED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_transferred(player_id: str, from_club_id: Optional[str], to_club_id: str, transfer_fee: Optional[float] = None, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "from_club_id": str(from_club_id) if from_club_id else None,
+        "to_club_id": str(to_club_id),
+        "transfer_fee": transfer_fee,
+    }
+    _publish(PLAYER_TRANSFERRED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_released(player_id: str, from_club_id: str, reason: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "from_club_id": str(from_club_id),
+        "reason": reason,
+    }
+    _publish(PLAYER_RELEASED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_loan_started(player_id: str, from_club_id: str, to_club_id: str, loan_start_date: str, loan_end_date: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "from_club_id": str(from_club_id),
+        "to_club_id": str(to_club_id),
+        "loan_start_date": loan_start_date,
+        "loan_end_date": loan_end_date,
+    }
+    _publish(PLAYER_LOAN_STARTED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_loan_ended(player_id: str, loan_club_id: str, parent_club_id: Optional[str], end_date: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "loan_club_id": str(loan_club_id),
+        "parent_club_id": str(parent_club_id) if parent_club_id else None,
+        "end_date": end_date,
+    }
+    _publish(PLAYER_LOAN_ENDED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_agent_linked(player_id: str, agent_id: str, relationship_id: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "agent_id": str(agent_id),
+        "relationship_id": str(relationship_id),
+    }
+    _publish(PLAYER_AGENT_LINKED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_agent_unlinked(player_id: str, agent_id: str, reason: Optional[str] = None, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "agent_id": str(agent_id),
+        "reason": reason,
+    }
+    _publish(PLAYER_AGENT_UNLINKED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_training_added(player_id: str, training_id: str, club_id: Optional[str], academy_name: Optional[str], start_date: str, category: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "training_id": str(training_id),
+        "club_id": str(club_id) if club_id else None,
+        "academy_name": academy_name,
+        "start_date": start_date,
+        "category": category,
+    }
+    _publish(PLAYER_TRAINING_ADDED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_training_verified(training_id: str, player_id: str, verified_by_id: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "training_id": str(training_id),
+        "player_id": str(player_id),
+        "verified_by_id": str(verified_by_id),
+    }
+    _publish(PLAYER_TRAINING_VERIFIED, payload, user_id=user_id, tenant_id=tenant_id)
