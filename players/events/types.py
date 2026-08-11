@@ -21,6 +21,8 @@ PLAYER_TRANSFERRED = "players.player.transferred"
 # Phase 2 additions
 PLAYER_CAREER_UPDATED = "players.player.career.updated"
 PLAYER_SEASON_STATISTICS_UPDATED = "players.player.season_statistics.updated"
+PLAYER_INVITE_CREATED = "players.player.invite.created"
+PLAYER_INVITE_REDEEMED = "players.player.invite.redeemed"
 
 
 def _publish(event_type: str, payload: Dict[str, Any], origin: Optional[str] = None, tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> None:
@@ -52,3 +54,26 @@ def publish_player_career_updated(player_id: str, seasons_affected: list, user_i
 def publish_player_season_statistics_updated(player_id: str, seasons_affected: list, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
     payload = {"player_id": str(player_id), "seasons": seasons_affected}
     _publish(PLAYER_SEASON_STATISTICS_UPDATED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_invite_created(invite_id: str, email: str, token: str, club_id: Optional[str] = None, invited_by_id: Optional[str] = None, expires_at: Optional[str] = None, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "invite_id": str(invite_id),
+        "email": email,
+        "token": token,
+        "club_id": str(club_id) if club_id else None,
+        "invited_by_id": str(invited_by_id) if invited_by_id else None,
+        "expires_at": expires_at,
+    }
+    _publish(PLAYER_INVITE_CREATED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_invite_redeemed(invite_id: str, email: str, token: str, redeemed_at: str, redeemed_by_user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "invite_id": str(invite_id),
+        "email": email,
+        "token": token,
+        "redeemed_at": redeemed_at,
+        "redeemed_by_user_id": str(redeemed_by_user_id) if redeemed_by_user_id else None,
+    }
+    _publish(PLAYER_INVITE_REDEEMED, payload, tenant_id=tenant_id)
