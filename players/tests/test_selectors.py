@@ -219,3 +219,81 @@ class PlayerRegistrationSelectorTestCase(TestCase):
         ids = [r.id for r in career]
         self.assertIn(self.reg1.id, ids)
         self.assertIn(self.reg2.id, ids)
+
+
+class PlayerSelectorsAdditionalTestCase(TestCase):
+    """Additional tests for new selectors: global_id, profile_photo, invites, career/statistics selectors."""
+
+    def setUp(self):
+        from media_assets.models.media_asset import MediaAsset
+        from players.models import PlayerInvite, PlayerCareer, PlayerSeasonStatistics
+        from clubs.models import Club
+        from core.models import Tenant
+        from competitions.models import Competition
+
+        self.tenant = Tenant.objects.create(name="Extra Tenant", slug="extra-tenant")
+        self.club = Club.objects.create(name="Extra Club", slug="extra-club", tenant=self.tenant)
+        self.competition = Competition.objects.create(name="Cup", slug="cup", tenant=self.tenant)
+
+        self.player = Player.objects.create(
+            first_name="Global",
+            last_name="Player",
+            slug="global-player",
+            date_of_birth=date(1995, 6, 1),
+            nationality="PT",
+            primary_position="cm",
+            status=Player.PlayerStatus.ACTIVE,
+        )
+
+        # Create a MediaAsset to attach as profile_photo
+        self.asset = MediaAsset.objects.create(
+            name="avatar.jpg",
+            original_filename="avatar.jpg",
+            mime_type="image/jpeg",
+            extension="jpg",
+            size_bytes=12345,
+            object_key="avatars/avatar.jpg",
+            cdn_url="https://cdn.example/avatar.jpg",
+        )
+        self.player.profile_photo = self.asset
+        self.player.save()
+
+        # Invite
+        self.invite = PlayerInvite.objects.create(email="invitee@example.com", first_name="Inv", last_name="It", invited_by=None, club=self.club)
+
+        # Career entry
+        self.career = PlayerCareer.objects.create(player=self.player, club=self.club, season="2024", competition=self.competition, appearances=5, goals=1)
+
+        # Season statistics
+        self.stats = PlayerSeasonStatistics.objects.create(player=self.player, season="2024", club=self.club, competition=self.competition, appearances=5, goals=1)
+
+    def test_get_by_global_id(self):
+        # global_id is auto-generated on save
+        pid = self.player.global_id
+        self.assertIsNotNone(pid)
+        p = PlayerSelector.get_by_global_id(pid)
+        self.assertIsNotNone(p)
+        self.assertEqual(p.id, self.player.id)
+
+    def test_get_with_profile_photo(self):
+        p = PlayerSelector.get_with_profile_photo(self.player.id, prefetch_related=True)
+        self.assertIsNotNone(p.profile_photo)
+        self.assertEqual(p.profile_photo.id, self.asset.id)
+
+    def test_invite_selectors(self):
+        from players.selectors import PlayerInviteSelector
+        found = PlayerInviteSelector.get_by_token(self.invite.token)
+        self.assertIsNotNone(found)
+        self.assertEqual(found.id, self.invite.id)
+        lst = PlayerInviteSelector.list_by_club(self.club.id)
+        self.assertTrue(lst.filter(id=self.invite.id).exists())
+
+    def test_career_selector(self):
+        from players.selectors import PlayerCareerSelector
+        entries = PlayerCareerSelector.list_for_player(self.player.id)
+        self.assertTrue(entries.filter(id=self.career.id).exists())
+
+    def test_season_statistics_selector(self):
+        from players.selectors import PlayerSeasonStatisticsSelector
+        rows = PlayerSeasonStatisticsSelector.get_for_player(self.player.id)
+        self.assertTrue(rows.filter(id=self.stats.id).exists())
