@@ -10,7 +10,7 @@ from players.models.career import PlayerCareer
 from players.models.statistics import PlayerSeasonStatistics
 from players.models.football_profile import PlayerFootballProfile
 
-# New models (Phase 1)
+# Phase 1 models
 from players.models.identity import PlayerIdentityDocument
 from players.models.contact import PlayerContact, EmergencyContact
 from players.models.guardian import LegalGuardian
@@ -18,6 +18,11 @@ from players.models.external_id import PlayerExternalId
 from players.models.privacy import PlayerPrivacySettings
 from players.models.onboarding import PlayerOnboardingStatus
 from players.models.invite import PlayerInvite
+
+# Phase 3 models (Professional)
+from players.models.contract import PlayerContract
+from players.models.agent import Agent, PlayerAgentRelationship
+from players.models.training import PlayerTrainingHistory
 
 __all__ = [
     "Player",
@@ -36,4 +41,11 @@ __all__ = [
     "LegalGuardian",
     "PlayerExternalId",
     "PlayerPrivacySettings",
+    "PlayerOnboardingStatus",
+    "PlayerInvite",
+    # Phase 3 additions
+    "PlayerContract",
+    "Agent",
+    "PlayerAgentRelationship",
+    "PlayerTrainingHistory",
 ]

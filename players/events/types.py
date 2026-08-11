@@ -24,6 +24,11 @@ PLAYER_SEASON_STATISTICS_UPDATED = "players.player.season_statistics.updated"
 PLAYER_INVITE_CREATED = "players.player.invite.created"
 PLAYER_INVITE_REDEEMED = "players.player.invite.redeemed"
 
+# Phase 3 events (Professional)
+PLAYER_CONTRACT_SIGNED = "players.player.contract.signed"
+PLAYER_CONTRACT_RENEWED = "players.player.contract.renewed"
+PLAYER_CONTRACT_TERMINATED = "players.player.contract.terminated"
+
 
 def _publish(event_type: str, payload: Dict[str, Any], origin: Optional[str] = None, tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> None:
     event = Event(type=event_type, payload=payload, origin=origin, tenant_id=tenant_id, user_id=user_id)
@@ -77,3 +82,24 @@ def publish_invite_redeemed(invite_id: str, email: str, token: str, redeemed_at:
         "redeemed_by_user_id": str(redeemed_by_user_id) if redeemed_by_user_id else None,
     }
     _publish(PLAYER_INVITE_REDEEMED, payload, tenant_id=tenant_id)
+
+
+def publish_player_contract_signed(contract_id: str, player_id: str, club_id: str, start_date: str, end_date: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "contract_id": str(contract_id),
+        "player_id": str(player_id),
+        "club_id": str(club_id),
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    _publish(PLAYER_CONTRACT_SIGNED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_contract_terminated(contract_id: str, player_id: str, club_id: str, reason: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "contract_id": str(contract_id),
+        "player_id": str(player_id),
+        "club_id": str(club_id),
+        "reason": reason,
+    }
+    _publish(PLAYER_CONTRACT_TERMINATED, payload, user_id=user_id, tenant_id=tenant_id)
