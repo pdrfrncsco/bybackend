@@ -72,6 +72,19 @@ from players.views.player_career_views import PlayerCareerListView
 from players.views.player_statistics_views import PlayerStatisticsListView
 from players.views.player_football_profile_views import PlayerFootballProfileView
 from players.views.player_invite_views import InvitePlayerView, RedeemInviteView
+from players.views.player_contract_views import (
+    PlayerContractListCreateView,
+    PlayerContractDetailView,
+    PlayerContractSignView,
+    PlayerContractRenewView,
+    PlayerContractTerminateView,
+)
+from players.views.player_agent_views import (
+    AgentListCreateView,
+    AgentDetailView,
+    PlayerAgentRelationshipListCreateView,
+    PlayerAgentRelationshipDetailView,
+)
 
 urlpatterns = [
     # Player CRUD
@@ -197,5 +210,56 @@ urlpatterns = [
         "<slug:slug>/statistics/<str:season>/",
         PlayerStatisticsListView.as_view(),
         name="player-statistics-season",
+    ),
+
+    # Phase 3: Contracts
+    path(
+        "<uuid:player_id>/contracts/",
+        PlayerContractListCreateView.as_view(),
+        name="player-contract-list-create",
+    ),
+    path(
+        "<uuid:player_id>/contracts/<uuid:id>/",
+        PlayerContractDetailView.as_view(),
+        name="player-contract-detail",
+    ),
+    path(
+        "<uuid:player_id>/contracts/<uuid:id>/sign/",
+        PlayerContractSignView.as_view(),
+        name="player-contract-sign",
+    ),
+    path(
+        "<uuid:player_id>/contracts/<uuid:id>/renew/",
+        PlayerContractRenewView.as_view(),
+        name="player-contract-renew",
+    ),
+    path(
+        "<uuid:player_id>/contracts/<uuid:id>/terminate/",
+        PlayerContractTerminateView.as_view(),
+        name="player-contract-terminate",
+    ),
+
+    # Phase 3: Agent relationships
+    path(
+        "<uuid:player_id>/agents/",
+        PlayerAgentRelationshipListCreateView.as_view(),
+        name="player-agent-relationship-list-create",
+    ),
+    path(
+        "<uuid:player_id>/agents/<uuid:id>/",
+        PlayerAgentRelationshipDetailView.as_view(),
+        name="player-agent-relationship-detail",
+    ),
+
+    # Global agents endpoint
+    path(
+        "agents/",
+        AgentListCreateView.as_view(),
+        name="agent-list-create",
+    ),
+    path(
+        "agents/<uuid:id>/",
+        AgentDetailView.as_view(),
+        name="agent-detail",
     ),
 ]
