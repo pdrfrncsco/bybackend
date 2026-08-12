@@ -56,6 +56,9 @@ from players.services.agent_service import PlayerAgentService, AgentError, Agent
 from players.services.training_service import PlayerTrainingHistoryService, TrainingHistoryError
 from players.services.transfer_service import PlayerTransferService, TransferError
 
+# Phase 4 services
+from players.services.medical_service import PlayerMedicalService, MedicalServiceError
+
 
 class PlayerService:
     """

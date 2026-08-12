@@ -24,6 +24,12 @@ from players.models.contract import PlayerContract
 from players.models.agent import Agent, PlayerAgentRelationship
 from players.models.training import PlayerTrainingHistory
 
+# Phase 4 models (Ecosystem)
+from players.models.medical import PlayerMedicalProfile, MedicalDocument
+from players.models.national_team import NationalTeamCallUp
+from players.models.performance import PlayerPerformanceMetric
+from players.models.compliance import PlayerComplianceRecord
+
 __all__ = [
     "Player",
     "PlayerRegistration",
@@ -48,4 +54,10 @@ __all__ = [
     "Agent",
     "PlayerAgentRelationship",
     "PlayerTrainingHistory",
+    # Phase 4 additions
+    "PlayerMedicalProfile",
+    "MedicalDocument",
+    "NationalTeamCallUp",
+    "PlayerPerformanceMetric",
+    "PlayerComplianceRecord",
 ]

@@ -91,6 +91,14 @@ from players.views.player_training_views import (
     PlayerTrainingHistoryVerifyView,
     PlayerTrainingCompensationDataView,
 )
+from players.views.player_medical_views import (
+    PlayerMedicalProfileView,
+    MedicalDocumentListCreateView,
+    MedicalDocumentDetailView,
+    MedicalDocumentVerifyView,
+    MedicalDocumentRejectView,
+    PlayerMedicalHistoryView,
+)
 
 urlpatterns = [
     # Player CRUD
@@ -289,5 +297,37 @@ urlpatterns = [
         "<uuid:player_id>/training-compensation/",
         PlayerTrainingCompensationDataView.as_view(),
         name="player-training-compensation",
+    ),
+
+    # Phase 4: Medical Profile (restricted access)
+    path(
+        "<uuid:player_id>/medical/",
+        PlayerMedicalProfileView.as_view(),
+        name="player-medical-profile",
+    ),
+    path(
+        "<uuid:player_id>/medical/history/",
+        PlayerMedicalHistoryView.as_view(),
+        name="player-medical-history",
+    ),
+    path(
+        "<uuid:player_id>/medical/documents/",
+        MedicalDocumentListCreateView.as_view(),
+        name="player-medical-document-list-create",
+    ),
+    path(
+        "<uuid:player_id>/medical/documents/<uuid:id>/",
+        MedicalDocumentDetailView.as_view(),
+        name="player-medical-document-detail",
+    ),
+    path(
+        "<uuid:player_id>/medical/documents/<uuid:id>/verify/",
+        MedicalDocumentVerifyView.as_view(),
+        name="player-medical-document-verify",
+    ),
+    path(
+        "<uuid:player_id>/medical/documents/<uuid:id>/reject/",
+        MedicalDocumentRejectView.as_view(),
+        name="player-medical-document-reject",
     ),
 ]

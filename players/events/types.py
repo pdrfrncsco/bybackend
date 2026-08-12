@@ -37,6 +37,15 @@ PLAYER_AGENT_UNLINKED = "players.player.agent.unlinked"
 PLAYER_TRAINING_ADDED = "players.player.training.added"
 PLAYER_TRAINING_VERIFIED = "players.player.training.verified"
 
+# Phase 4 events (Ecosystem)
+PLAYER_MEDICAL_STATUS_CHANGED = "players.player.medical.status_changed"
+PLAYER_MEDICAL_DOCUMENT_UPLOADED = "players.player.medical.document_uploaded"
+PLAYER_MEDICAL_DOCUMENT_VERIFIED = "players.player.medical.document_verified"
+PLAYER_CALLED_TO_NATIONAL_TEAM = "players.player.national_team.called"
+PLAYER_RELEASED_FROM_NATIONAL_TEAM = "players.player.national_team.released"
+PLAYER_PERFORMANCE_RECORDED = "players.player.performance.recorded"
+PLAYER_COMPLIANCE_UPDATED = "players.player.compliance.updated"
+
 
 def _publish(event_type: str, payload: Dict[str, Any], origin: Optional[str] = None, tenant_id: Optional[str] = None, user_id: Optional[str] = None) -> None:
     event = Event(type=event_type, payload=payload, origin=origin, tenant_id=tenant_id, user_id=user_id)
@@ -190,3 +199,52 @@ def publish_player_training_verified(training_id: str, player_id: str, verified_
         "verified_by_id": str(verified_by_id),
     }
     _publish(PLAYER_TRAINING_VERIFIED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+# Phase 4 event publishers
+def publish_player_medical_status_changed(player_id: str, old_status: str, new_status: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "player_id": str(player_id),
+        "old_status": old_status,
+        "new_status": new_status,
+    }
+    _publish(PLAYER_MEDICAL_STATUS_CHANGED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_medical_document_uploaded(document_id: str, player_id: str, document_type: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "document_id": str(document_id),
+        "player_id": str(player_id),
+        "document_type": document_type,
+    }
+    _publish(PLAYER_MEDICAL_DOCUMENT_UPLOADED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_called_to_national_team(call_up_id: str, player_id: str, national_team: str, category: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "call_up_id": str(call_up_id),
+        "player_id": str(player_id),
+        "national_team": national_team,
+        "category": category,
+    }
+    _publish(PLAYER_CALLED_TO_NATIONAL_TEAM, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_performance_recorded(metric_id: str, player_id: str, metric_type: str, value: float, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "metric_id": str(metric_id),
+        "player_id": str(player_id),
+        "metric_type": metric_type,
+        "value": float(value),
+    }
+    _publish(PLAYER_PERFORMANCE_RECORDED, payload, user_id=user_id, tenant_id=tenant_id)
+
+
+def publish_player_compliance_updated(compliance_id: str, player_id: str, rule_type: str, status: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:
+    payload = {
+        "compliance_id": str(compliance_id),
+        "player_id": str(player_id),
+        "rule_type": rule_type,
+        "status": status,
+    }
+    _publish(PLAYER_COMPLIANCE_UPDATED, payload, user_id=user_id, tenant_id=tenant_id)
