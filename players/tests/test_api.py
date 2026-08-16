@@ -94,6 +94,14 @@ class PlayerListViewTestCase(TestCase):
         self.assertEqual(response.data['data']['count'], 1)
         self.assertEqual(response.data['data']['results'][0]['slug'], 'jane-smith')
 
+    def test_search_is_paginated_and_keeps_active_player_scope(self):
+        """The public list endpoint supports search without switching endpoints."""
+        response = self.client.get('/api/v1/players/?search=john')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['data']['count'], 1)
+        self.assertEqual(response.data['data']['results'][0]['slug'], 'john-doe')
+
 
 class PlayerDetailViewTestCase(TestCase):
     """Test GET /api/v1/players/{slug}/"""

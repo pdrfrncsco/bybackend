@@ -63,12 +63,19 @@ class PlayerSelector:
     @staticmethod
     def list_players(
         *,
+        search: Optional[str] = None,
         position: Optional[str] = None,
         nationality: Optional[str] = None,
         without_club: bool = False,
         include_football_profile: bool = False,
     ) -> QuerySet:
         qs = Player.objects.filter(status=Player.PlayerStatus.ACTIVE, is_public=True)
+        if search:
+            qs = qs.filter(
+                Q(first_name__icontains=search)
+                | Q(last_name__icontains=search)
+                | Q(slug__icontains=search)
+            )
         if position:
             qs = qs.filter(primary_position=position)
         if nationality:

@@ -4,7 +4,7 @@ BOLAYETU — Player Views
 API endpoints for players (public, global domain).
 
 Public endpoints (no auth required):
-    GET    /api/v1/players/              — List active players (filterable by position/nationality)
+    GET    /api/v1/players/              — List active players (searchable and filterable)
     GET    /api/v1/players/search/       — Search players by name
     GET    /api/v1/players/{slug}/       — Get player detail + career history
 
@@ -34,7 +34,7 @@ from players.permissions import IsStaffOrReadOnly, CanManagePlayerRegistrations
 
 class PlayerListCreateView(APIView):
     """
-    GET:  List all active players. Supports ?position=, ?nationality= and ?without_club= filters.
+    GET:  List all active players. Supports ?search=, ?position=, ?nationality= and ?without_club= filters.
     POST: Create a new player (staff only).
     """
 
@@ -44,6 +44,7 @@ class PlayerListCreateView(APIView):
         tags=["players"],
         summary="List players",
         parameters=[
+            OpenApiParameter("search", OpenApiTypes.STR, description="Search by player name or slug"),
             OpenApiParameter("position", OpenApiTypes.STR, description="Filter by position code (gk, cb, st, ...)"),
             OpenApiParameter("nationality", OpenApiTypes.STR, description="Filter by nationality (ISO code)"),
             OpenApiParameter("without_club", OpenApiTypes.BOOL, description="Filter players without any active club registration"),
@@ -51,11 +52,13 @@ class PlayerListCreateView(APIView):
         responses={200: PlayerSerializer(many=True)},
     )
     def get(self, request):
+        search = request.query_params.get("search", "").strip()
         position = request.query_params.get("position")
         nationality = request.query_params.get("nationality")
         without_club = request.query_params.get("without_club") == "true"
 
         queryset = PlayerSelector.list_players(
+            search=search or None,
             position=position,
             nationality=nationality,
             without_club=without_club,
