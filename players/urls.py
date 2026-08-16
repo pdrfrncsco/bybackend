@@ -68,6 +68,7 @@ from players.views.player_contact_views import (
     PlayerContactView,
     PlayerEmergencyContactListCreateView,
 )
+from players.views.player_privacy_views import PlayerPrivacySettingsView
 from players.views.player_career_views import PlayerCareerListView
 from players.views.player_statistics_views import PlayerStatisticsListView
 from players.views.player_football_profile_views import PlayerFootballProfileView
@@ -185,6 +186,11 @@ urlpatterns = [
         "<slug:slug>/contact/",
         PlayerContactView.as_view(),
         name="player-contact",
+    ),
+    path(
+        "<slug:slug>/privacy/",
+        PlayerPrivacySettingsView.as_view(),
+        name="player-privacy-settings",
     ),
     path(
         "<slug:slug>/emergency-contacts/",

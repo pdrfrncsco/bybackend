@@ -8,7 +8,7 @@ from rest_framework import status
 from datetime import date
 
 from media_assets.models import MediaAsset
-from players.models import Player, PlayerContact, PlayerIdentityDocument
+from players.models import Player, PlayerContact, PlayerIdentityDocument, PlayerPrivacySettings
 from players.services import PlayerService
 
 User = get_user_model()
@@ -135,3 +135,25 @@ class PlayerIdentityContactAPITestCase(TestCase):
         self.assertEqual(document.document_front_id, front_asset.id)
         self.assertEqual(document.document_back_id, back_asset.id)
         self.assertEqual(document.document_number, "")
+
+    def test_player_privacy_settings_can_be_read_and_updated_by_linked_player(self):
+        linked_user = User.objects.create_user(username="privacy", email="privacy@test.com", password="pass1234")
+        self.player.user = linked_user
+        self.player.save(update_fields=["user"])
+        self.client.force_authenticate(user=linked_user)
+
+        get_response = self.client.get(f"/api/v1/players/{self.player.slug}/privacy/")
+        self.assertEqual(get_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(get_response.data["data"]["profile_visibility"], "public")
+
+        patch_response = self.client.patch(
+            f"/api/v1/players/{self.player.slug}/privacy/",
+            {"profile_visibility": "private", "documents_visibility": "agent"},
+            format="json",
+        )
+        self.assertEqual(patch_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(patch_response.data["data"]["profile_visibility"], "private")
+        self.assertEqual(
+            PlayerPrivacySettings.objects.get(player=self.player).documents_visibility,
+            "agent",
+        )
