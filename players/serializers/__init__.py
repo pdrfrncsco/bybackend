@@ -182,8 +182,6 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "full_name",
-            "email",
-            "phone",
             "date_of_birth",
             "age",
             "nationality",
@@ -344,7 +342,7 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
     
     def get_achievements(self, obj: Player) -> list:
         """Return player's achievements."""
-        achievements = obj.achievements.all().order_by("-date_achieved", "-created_at")[:20]
+        achievements = obj.achievements.filter(is_verified=True).order_by("-date_achieved", "-created_at")[:20]
         return [
             {
                 "id": achievement.id,

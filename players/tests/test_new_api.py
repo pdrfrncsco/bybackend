@@ -279,6 +279,7 @@ class PlayerDetailWithRelatedDataTestCase(TestCase):
             achievement_type=PlayerAchievement.AchievementType.LEAGUE_TITLE,
             level=PlayerAchievement.AchievementLevel.NATIONAL,
             date_achieved=date(2025, 5, 15),
+            is_verified=True,
         )
     
     def test_player_detail_includes_videos(self):
