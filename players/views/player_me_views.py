@@ -14,6 +14,57 @@ from players.serializers import PlayerDetailSerializer, PlayerSerializer
 from players.services import NoPlayerProfile, PlayerService
 
 
+def build_onboarding_status_data(player, status):
+    has_basic_info = bool(
+        player.first_name
+        and player.last_name
+        and player.date_of_birth
+        and player.nationality
+    )
+    has_football_info = bool(player.primary_position and player.primary_position != "multiple")
+
+    dirty = False
+    if has_basic_info and not status.personal_complete:
+        status.personal_complete = True
+        dirty = True
+    if has_football_info and not status.football_complete:
+        status.football_complete = True
+        dirty = True
+    has_identity_info = player.identity_documents.exists()
+    if has_identity_info and not status.identity_complete:
+        status.identity_complete = True
+        dirty = True
+    if not status.account_complete:
+        status.account_complete = True
+        dirty = True
+
+    if dirty:
+        status.save()
+
+    next_step = status.get_next_step()
+    onboarding_required = not status.is_complete
+
+    return {
+        "onboarding_required": onboarding_required,
+        "has_player_profile": True,
+        "has_basic_info": has_basic_info,
+        "has_football_info": has_football_info,
+        "has_identity_info": has_identity_info,
+        "next_step": next_step,
+        "account_complete": status.account_complete,
+        "identity_complete": status.identity_complete,
+        "personal_complete": status.personal_complete,
+        "football_complete": status.football_complete,
+        "contact_complete": status.contact_complete,
+        "guardian_complete": status.guardian_complete,
+        "documents_complete": status.documents_complete,
+        "club_complete": status.club_complete,
+        "review_complete": status.review_complete,
+        "progress_percentage": status.progress_percentage,
+        "player": PlayerSerializer(player).data,
+    }
+
+
 class PlayerOnboardingStatusView(APIView):
     """
     Return onboarding gate status for the authenticated user's player profile.
@@ -38,29 +89,12 @@ class PlayerOnboardingStatusView(APIView):
                 message="Player onboarding status retrieved successfully.",
             )
 
-        has_basic_info = bool(
-            player.first_name
-            and player.last_name
-            and player.date_of_birth
-            and player.nationality
-        )
-        has_football_info = bool(player.primary_position and player.primary_position != "multiple")
-        onboarding_required = not (has_basic_info and has_football_info)
-        next_step = None
-        if not has_basic_info:
-            next_step = "profile"
-        elif not has_football_info:
-            next_step = "football"
+        from players.services.onboarding_service import PlayerOnboardingService
+        status = PlayerOnboardingService.get_status(player)
+        data = build_onboarding_status_data(player, status)
 
         return success_response(
-            data={
-                "onboarding_required": onboarding_required,
-                "has_player_profile": True,
-                "has_basic_info": has_basic_info,
-                "has_football_info": has_football_info,
-                "next_step": next_step,
-                "player": PlayerSerializer(player).data,
-            },
+            data=data,
             message="Player onboarding status retrieved successfully.",
         )
 

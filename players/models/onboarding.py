@@ -75,7 +75,6 @@ class PlayerOnboardingStatus(BaseModel):
         """Return True if all steps are complete."""
         return all([
             self.account_complete,
-            self.identity_complete,
             self.personal_complete,
             self.football_complete,
             self.contact_complete,
@@ -88,12 +87,11 @@ class PlayerOnboardingStatus(BaseModel):
     @property
     def progress_percentage(self) -> int:
         """Return percentage of onboarding complete."""
-        total_steps = len(self.STEP_ORDER)
+        total_steps = len(self.STEP_ORDER) - 1  # identity is optional
         if self.player.is_minor:
             # All steps required for minors
             completed = sum([
                 self.account_complete,
-                self.identity_complete,
                 self.personal_complete,
                 self.football_complete,
                 self.contact_complete,
@@ -104,9 +102,9 @@ class PlayerOnboardingStatus(BaseModel):
             ])
         else:
             # Adults skip guardian step
+            total_steps -= 1
             completed = sum([
                 self.account_complete,
-                self.identity_complete,
                 self.personal_complete,
                 self.football_complete,
                 self.contact_complete,
@@ -121,6 +119,8 @@ class PlayerOnboardingStatus(BaseModel):
     def get_next_step(self) -> str | None:
         """Return the next incomplete step, or None if onboarding is complete."""
         for step in self.STEP_ORDER:
+            if step == self.Steps.IDENTITY:
+                continue
             # Skip guardian for adults
             if step == self.Steps.GUARDIAN and not self.player.is_minor:
                 continue

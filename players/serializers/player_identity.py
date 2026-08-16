@@ -4,6 +4,8 @@ from players.models import PlayerIdentityDocument
 
 class PlayerIdentityDocumentSerializer(serializers.ModelSerializer):
     issuing_country_label = serializers.SerializerMethodField()
+    document_front_url = serializers.SerializerMethodField()
+    document_back_url = serializers.SerializerMethodField()
 
     class Meta:
         model = PlayerIdentityDocument
@@ -18,6 +20,8 @@ class PlayerIdentityDocumentSerializer(serializers.ModelSerializer):
             "expiry_date",
             "document_front",
             "document_back",
+            "document_front_url",
+            "document_back_url",
             "verification_status",
             "verified_by",
             "verified_at",
@@ -31,24 +35,36 @@ class PlayerIdentityDocumentSerializer(serializers.ModelSerializer):
             return obj.issuing_country
         return None
 
+    def get_document_front_url(self, obj: PlayerIdentityDocument) -> str | None:
+        if obj.document_front:
+            return getattr(obj.document_front, "public_url", None)
+        return None
+
+    def get_document_back_url(self, obj: PlayerIdentityDocument) -> str | None:
+        if obj.document_back:
+            return getattr(obj.document_back, "public_url", None)
+        return None
+
 
 class PlayerIdentityDocumentCreateSerializer(serializers.Serializer):
     document_type = serializers.ChoiceField(choices=PlayerIdentityDocument._meta.get_field("document_type").choices)
-    document_number = serializers.CharField(max_length=128)
+    document_number = serializers.CharField(max_length=128, required=False, allow_blank=True, allow_null=True)
     issuing_country = serializers.CharField(max_length=3, required=False, allow_blank=True)
     issuing_authority = serializers.CharField(max_length=255, required=False, allow_blank=True)
     issue_date = serializers.DateField(required=False, allow_null=True)
     expiry_date = serializers.DateField(required=False, allow_null=True)
     document = serializers.FileField(required=False)
+    document_front = serializers.FileField(required=False)
+    document_back = serializers.FileField(required=False)
     asset = serializers.UUIDField(required=False)
 
     def validate(self, data):
-        doc = data.get("document")
+        doc = data.get("document") or data.get("document_front")
         asset_id = data.get("asset")
-        if not doc and not asset_id:
-            raise serializers.ValidationError("Either document file or asset UUID is required.")
         if doc and asset_id:
             raise serializers.ValidationError("Provide either document file or asset UUID, not both.")
+        if not doc and not asset_id:
+            raise serializers.ValidationError({"document_front": "Upload the front of the document or provide an asset UUID."})
 
         if asset_id:
             from media_assets.models import MediaAsset
@@ -57,6 +73,9 @@ class PlayerIdentityDocumentCreateSerializer(serializers.Serializer):
             except MediaAsset.DoesNotExist as exc:
                 raise serializers.ValidationError({"asset": "Asset not found."}) from exc
             data["asset_instance"] = asset
+
+        if doc:
+            data["document"] = doc
         return data
 
 

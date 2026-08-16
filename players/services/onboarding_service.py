@@ -20,17 +20,27 @@ class PlayerOnboardingService:
 
     @staticmethod
     def get_status(player: Player) -> PlayerOnboardingStatus:
-        status, created = PlayerOnboardingStatus.objects.get_or_create(player=player)
+        status, created = PlayerOnboardingStatus.objects.get_or_create(
+            player=player,
+            defaults={"account_complete": True, "current_step": "personal"},
+        )
+        if not status.account_complete:
+            status.account_complete = True
+            status.save(update_fields=["account_complete"])
         return status
 
     @staticmethod
     @transaction.atomic
     def complete_step(player: Player, step: str) -> PlayerOnboardingStatus:
         status = PlayerOnboardingService.get_status(player)
+        if step == "profile":
+            step = "personal"
         field = f"{step}_complete"
         if not hasattr(status, field):
             raise ValueError("Unknown onboarding step")
         setattr(status, field, True)
+        if not status.account_complete:
+            status.account_complete = True
         # advance current_step
         next_step = status.get_next_step()
         if next_step:

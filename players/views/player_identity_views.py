@@ -29,7 +29,7 @@ class PlayerIdentityDocumentListView(APIView):
 
     @extend_schema(tags=["players"], summary="List player identity documents", responses={200: PlayerIdentityDocumentSerializer(many=True)})
     def get(self, request, slug: str):
-        player = PlayerSelector.get_public_by_slug(slug)
+        player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
@@ -37,9 +37,9 @@ class PlayerIdentityDocumentListView(APIView):
 
         can_view_documents = CanViewPlayerDocuments().has_object_permission(request, self, player)
         if can_view_documents:
-            docs = player.identity_documents.all()
+            docs = player.identity_documents.all().order_by("-created_at")
         else:
-            docs = player.identity_documents.filter(verification_status="verified")
+            docs = player.identity_documents.filter(verification_status="verified").order_by("-created_at")
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(docs, request)

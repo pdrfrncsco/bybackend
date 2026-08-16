@@ -1,9 +1,10 @@
 from rest_framework import generics, permissions
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
+from django.http import Http404
 
-from players.models import Player, PlayerOnboardingStatus
+from players.models import PlayerOnboardingStatus
 from players.serializers.player_onboarding import PlayerOnboardingStatusSerializer
+from players.services import NoPlayerProfile, PlayerService
 from players.services.onboarding_service import PlayerOnboardingService
 
 
@@ -12,7 +13,10 @@ class PlayerOnboardingStatusView(generics.RetrieveAPIView):
     serializer_class = PlayerOnboardingStatusSerializer
 
     def get_object(self):
-        player = get_object_or_404(Player, user=self.request.user)
+        try:
+            player = PlayerService.get_player_for_user(self.request.user)
+        except NoPlayerProfile:
+            raise Http404
         return PlayerOnboardingService.get_status(player)
 
 
@@ -21,15 +25,20 @@ class PlayerOnboardingCompleteStepView(generics.UpdateAPIView):
     serializer_class = PlayerOnboardingStatusSerializer
 
     def get_object(self):
-        player = get_object_or_404(Player, user=self.request.user)
+        player = PlayerService.get_player_for_user(self.request.user)
         return PlayerOnboardingService.get_status(player)
 
     def patch(self, request, *args, **kwargs):
         step = request.data.get('step')
         if not step:
             return Response({'detail': 'step is required'}, status=400)
+        player = PlayerService.get_player_for_user(request.user)
         try:
-            status = PlayerOnboardingService.complete_step(player=get_object_or_404(Player, user=request.user), step=step)
+            status = PlayerOnboardingService.complete_step(player=player, step=step)
         except ValueError:
             return Response({'detail': 'unknown step'}, status=400)
-        return Response(PlayerOnboardingStatusSerializer(status).data)
+
+        from common.responses import success_response
+        from players.views.player_me_views import build_onboarding_status_data
+        data = build_onboarding_status_data(player, status)
+        return success_response(data=data, message=f"Step '{step}' marked complete.")

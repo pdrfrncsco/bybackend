@@ -55,7 +55,7 @@ class PlayerVideoListView(APIView):
         responses={200: PlayerVideoSerializer(many=True)},
     )
     def get(self, request, slug: str):
-        player = PlayerSelector.get_public_by_slug(slug)
+        player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
 

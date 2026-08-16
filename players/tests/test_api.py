@@ -414,10 +414,10 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
         self.assertTrue(payload["has_player_profile"])
         self.assertFalse(payload["has_basic_info"])
         self.assertFalse(payload["has_football_info"])
-        self.assertEqual(payload["next_step"], "profile")
+        self.assertEqual(payload["next_step"], "personal")
 
     def test_status_complete_after_basic_info_and_position(self):
-        Player.objects.create(
+        player = Player.objects.create(
             first_name="Ana",
             last_name="Mendes",
             date_of_birth=date(2001, 4, 2),
@@ -426,6 +426,10 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
             primary_position="st",
             status="active",
         )
+        from players.services.onboarding_service import PlayerOnboardingService
+        for step in ["contact", "documents", "club", "review"]:
+            PlayerOnboardingService.complete_step(player, step)
+
         self.client.force_authenticate(user=self.user)
 
         response = self.client.get("/api/v1/players/me/onboarding-status/")
@@ -436,6 +440,50 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
         self.assertTrue(payload["has_basic_info"])
         self.assertTrue(payload["has_football_info"])
         self.assertIsNone(payload["next_step"])
+
+    def test_status_complete_without_identity_document(self):
+        player = Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            date_of_birth=date(2001, 4, 2),
+            nationality="Angolana",
+            user=self.user,
+            primary_position="st",
+            status="active",
+        )
+        from players.services.onboarding_service import PlayerOnboardingService
+        for step in ["personal", "football", "contact", "documents", "club", "review"]:
+            PlayerOnboardingService.complete_step(player, step)
+
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.get("/api/v1/players/me/onboarding-status/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertFalse(payload["onboarding_required"])
+        self.assertEqual(payload["next_step"], None)
+
+    def test_complete_identity_step_advances_to_personal(self):
+        Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            user=self.user,
+            primary_position="multiple",
+            status="active",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.patch(
+            "/api/v1/players/me/onboarding/complete-step/",
+            {"step": "identity"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"]
+        self.assertTrue(payload["identity_complete"])
+        self.assertEqual(payload["next_step"], "personal")
 
 
 class PlayerRegisterClubUserTestCase(TestCase):

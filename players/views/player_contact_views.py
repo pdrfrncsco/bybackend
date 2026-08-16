@@ -16,7 +16,9 @@ class PlayerContactView(APIView):
 
     @extend_schema(tags=["players"], summary="Get player contact info", responses={200: PlayerContactSerializer})
     def get(self, request, slug: str):
-        player = PlayerSelector.get_public_by_slug(slug)
+        # Onboarding and self-service pages can hit this endpoint before the
+        # player profile is public, so resolve by slug and let permissions decide.
+        player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
@@ -61,7 +63,7 @@ class PlayerEmergencyContactListCreateView(APIView):
 
     @extend_schema(tags=["players"], summary="List emergency contacts", responses={200: EmergencyContactSerializer(many=True)})
     def get(self, request, slug: str):
-        player = PlayerSelector.get_public_by_slug(slug)
+        player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
 

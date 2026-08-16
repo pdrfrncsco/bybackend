@@ -10,16 +10,15 @@ class PlayerIdentityService:
     @staticmethod
     @transaction.atomic
     def create_document(*, player, validated_data, uploaded_by=None) -> PlayerIdentityDocument:
-        """Create an identity document. validated_data may include asset_instance or file under 'document'."""
+        """Create an identity document and persist both front and back assets when provided."""
         asset_instance = validated_data.pop("asset_instance", None)
         document_file = validated_data.pop("document", None)
+        document_front_file = validated_data.pop("document_front", None)
+        document_back_file = validated_data.pop("document_back", None)
+        validated_data.pop("asset", None)
+        validated_data["document_number"] = (validated_data.get("document_number") or "").strip()
 
-        if asset_instance:
-            # Create record pointing to existing DAM asset
-            return PlayerIdentityDocument.objects.create(player=player, document_front=asset_instance, **validated_data)
-
-        if document_file:
-            # Upload via media_assets service
+        def upload_identity_asset(file_obj, *, side: str):
             try:
                 from media_assets.services import MediaAssetService
                 from media_assets.constants import AssetCategory, OwnerType, AssetVisibility
@@ -29,22 +28,38 @@ class PlayerIdentityService:
 
             visibility = AssetVisibility.INTERNAL
             try:
-                asset = MediaAssetService.upload_for_owner(
-                    file=document_file,
+                return MediaAssetService.upload_for_owner(
+                    file=file_obj,
                     owner_type=OwnerType.PLAYER,
                     owner_id=player.id,
                     role=AssetCategory.DOCUMENT,
-                    name=f"{player.first_name} {player.last_name} Identity Document",
+                    name=f"{player.first_name} {player.last_name} Identity Document {side}",
                     tenant=None,
                     uploaded_by=uploaded_by,
                     visibility=visibility,
                     images_only=False,
                 )
             except Exception as exc:
-                logger.exception("Failed to upload identity document: %s", exc)
+                logger.exception("Failed to upload identity document %s: %s", side.lower(), exc)
                 raise ValueError(str(exc)) from exc
 
-            return PlayerIdentityDocument.objects.create(player=player, document_front=asset, **validated_data)
+        if asset_instance:
+            front_asset = asset_instance
+        elif document_front_file or document_file:
+            front_asset = upload_identity_asset(document_front_file or document_file, side="Front")
+        else:
+            raise ValueError("The front of the identity document is required.")
+
+        back_asset = None
+        if document_back_file:
+            back_asset = upload_identity_asset(document_back_file, side="Back")
+
+        return PlayerIdentityDocument.objects.create(
+            player=player,
+            document_front=front_asset,
+            document_back=back_asset,
+            **validated_data,
+        )
 
     @staticmethod
     @transaction.atomic
@@ -57,9 +72,12 @@ class PlayerIdentityService:
     @staticmethod
     @transaction.atomic
     def remove_document(*, document: PlayerIdentityDocument) -> None:
-        asset_id = getattr(document.document_front, "id", None)
+        asset_ids = [
+            getattr(document.document_front, "id", None),
+            getattr(document.document_back, "id", None),
+        ]
         document.delete()
-        if asset_id:
+        for asset_id in [asset_id for asset_id in asset_ids if asset_id]:
             try:
                 from media_assets.services import MediaAssetService
                 MediaAssetService.delete_asset(asset_id=str(asset_id))
