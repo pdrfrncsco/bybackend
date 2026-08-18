@@ -250,6 +250,38 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(standing.goals_for, 3)
         self.assertEqual(standing.goals_against, 2)
 
+    def test_get_match_detail_api_exposes_canonical_contract(self):
+        """Detail endpoint should expose a canonical match contract and compatibility aliases."""
+        match = Match.objects.create(
+            competition=self.competition,
+            tenant=self.tenant,
+            home_club=self.club1,
+            away_club=self.club2,
+            match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
+            round_number=2,
+            round_name="Jornada 2",
+            status=Match.MatchStatus.LIVE,
+            home_score=1,
+            away_score=0,
+            venue="Arena",
+        )
+
+        self.client.force_authenticate(user=None)
+        response = self.client.get(f"/api/v1/competitions/{self.competition.id}/matches/{match.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["success"], True)
+        payload = response.data["data"]
+        self.assertEqual(payload["id"], str(match.id))
+        self.assertEqual(payload["competition_id"], str(self.competition.id))
+        self.assertEqual(payload["home_team_id"], str(self.club1.id))
+        self.assertEqual(payload["away_team_id"], str(self.club2.id))
+        self.assertEqual(payload["home_team_name"], "Petro de Luanda")
+        self.assertEqual(payload["away_team_name"], "1º de Agosto")
+        self.assertEqual(payload["status"], "live")
+        self.assertEqual(payload["status_label"], "Em Curso")
+        self.assertEqual(payload["scheduled_at"], payload["match_date"])
+
     def test_get_standings_api(self):
         """Test public GET standings endpoint."""
         # Register and setup initial standing

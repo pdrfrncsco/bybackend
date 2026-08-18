@@ -267,6 +267,33 @@ class CompetitionMatchListView(APIView):
         )
 
 
+class MatchDetailView(APIView):
+    """
+    GET: Retrieve a single match within a competition by ID.
+    """
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        tags=["competitions"],
+        summary="Get a match detail by competition and match id",
+        responses={200: MatchSerializer},
+    )
+    def get(self, request, competition_id, match_id):
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
+            return not_found_response(message="Competition not found.")
+
+        match = MatchSelector.get_by_id(tenant=competition.tenant, match_id=match_id)
+        if match is None or match.competition_id != competition.id:
+            return not_found_response(message="Match not found.")
+
+        serializer = MatchSerializer(match)
+        return success_response(
+            data=serializer.data,
+            message="Match retrieved successfully.",
+        )
+
+
 class MatchScoreUpdateView(APIView):
     """
     PATCH: Update match score and recalculate standings (Organization Admin only).

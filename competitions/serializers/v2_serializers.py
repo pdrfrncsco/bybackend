@@ -31,6 +31,15 @@ class CompetitionRegistrationSerializer(serializers.ModelSerializer):
 
 
 class MatchSerializer(serializers.ModelSerializer):
+    competition_id = serializers.SerializerMethodField()
+    round_label = serializers.SerializerMethodField()
+    home_team_id = serializers.SerializerMethodField()
+    home_team_name = serializers.SerializerMethodField()
+    home_team_logo = serializers.SerializerMethodField()
+    away_team_id = serializers.SerializerMethodField()
+    away_team_name = serializers.SerializerMethodField()
+    away_team_logo = serializers.SerializerMethodField()
+    scheduled_at = serializers.DateTimeField(source="match_date", read_only=True)
     home_club_name = serializers.CharField(source="home_club.name", read_only=True)
     away_club_name = serializers.CharField(source="away_club.name", read_only=True)
     home_club_logo = serializers.SerializerMethodField()
@@ -42,17 +51,26 @@ class MatchSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "competition",
+            "competition_id",
             "round_number",
             "round_name",
+            "round_label",
             "phase",
             "group_id",
             "home_club",
+            "home_team_id",
             "home_club_name",
+            "home_team_name",
             "home_club_logo",
+            "home_team_logo",
             "away_club",
+            "away_team_id",
             "away_club_name",
+            "away_team_name",
             "away_club_logo",
+            "away_team_logo",
             "match_date",
+            "scheduled_at",
             "status",
             "status_label",
             "home_score",
@@ -61,12 +79,43 @@ class MatchSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "competition_id",
             "home_club_name",
+            "home_team_name",
             "home_club_logo",
+            "home_team_logo",
             "away_club_name",
+            "away_team_name",
             "away_club_logo",
+            "away_team_logo",
             "status_label",
+            "scheduled_at",
+            "round_label",
         ]
+
+    def get_competition_id(self, obj: Match) -> str:
+        return str(obj.competition_id)
+
+    def get_round_label(self, obj: Match) -> str | None:
+        return obj.round_name
+
+    def get_home_team_id(self, obj: Match) -> str:
+        return str(obj.home_club_id)
+
+    def get_home_team_name(self, obj: Match) -> str:
+        return obj.home_club.name
+
+    def get_home_team_logo(self, obj: Match) -> str | None:
+        return get_club_logo_url(obj.home_club)
+
+    def get_away_team_id(self, obj: Match) -> str:
+        return str(obj.away_club_id)
+
+    def get_away_team_name(self, obj: Match) -> str:
+        return obj.away_club.name
+
+    def get_away_team_logo(self, obj: Match) -> str | None:
+        return get_club_logo_url(obj.away_club)
 
     def get_home_club_logo(self, obj: Match) -> str | None:
         return get_club_logo_url(obj.home_club)
