@@ -91,6 +91,8 @@ class MatchService:
         home_score: int,
         away_score: int,
         status: str = Match.MatchStatus.FINISHED,
+        current_period: str | None = None,
+        current_minute: int | None = None,
     ) -> Match:
         """
         Record final score of a match and trigger standings recalculation.
@@ -103,7 +105,13 @@ class MatchService:
         match.home_score = home_score
         match.away_score = away_score
         match.status = status
-        match.save()
+
+        if current_period is not None:
+            match.current_period = current_period
+        if current_minute is not None:
+            match.current_minute = max(0, min(int(current_minute), 130))
+
+        match.save(update_fields=["home_score", "away_score", "status", "current_period", "current_minute", "updated_at"])
 
         logger.info(
             "Match %s scored: %s %s - %s %s",

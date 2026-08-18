@@ -24,6 +24,14 @@ class Match(BaseModel):
         CANCELLED = "cancelled", "Cancelado"
         WALKOVER = "walkover", "Walkover"
 
+    class MatchPeriod(models.TextChoices):
+        FIRST_HALF = "first_half", "1º Tempo"
+        SECOND_HALF = "second_half", "2º Tempo"
+        EXTRA_TIME = "extra_time", "Prorrogação"
+        PENALTIES = "penalties", "Penaltis"
+        HALFTIME = "halftime", "Intervalo"
+        FULLTIME = "fulltime", "Fim de jogo"
+
     competition = models.ForeignKey(
         "competitions.Competition",
         on_delete=models.CASCADE,
@@ -58,6 +66,19 @@ class Match(BaseModel):
         choices=MatchStatus.choices,
         default=MatchStatus.SCHEDULED,
         verbose_name="Status",
+    )
+    current_period = models.CharField(
+        max_length=20,
+        choices=MatchPeriod.choices,
+        null=True,
+        blank=True,
+        default=None,
+        verbose_name="Current Period",
+    )
+    current_minute = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Current Minute",
+        help_text="Live minute value for the current period.",
     )
     
     # Results (populated when status = finished or live)

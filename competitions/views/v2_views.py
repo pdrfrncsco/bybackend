@@ -325,6 +325,8 @@ class MatchScoreUpdateView(APIView):
             return error_response(message="Scores must be integer values.", status_code=400)
 
         status = request.data.get("status", Match.MatchStatus.FINISHED)
+        current_period = request.data.get("current_period")
+        current_minute = request.data.get("current_minute")
 
         try:
             match = MatchService.update_match_score(
@@ -333,6 +335,8 @@ class MatchScoreUpdateView(APIView):
                 home_score=home_score,
                 away_score=away_score,
                 status=status,
+                current_period=current_period,
+                current_minute=current_minute,
             )
         except MatchNotFound:
             return not_found_response(message="Match not found.")

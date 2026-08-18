@@ -45,6 +45,7 @@ class MatchSerializer(serializers.ModelSerializer):
     home_club_logo = serializers.SerializerMethodField()
     away_club_logo = serializers.SerializerMethodField()
     status_label = serializers.CharField(source="get_status_display", read_only=True)
+    current_period_label = serializers.CharField(source="get_current_period_display", read_only=True, allow_null=True)
 
     class Meta:
         model = Match
@@ -73,6 +74,9 @@ class MatchSerializer(serializers.ModelSerializer):
             "scheduled_at",
             "status",
             "status_label",
+            "current_period",
+            "current_period_label",
+            "current_minute",
             "home_score",
             "away_score",
             "venue",
@@ -89,6 +93,7 @@ class MatchSerializer(serializers.ModelSerializer):
             "away_club_logo",
             "away_team_logo",
             "status_label",
+            "current_period_label",
             "scheduled_at",
             "round_label",
         ]

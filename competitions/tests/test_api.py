@@ -261,6 +261,8 @@ class CompetitionAPITestCase(TestCase):
             round_number=2,
             round_name="Jornada 2",
             status=Match.MatchStatus.LIVE,
+            current_period=Match.MatchPeriod.SECOND_HALF,
+            current_minute=52,
             home_score=1,
             away_score=0,
             venue="Arena",
@@ -279,6 +281,8 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(payload["home_team_name"], "Petro de Luanda")
         self.assertEqual(payload["away_team_name"], "1º de Agosto")
         self.assertEqual(payload["status"], "live")
+        self.assertEqual(payload["current_period"], "second_half")
+        self.assertEqual(payload["current_minute"], 52)
         self.assertEqual(payload["status_label"], "Em Curso")
         self.assertEqual(payload["scheduled_at"], payload["match_date"])
 
