@@ -11,10 +11,10 @@ from players.models import Player
 from datetime import date
 import traceback
 
-# Clean up first
+# Safe local smoke test: do not delete persisted data from the database.
+# The previous version used Tenant.objects.all().delete() and Player.objects.all().delete(),
+# which explains why clubs/players were disappearing during manual debugging.
 Tenant = __import__('core.models', fromlist=['Tenant']).Tenant
-Tenant.objects.all().delete()
-Player.objects.all().delete()
 
 # Create test data
 tenant = Tenant.objects.create(name='TestTenant', slug='test-tenant-unique')
