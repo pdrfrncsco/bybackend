@@ -30,6 +30,7 @@ from common.responses import (
     success_response, created_response, not_found_response, error_response
 )
 from organizations.permissions import IsOrganizationAdmin
+from competitions.permissions import IsMatchEventOperator
 from organizations.services import OrganizationService
 from competitions.models import Match, MatchEvent
 from competitions.serializers.v2_serializers import MatchSerializer
@@ -52,7 +53,7 @@ class MatchEventListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == "GET":
             return [AllowAny()]
-        return [IsAuthenticated(), IsActiveAccount(), IsOrganizationAdmin()]
+        return [IsAuthenticated(), IsActiveAccount(), IsMatchEventOperator()]
 
     @extend_schema(
         tags=["match-center"],

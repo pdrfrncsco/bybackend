@@ -24,6 +24,7 @@ from competitions.selectors import CompetitionSelector, CompetitionRegistrationS
 from competitions.services.competition_registration_service import CompetitionRegistrationService, ClubAlreadyRegistered
 from competitions.services.competition_format_service import CompetitionFormatService
 from competitions.services.match_service import MatchService, MatchNotFound, InvalidMatchTransition
+from competitions.permissions import IsMatchEventOperator
 from competitions.services.standing_service import StandingService
 from competitions.serializers.v2_serializers import (
     CompetitionRegistrationSerializer,
@@ -355,11 +356,10 @@ class MatchScoreUpdateView(APIView):
 class MatchTransitionView(APIView):
     """PATCH: apply one validated lifecycle transition to a match."""
 
-    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsMatchEventOperator]
 
     def patch(self, request, match_id):
         tenant = OrganizationService.get_organization_for_user(user=request.user)
-        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
         status = request.data.get("status")
         if not status:
             return error_response(message="status is required.", status_code=400)
