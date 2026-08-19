@@ -10,6 +10,12 @@ Endpoints:
 """
 
 from django.db.models import Q
+import json
+import time
+from django.http import StreamingHttpResponse
+from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from django.contrib.auth import get_user_model
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from drf_spectacular.utils import extend_schema
@@ -33,6 +39,8 @@ from competitions.services.match_event_service import (
 from competitions.serializers.match_event_serializers import (
     MatchEventSerializer, MatchEventCreateSerializer, PlayerStatsSerializer
 )
+
+User = get_user_model()
 
 
 class MatchEventListCreateView(APIView):
@@ -204,6 +212,74 @@ class LiveMatchesView(APIView):
             data=serializer.data,
             message="Live matches retrieved successfully."
         )
+
+
+class MatchStreamView(APIView):
+    """Authenticated SSE stream for one match; HTTP polling remains the fallback."""
+
+    permission_classes = []
+    POLL_INTERVAL = 2
+
+    @staticmethod
+    def _event(name, payload):
+        return f"event: {name}\ndata: {json.dumps(payload, default=str)}\n\n"
+
+    def _user_from_token(self, request):
+        raw_token = request.GET.get("token")
+        if not raw_token:
+            return None
+        try:
+            validated = AccessToken(raw_token)
+            return User.objects.get(pk=validated["user_id"])
+        except (InvalidToken, TokenError, User.DoesNotExist):
+            return None
+
+    def get(self, request, match_id):
+        user = self._user_from_token(request)
+        if user is None:
+            return StreamingHttpResponse(
+                (self._event("error", {"detail": "Authentication required."}),),
+                content_type="text/event-stream",
+            )
+        try:
+            tenant = OrganizationService.get_organization_for_user(user=user)
+            match = Match.objects.select_related("home_club", "away_club", "competition").get(
+                id=match_id, tenant=tenant,
+            )
+        except (Match.DoesNotExist, Exception) as exc:
+            if isinstance(exc, Match.DoesNotExist):
+                return StreamingHttpResponse(
+                    (self._event("error", {"detail": "Match not found."}),),
+                    content_type="text/event-stream",
+                )
+            return StreamingHttpResponse(
+                (self._event("error", {"detail": "Match access unavailable."}),),
+                content_type="text/event-stream",
+            )
+
+        def stream():
+            last_match_updated = None
+            last_event_updated = None
+            yield self._event("snapshot", {"match": MatchSerializer(match).data})
+            while True:
+                time.sleep(self.POLL_INTERVAL)
+                current = Match.objects.select_related("home_club", "away_club", "competition").get(id=match.id)
+                current_updated = str(current.updated_at)
+                if current_updated != last_match_updated:
+                    yield self._event("match_state", {"match": MatchSerializer(current).data})
+                    last_match_updated = current_updated
+                events = MatchEvent.objects.filter(match_id=match.id).select_related("player", "player_off", "club").order_by("created_at")
+                new_events = [event for event in events if last_event_updated is None or str(event.created_at) > last_event_updated]
+                for event in new_events:
+                    yield self._event("match_event", {"event": MatchEventSerializer(event).data})
+                if new_events:
+                    last_event_updated = str(new_events[-1].created_at)
+                yield self._event("ping", {"ts": str(time.time())})
+
+        response = StreamingHttpResponse(stream(), content_type="text/event-stream")
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
+        return response
 
 
 class MatchReportDocumentUploadView(APIView):

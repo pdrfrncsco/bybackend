@@ -24,6 +24,7 @@ from competitions.views.match_center_views import (
     MatchEventDeleteView,
     CompetitionPlayerStatsView,
     LiveMatchesView,
+    MatchStreamView,
     MatchReportDocumentUploadView,
 )
 from competitions.views.fair_play_views import (
@@ -63,6 +64,7 @@ urlpatterns = [
 
     # Phase 3 — Live matches (global endpoint)
     path("matches/live/", LiveMatchesView.as_view(), name="live-matches"),
+    path("matches/<uuid:match_id>/stream/", MatchStreamView.as_view(), name="match-stream"),
 
     # Phase 2.4 — Fair Play & Suspensions
     path("<str:competition_id>/suspensions/", CompetitionSuspensionListView.as_view(), name="competition-suspensions"),
