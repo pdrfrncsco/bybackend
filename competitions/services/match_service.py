@@ -22,10 +22,50 @@ class MatchNotFound(Exception):
     pass
 
 
+class InvalidMatchTransition(Exception):
+    """Raised when a match lifecycle transition is not allowed."""
+    pass
+
+
 class MatchService:
     """
     Handles match life cycle: scheduling, scoring, and status updates.
     """
+
+    ALLOWED_TRANSITIONS = {
+        Match.MatchStatus.SCHEDULED: {Match.MatchStatus.PRE_MATCH, Match.MatchStatus.POSTPONED, Match.MatchStatus.CANCELLED},
+        Match.MatchStatus.PRE_MATCH: {Match.MatchStatus.LIVE, Match.MatchStatus.POSTPONED, Match.MatchStatus.CANCELLED},
+        Match.MatchStatus.LIVE: {Match.MatchStatus.HALFTIME, Match.MatchStatus.FINISHED, Match.MatchStatus.CANCELLED},
+        Match.MatchStatus.HALFTIME: {Match.MatchStatus.LIVE, Match.MatchStatus.FINISHED},
+        Match.MatchStatus.FINISHED: {Match.MatchStatus.ARCHIVED},
+        Match.MatchStatus.POSTPONED: {Match.MatchStatus.SCHEDULED, Match.MatchStatus.CANCELLED},
+        Match.MatchStatus.WALKOVER: {Match.MatchStatus.ARCHIVED},
+        Match.MatchStatus.ARCHIVED: set(),
+        Match.MatchStatus.CANCELLED: set(),
+    }
+
+    @staticmethod
+    @transaction.atomic
+    def transition_match(*, tenant: Tenant, match_id: str, status: str,
+                         current_period: str | None = None,
+                         current_minute: int | None = None) -> Match:
+        """Apply one explicit lifecycle transition to a locked match row."""
+        try:
+            match = Match.objects.select_for_update().get(id=match_id, tenant=tenant)
+        except Match.DoesNotExist:
+            raise MatchNotFound("Match not found.")
+
+        MatchService.validate_match_state(status=status, current_period=current_period, current_minute=current_minute)
+        if status not in MatchService.ALLOWED_TRANSITIONS.get(match.status, set()):
+            raise InvalidMatchTransition(f"Cannot transition match from '{match.status}' to '{status}'.")
+
+        match.status = status
+        if current_period is not None:
+            match.current_period = current_period
+        if current_minute is not None:
+            match.current_minute = max(0, min(int(current_minute), 130))
+        match.save(update_fields=["status", "current_period", "current_minute", "updated_at"])
+        return match
 
     @staticmethod
     def validate_match_state(
@@ -35,7 +75,7 @@ class MatchService:
         current_minute: int | str | None = None,
     ) -> None:
         """Validate the canonical lifecycle values for a match update."""
-        valid_statuses = {value for value, _ in Match.MatchStatus.choices}
+        valid_statuses = {value for value, _ in Match.MatchStatus.choices} | {"archived"}
         valid_periods = {value for value, _ in Match.MatchPeriod.choices}
 
         if status is not None and status not in valid_statuses:

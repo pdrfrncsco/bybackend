@@ -20,6 +20,7 @@ class Match(BaseModel):
         LIVE = "live", "Em Curso"
         HALFTIME = "halftime", "Intervalo"
         FINISHED = "finished", "Concluído"
+        ARCHIVED = "archived", "Arquivado"
         POSTPONED = "postponed", "Adiado"
         CANCELLED = "cancelled", "Cancelado"
         WALKOVER = "walkover", "Walkover"

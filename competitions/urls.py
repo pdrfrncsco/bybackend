@@ -9,6 +9,7 @@ from competitions.views import (
     CompetitionMatchListView,
     MatchDetailView,
     MatchScoreUpdateView,
+    MatchTransitionView,
     CompetitionStandingListView,
     CompetitionBracketView,
     CompetitionRoundsView,
@@ -53,6 +54,7 @@ urlpatterns = [
     path("<str:competition_id>/regulations/", CompetitionRegulationListCreateView.as_view(), name="competition-regulation-list-create"),
     path("<str:competition_id>/regulations/<uuid:regulation_id>/", CompetitionRegulationDetailView.as_view(), name="competition-regulation-detail"),
     path("matches/<uuid:match_id>/", MatchScoreUpdateView.as_view(), name="match-score-update"),
+    path("matches/<uuid:match_id>/transition/", MatchTransitionView.as_view(), name="match-transition"),
 
     # Phase 4 — Match Center (súmula + player stats)
     path("<str:competition_id>/matches/<uuid:match_id>/events/", MatchEventListCreateView.as_view(), name="match-event-list-create"),

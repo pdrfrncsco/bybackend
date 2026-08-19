@@ -23,7 +23,7 @@ from competitions.models import Competition, Match, Standing
 from competitions.selectors import CompetitionSelector, CompetitionRegistrationSelector, MatchSelector, StandingSelector
 from competitions.services.competition_registration_service import CompetitionRegistrationService, ClubAlreadyRegistered
 from competitions.services.competition_format_service import CompetitionFormatService
-from competitions.services.match_service import MatchService, MatchNotFound
+from competitions.services.match_service import MatchService, MatchNotFound, InvalidMatchTransition
 from competitions.services.standing_service import StandingService
 from competitions.serializers.v2_serializers import (
     CompetitionRegistrationSerializer,
@@ -350,6 +350,30 @@ class MatchScoreUpdateView(APIView):
             data=serializer.data,
             message="Match score updated and standings recalculated.",
         )
+
+
+class MatchTransitionView(APIView):
+    """PATCH: apply one validated lifecycle transition to a match."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsOrganizationAdmin]
+
+    def patch(self, request, match_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+        status = request.data.get("status")
+        if not status:
+            return error_response(message="status is required.", status_code=400)
+        try:
+            match = MatchService.transition_match(
+                tenant=tenant,
+                match_id=match_id,
+                status=status,
+                current_period=request.data.get("current_period"),
+                current_minute=request.data.get("current_minute"),
+            )
+        except (MatchNotFound, InvalidMatchTransition, ValueError) as exc:
+            return error_response(message=str(exc), status_code=400)
+        return success_response(data=MatchSerializer(match).data, message="Match transition applied.")
 
 
 class CompetitionStandingListView(APIView):
