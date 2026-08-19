@@ -20,5 +20,11 @@ class EventType:
     CLUB_APPROVED = "ClubApproved"
     CLUB_SUSPENDED = "ClubSuspended"
 
+    # MatchCenter lifecycle and live feed events
+    MATCH_EVENT_CREATED = "MatchEventCreated"
+    MATCH_EVENT_REMOVED = "MatchEventRemoved"
+    MATCH_FINISHED = "MatchFinished"
+    MATCH_ARCHIVED = "MatchArchived"
+
 
 __all__ = ["EventType"]

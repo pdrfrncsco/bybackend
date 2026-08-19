@@ -63,3 +63,39 @@ def handle_club_approved(event: Event) -> None:
 def handle_club_suspended(event: Event) -> None:
     """Create a notification when a club is suspended."""
     _create_club_notification(event=event, notification_type=EventType.CLUB_SUSPENDED)
+
+
+def _fanout_match_notification(*, event: Event, notification_type: str) -> None:
+    """Create one notification per active tenant member/subscriber."""
+    from accounts.models import TenantMembership
+    from organizations.models import OrganizationSubscription
+
+    payload = event.payload or {}
+    tenant_id = event.tenant_id
+    recipient_ids = set(
+        TenantMembership.objects.filter(tenant_id=tenant_id, is_active=True)
+        .values_list("user_id", flat=True)
+    )
+    recipient_ids.update(
+        OrganizationSubscription.objects.filter(tenant_id=tenant_id, is_active=True)
+        .values_list("user_id", flat=True)
+    )
+    Notification.objects.bulk_create([
+        Notification(
+            tenant_id=tenant_id,
+            recipient_id=recipient_id,
+            type=notification_type,
+            payload=payload,
+        )
+        for recipient_id in recipient_ids
+    ])
+
+
+@subscribe(EventType.MATCH_EVENT_CREATED)
+def handle_match_event_created(event: Event) -> None:
+    _fanout_match_notification(event=event, notification_type=EventType.MATCH_EVENT_CREATED)
+
+
+@subscribe(EventType.MATCH_FINISHED)
+def handle_match_finished(event: Event) -> None:
+    _fanout_match_notification(event=event, notification_type=EventType.MATCH_FINISHED)

@@ -11,7 +11,7 @@ from core.models import Tenant
 from clubs.models import Club
 from players.models import Player
 from competitions.models import Match, MatchEvent
-from core.events import Event, publish_event
+from core.events import Event, EventType, publish_event
 
 
 class MatchEventNotFound(Exception):
@@ -143,7 +143,7 @@ class MatchEventService:
         # Auto-sync player stats
         MatchEventService._sync_player_stats(event, operation="add")
         publish_event(Event(
-            type="MatchEventCreated",
+            type=EventType.MATCH_EVENT_CREATED,
             tenant_id=str(tenant.id),
             payload={
                 "match_id": str(match.id),
@@ -181,7 +181,7 @@ class MatchEventService:
         MatchEventService._sync_player_stats(event, operation="remove")
 
         publish_event(Event(
-            type="MatchEventRemoved",
+            type=EventType.MATCH_EVENT_REMOVED,
             tenant_id=str(tenant.id),
             payload={"match_id": str(match.id), "event_id": str(event.id)},
             origin="competitions.match_event_service",

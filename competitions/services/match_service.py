@@ -13,6 +13,7 @@ from core.models import Tenant
 from clubs.models import Club
 from competitions.models import Competition, CompetitionRegistration, Match
 from competitions.services.standing_service import StandingService
+from core.events import Event, EventType, publish_event
 
 logger = logging.getLogger("competitions")
 
@@ -65,6 +66,12 @@ class MatchService:
         if current_minute is not None:
             match.current_minute = max(0, min(int(current_minute), 130))
         match.save(update_fields=["status", "current_period", "current_minute", "updated_at"])
+        publish_event(Event(
+            type=EventType.MATCH_ARCHIVED if status == Match.MatchStatus.ARCHIVED else EventType.MATCH_FINISHED if status == Match.MatchStatus.FINISHED else "MatchStateChanged",
+            tenant_id=str(tenant.id),
+            payload={"match_id": str(match.id), "status": status},
+            origin="competitions.match_service",
+        ))
         return match
 
     @staticmethod
@@ -188,6 +195,14 @@ class MatchService:
             match.current_minute = max(0, min(int(current_minute), 130))
 
         match.save(update_fields=["home_score", "away_score", "status", "current_period", "current_minute", "updated_at"])
+
+        if status == Match.MatchStatus.FINISHED:
+            publish_event(Event(
+                type=EventType.MATCH_FINISHED,
+                tenant_id=str(tenant.id),
+                payload={"match_id": str(match.id), "status": status},
+                origin="competitions.match_service",
+            ))
 
         logger.info(
             "Match %s scored: %s %s - %s %s",
