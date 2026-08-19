@@ -13,10 +13,11 @@ from accounts.models.membership import TenantMembership
 from clubs.models import Club
 from core.models import Tenant
 from players.models import Player
-from competitions.models import Competition, CompetitionRegistration, Match, MatchEvent, Standing
+from competitions.models import Competition, CompetitionRegistration, Match, MatchEvent, MatchReport, Standing
 from competitions.services.match_event_service import (
     MatchEventService, InvalidMatchEventData, MatchEventNotFound
 )
+from competitions.services.match_service import MatchService, InvalidMatchTransition
 
 
 def make_tenant(name="Liga Angola"):
@@ -177,6 +178,56 @@ class MatchEventServiceTestCase(TestCase):
         self.assertEqual(events[0].minute, 33)
         self.assertEqual(events[1].minute, 67)
 
+    def test_idempotent_event_retry_returns_original(self):
+        first = MatchEventService.add_event(
+            tenant=self.tenant, match=self.match, club=self.home,
+            event_type=MatchEvent.EventType.GOAL, minute=10,
+            idempotency_key="client-retry-1",
+        )
+        second = MatchEventService.add_event(
+            tenant=self.tenant, match=self.match, club=self.home,
+            event_type=MatchEvent.EventType.GOAL, minute=10,
+            idempotency_key="client-retry-1",
+        )
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(MatchEvent.objects.filter(match=self.match).count(), 1)
+
+
+class MatchLifecycleServiceTestCase(TestCase):
+    def setUp(self):
+        self.tenant = make_tenant()
+        self.home = make_club(self.tenant, "Lifecycle Home")
+        self.away = make_club(self.tenant, "Lifecycle Away")
+        self.comp = make_competition(self.tenant)
+        self.match = make_match(self.tenant, self.comp, self.home, self.away)
+
+    def test_valid_lifecycle_transitions(self):
+        MatchService.transition_match(
+            tenant=self.tenant, match_id=str(self.match.id), status="pre_match"
+        )
+        MatchService.transition_match(
+            tenant=self.tenant, match_id=str(self.match.id), status="live",
+            current_period="first_half",
+        )
+        MatchService.transition_match(
+            tenant=self.tenant, match_id=str(self.match.id), status="finished",
+            current_period="fulltime",
+        )
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.FINISHED)
+
+    def test_invalid_lifecycle_jump_is_rejected(self):
+        with self.assertRaises(InvalidMatchTransition):
+            MatchService.transition_match(
+                tenant=self.tenant, match_id=str(self.match.id), status="finished"
+            )
+
+    def test_archiving_before_finished_is_rejected(self):
+        with self.assertRaises(InvalidMatchTransition):
+            MatchService.transition_match(
+                tenant=self.tenant, match_id=str(self.match.id), status="archived"
+            )
+
 
 class MatchCenterAPITestCase(TestCase):
     def setUp(self):
@@ -249,3 +300,71 @@ class MatchCenterAPITestCase(TestCase):
         stats = response.data["data"]
         self.assertEqual(len(stats), 1)
         self.assertEqual(stats[0]["goals"], 1)
+
+
+class MatchCenterRBACAPITestCase(TestCase):
+    """Role matrix for live operations, approval and archival."""
+
+    def setUp(self):
+        self.client = APIClient()
+        self.tenant = make_tenant("RBAC League")
+        self.admin = make_user(self.tenant, "rbac-admin@test.com", "admin")
+        self.manager = make_user(self.tenant, "rbac-manager@test.com", "manager")
+        self.member = make_user(self.tenant, "rbac-member@test.com", "member")
+        self.home = make_club(self.tenant, "RBAC Home")
+        self.away = make_club(self.tenant, "RBAC Away")
+        self.comp = make_competition(self.tenant, "RBAC Competition")
+        self.match = make_match(self.tenant, self.comp, self.home, self.away)
+
+    def _auth_as(self, user):
+        from rest_framework_simplejwt.tokens import RefreshToken
+        token = RefreshToken.for_user(user)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.access_token}")
+
+    def _transition(self, status_value):
+        return self.client.patch(
+            f"/api/v1/competitions/matches/{self.match.id}/transition/",
+            {"status": status_value}, format="json",
+        )
+
+    def test_manager_can_open_pre_match_and_start_live(self):
+        self._auth_as(self.manager)
+        self.assertEqual(self._transition("pre_match").status_code, status.HTTP_200_OK)
+        self.assertEqual(self._transition("live").status_code, status.HTTP_200_OK)
+
+    def test_member_cannot_operate_live_match(self):
+        self._auth_as(self.member)
+        response = self._transition("pre_match")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_manager_cannot_archive_match(self):
+        self.match.status = Match.MatchStatus.FINISHED
+        self.match.save(update_fields=["status"])
+        self._auth_as(self.manager)
+        response = self._transition("archived")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_admin_can_archive_finished_match(self):
+        self.match.status = Match.MatchStatus.FINISHED
+        self.match.save(update_fields=["status"])
+        self._auth_as(self.admin)
+        response = self._transition("archived")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.status, Match.MatchStatus.ARCHIVED)
+
+    def test_manager_can_submit_but_not_finalize_report(self):
+        url = f"/api/v1/competitions/matches/{self.match.id}/report/create/"
+        payload = {"home_score": 1, "away_score": 0, "match_duration": 90}
+
+        self._auth_as(self.manager)
+        submitted = self.client.post(url, payload, format="json")
+        self.assertIn(submitted.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+
+        rejected = self.client.post(url, {**payload, "status": "finalized"}, format="json")
+        self.assertEqual(rejected.status_code, status.HTTP_403_FORBIDDEN)
+
+        self._auth_as(self.admin)
+        approved = self.client.post(url, {**payload, "status": "finalized"}, format="json")
+        self.assertIn(approved.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertEqual(approved.data["status"], MatchReport.ReportStatus.FINALIZED)
