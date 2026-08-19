@@ -129,6 +129,7 @@ class MatchEventListCreateView(APIView):
                 player_off=player_off,
                 extra_time=data.get("extra_time", False),
                 notes=data.get("notes", ""),
+                idempotency_key=data.get("idempotency_key"),
             )
         except InvalidMatchEventData as exc:
             return error_response(message=str(exc), status_code=400)

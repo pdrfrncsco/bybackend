@@ -11,6 +11,7 @@ from core.models import Tenant
 from clubs.models import Club
 from players.models import Player
 from competitions.models import Match, MatchEvent
+from core.events import Event, publish_event
 
 
 class MatchEventNotFound(Exception):
@@ -80,6 +81,7 @@ class MatchEventService:
         player_off: Player | None = None,
         extra_time: bool = False,
         notes: str = "",
+        idempotency_key: str | None = None,
     ) -> MatchEvent:
         """
         Record a new in-game event. If it's a goal type, recalculates score.
@@ -109,6 +111,13 @@ class MatchEventService:
         if club.id not in (match.home_club_id, match.away_club_id):
             raise InvalidMatchEventData("Club is not participating in this match.")
 
+        if idempotency_key:
+            existing = MatchEvent.objects.filter(
+                tenant=tenant, match=match, idempotency_key=idempotency_key,
+            ).first()
+            if existing:
+                return existing
+
         event = MatchEvent.objects.create(
             tenant=tenant,
             match=match,
@@ -119,6 +128,7 @@ class MatchEventService:
             player_off=player_off,
             extra_time=extra_time,
             notes=notes,
+            idempotency_key=idempotency_key or None,
         )
 
         # Auto-recalculate score from goal events
@@ -132,6 +142,17 @@ class MatchEventService:
 
         # Auto-sync player stats
         MatchEventService._sync_player_stats(event, operation="add")
+        publish_event(Event(
+            type="MatchEventCreated",
+            tenant_id=str(tenant.id),
+            payload={
+                "match_id": str(match.id),
+                "event_id": str(event.id),
+                "event_type": event.event_type,
+                "minute": event.minute,
+            },
+            origin="competitions.match_event_service",
+        ))
 
         return event
 
@@ -158,6 +179,13 @@ class MatchEventService:
         
         # Sync player stats BEFORE deletion (need event data)
         MatchEventService._sync_player_stats(event, operation="remove")
+
+        publish_event(Event(
+            type="MatchEventRemoved",
+            tenant_id=str(tenant.id),
+            payload={"match_id": str(match.id), "event_id": str(event.id)},
+            origin="competitions.match_event_service",
+        ))
         
         event.delete()
 

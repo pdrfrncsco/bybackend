@@ -33,6 +33,7 @@ class MatchEventSerializer(serializers.ModelSerializer):
             "club_name",
             "club_logo",
             "notes",
+            "idempotency_key",
             "created_at",
         ]
         read_only_fields = ["id", "created_at"]
@@ -60,6 +61,7 @@ class MatchEventCreateSerializer(serializers.Serializer):
     player = serializers.UUIDField(required=False, allow_null=True)
     player_off = serializers.UUIDField(required=False, allow_null=True)
     notes = serializers.CharField(max_length=255, required=False, default="")
+    idempotency_key = serializers.CharField(max_length=128, required=False, allow_blank=True)
 
 
 class PlayerStatsSerializer(serializers.Serializer):
