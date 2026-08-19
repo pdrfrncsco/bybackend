@@ -23,3 +23,9 @@ class IsMatchEventOperator(BasePermission):
                 role__in=[*MembershipRole.ADMIN_ROLES, MembershipRole.MANAGER],
             ).exists()
         )
+
+
+class IsMatchReportOperator(IsMatchEventOperator):
+    """Allow operators to submit match data; approval remains administrative."""
+
+    message = "You must be an active match report operator."

@@ -363,6 +363,8 @@ class MatchTransitionView(APIView):
         status = request.data.get("status")
         if not status:
             return error_response(message="status is required.", status_code=400)
+        if status == Match.MatchStatus.ARCHIVED:
+            OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
         try:
             match = MatchService.transition_match(
                 tenant=tenant,

@@ -26,6 +26,8 @@ from competitions.services.lineup_service import (
 )
 from clubs.models import Club
 from players.models import Player
+from competitions.permissions import IsMatchReportOperator
+from organizations.permissions import IsOrganizationAdmin
 
 
 # ─── Tenant Helper ────────────────────────────────────────────────────────────
@@ -541,7 +543,9 @@ class MatchReportViewSet(viewsets.ModelViewSet):
         """Allow unauthenticated read access for match reports on public pages."""
         if self.action in ['get_report', 'list', 'retrieve']:
             return [AllowAny()]
-        return super().get_permissions()
+        # Operators can submit live report data; administrative approval actions
+        # are checked explicitly in their handler.
+        return [IsMatchReportOperator()]
 
     def get_queryset(self):
         """Filter reports by tenant and match."""
@@ -600,6 +604,17 @@ class MatchReportViewSet(viewsets.ModelViewSet):
         tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
 
+        # Finalization is an organization-level approval action; operators may
+        # submit/update the report but cannot approve their own submission.
+        is_finalize = request.data.get('status') in {
+            MatchReport.ReportStatus.FINALIZED,
+            'finalized',
+        }
+        if is_finalize:
+            from organizations.services import OrganizationService
+            org_tenant = OrganizationService.get_organization_for_user(user=request.user)
+            OrganizationService.assert_is_organization_admin(user=request.user, tenant=org_tenant)
+
         match_qs = Match.objects.filter(id=match_id)
         if tenant:
             match_qs = match_qs.filter(tenant=tenant)
@@ -619,6 +634,8 @@ class MatchReportViewSet(viewsets.ModelViewSet):
                 report.match_duration = serializer.validated_data['match_duration']
 
             report.save()
+            if is_finalize:
+                report.finalize(request.user)
 
             response_serializer = self.get_serializer(report)
             return Response(
