@@ -340,6 +340,8 @@ class MatchScoreUpdateView(APIView):
             )
         except MatchNotFound:
             return not_found_response(message="Match not found.")
+        except ValueError as exc:
+            return error_response(message=f"Invalid match state: {exc}", status_code=400)
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 

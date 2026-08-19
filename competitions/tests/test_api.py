@@ -220,6 +220,35 @@ class CompetitionAPITestCase(TestCase):
         self.assertEqual(response.data["success"], False)
         self.assertIn("phase or group", response.data["message"])
 
+    def test_update_match_state_rejects_invalid_period_and_minute(self):
+        """Match lifecycle updates must reject invalid phase names and out-of-range minutes."""
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club1)
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club2)
+
+        match = Match.objects.create(
+            competition=self.competition,
+            tenant=self.tenant,
+            home_club=self.club1,
+            away_club=self.club2,
+            match_date=datetime(2026, 8, 1, 16, 0, tzinfo=timezone.utc),
+            round_number=1,
+            status=Match.MatchStatus.SCHEDULED,
+        )
+
+        url = f"/api/v1/competitions/matches/{match.id}/"
+        payload = {
+            "home_score": 1,
+            "away_score": 0,
+            "status": "live",
+            "current_period": "midfield",
+            "current_minute": 200,
+        }
+        response = self.client.patch(url, payload, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["success"], False)
+        self.assertIn("current_period", response.data["message"])
+
     def test_update_match_score_api(self):
         """Test PATCH update match score and standings recalculation."""
         # Register clubs

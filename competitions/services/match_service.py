@@ -28,6 +28,36 @@ class MatchService:
     """
 
     @staticmethod
+    def validate_match_state(
+        *,
+        status: str | None = None,
+        current_period: str | None = None,
+        current_minute: int | str | None = None,
+    ) -> None:
+        """Validate the canonical lifecycle values for a match update."""
+        valid_statuses = {value for value, _ in Match.MatchStatus.choices}
+        valid_periods = {value for value, _ in Match.MatchPeriod.choices}
+
+        if status is not None and status not in valid_statuses:
+            raise ValueError(
+                f"Invalid status '{status}'. Expected one of: {sorted(valid_statuses)}."
+            )
+
+        if current_period is not None and current_period not in valid_periods:
+            raise ValueError(
+                f"Invalid current_period '{current_period}'. Expected one of: {sorted(valid_periods)}."
+            )
+
+        if current_minute is not None:
+            try:
+                minute_value = int(current_minute)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("current_minute must be an integer between 0 and 130.") from exc
+
+            if minute_value < 0 or minute_value > 130:
+                raise ValueError("current_minute must be between 0 and 130.")
+
+    @staticmethod
     @transaction.atomic
     def create_match(
         *,
@@ -97,6 +127,12 @@ class MatchService:
         """
         Record final score of a match and trigger standings recalculation.
         """
+        MatchService.validate_match_state(
+            status=status,
+            current_period=current_period,
+            current_minute=current_minute,
+        )
+
         try:
             match = Match.objects.get(id=match_id, tenant=tenant)
         except Match.DoesNotExist:
