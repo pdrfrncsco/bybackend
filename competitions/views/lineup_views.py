@@ -26,7 +26,7 @@ from competitions.services.lineup_service import (
 )
 from clubs.models import Club
 from players.models import Player
-from competitions.permissions import IsMatchReportOperator
+from competitions.permissions import CanManageClubLineup, IsMatchReportOperator
 from organizations.permissions import IsOrganizationAdmin
 
 
@@ -169,6 +169,17 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
             )
 
         club = get_object_or_404(Club, id=club_id, tenant=tenant)
+
+        if not CanManageClubLineup.user_can_manage(
+            user=request.user,
+            tenant=tenant,
+            match=match,
+            club=club,
+        ):
+            return Response(
+                {"error": "Usuário não autorizado a submeter esta escalação."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # Validate input
         serializer = self.get_serializer(data=request.data)
@@ -374,31 +385,12 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
             match = Match.objects.get(id=match_id, tenant=tenant)
             club = Club.objects.get(id=club_id, tenant=tenant)
 
-            # Permission check: superuser OR organization admin OR club manager/coach/assistant_coach
-            is_allowed = request.user.is_superuser
-
-            if not is_allowed:
-                try:
-                    from organizations.services import OrganizationService
-
-                    # organization admin check (will raise if no membership)
-                    org_tenant = OrganizationService.get_organization_for_user(user=request.user)
-                    OrganizationService.assert_is_organization_admin(user=request.user, tenant=org_tenant)
-                    is_allowed = True
-                except Exception:
-                    is_allowed = False
-
-            if not is_allowed:
-                from clubs.models import ClubMember
-
-                is_allowed = ClubMember.objects.filter(
-                    club_id=club_id,
-                    user=request.user,
-                    is_active=True,
-                    role__in=["manager", "coach", "assistant_coach"]
-                ).exists()
-
-            if not is_allowed:
+            if not CanManageClubLineup.user_can_manage(
+                user=request.user,
+                tenant=tenant,
+                match=match,
+                club=club,
+            ):
                 return Response(
                     {"error": "Usuário não autorizado a confirmar esta escalação."},
                     status=status.HTTP_403_FORBIDDEN
@@ -458,26 +450,12 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
                 except Club.DoesNotExist:
                     return Response({"error": "Clube não encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
-                is_allowed = request.user.is_superuser
-                if not is_allowed:
-                    try:
-                        from organizations.services import OrganizationService
-                        org_tenant = OrganizationService.get_organization_for_user(user=request.user)
-                        OrganizationService.assert_is_organization_admin(user=request.user, tenant=org_tenant)
-                        is_allowed = True
-                    except Exception:
-                        is_allowed = False
-
-                if not is_allowed:
-                    from clubs.models import ClubMember
-                    is_allowed = ClubMember.objects.filter(
-                        club_id=club_id,
-                        user=request.user,
-                        is_active=True,
-                        role__in=["manager", "coach", "assistant_coach"]
-                    ).exists()
-
-                if not is_allowed:
+                if not CanManageClubLineup.user_can_manage(
+                    user=request.user,
+                    tenant=tenant,
+                    match=match,
+                    club=club,
+                ):
                     return Response({"error": "Usuário não autorizado a bloquear esta escalação."}, status=status.HTTP_403_FORBIDDEN)
 
                 submission = LineupService.lock_lineup(
