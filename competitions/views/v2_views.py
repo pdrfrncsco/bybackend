@@ -395,6 +395,8 @@ class MatchClockActionView(APIView):
                 action=str(action),
                 expected_version=request.data.get("expected_version"),
                 stoppage_time_minutes=request.data.get("stoppage_time_minutes"),
+                home_penalty_score=request.data.get("home_penalty_score"),
+                away_penalty_score=request.data.get("away_penalty_score"),
             )
         except (MatchNotFound, InvalidClockAction, ValueError) as exc:
             return error_response(message=str(exc), status_code=400)

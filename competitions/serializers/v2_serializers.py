@@ -84,6 +84,8 @@ class MatchSerializer(serializers.ModelSerializer):
             "clock_version",
             "home_score",
             "away_score",
+            "home_penalty_score",
+            "away_penalty_score",
             "venue",
         ]
         read_only_fields = [

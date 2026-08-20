@@ -57,13 +57,17 @@ class MatchService:
         "resume_clock",
         "finish_match",
         "set_stoppage_time",
+        "start_extra_time",
+        "start_penalties",
     }
 
     @staticmethod
     @transaction.atomic
     def apply_clock_action(*, tenant: Tenant, match_id: str, action: str,
                            expected_version: int | None = None,
-                           stoppage_time_minutes: int | None = None) -> Match:
+                           stoppage_time_minutes: int | None = None,
+                           home_penalty_score: int | None = None,
+                           away_penalty_score: int | None = None) -> Match:
         """Apply an explicit referee clock command with optimistic concurrency."""
         try:
             match = Match.objects.select_for_update().get(id=match_id, tenant=tenant)
@@ -83,6 +87,10 @@ class MatchService:
         clock_running = match.clock_running
         clock_started_at = match.clock_started_at
         elapsed_seconds = match.clock_elapsed_seconds
+        competition_config = match.competition.config or {}
+        knockout_config = competition_config.get("knockoutStage", {}) if isinstance(competition_config, dict) else {}
+        extra_time_allowed = bool(competition_config.get("extraTimeOnDraw", False) or knockout_config.get("extraTimeOnDraw", False))
+        penalties_allowed = bool(competition_config.get("penaltiesOnDraw", False) or knockout_config.get("penaltiesOnDraw", False))
 
         if action == "start_first_half":
             if match.status != Match.MatchStatus.PRE_MATCH:
@@ -106,9 +114,32 @@ class MatchService:
             period_base = 45 if current_period == Match.MatchPeriod.SECOND_HALF else 0
             elapsed_seconds = max(0, int(match.current_minute - period_base) * 60)
             clock_running, clock_started_at = True, now
-        elif action == "finish_match":
+        elif action == "start_extra_time":
+            if not extra_time_allowed:
+                raise InvalidClockAction("Extra time is not enabled for this competition.")
             if match.status != Match.MatchStatus.LIVE or current_period != Match.MatchPeriod.SECOND_HALF:
-                raise InvalidClockAction("The match can only finish during the second half.")
+                raise InvalidClockAction("Extra time can only start after the second half.")
+            if (match.home_score or 0) != (match.away_score or 0):
+                raise InvalidClockAction("Extra time is only available when the match is drawn.")
+            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.EXTRA_TIME, 90
+            clock_running, clock_started_at, elapsed_seconds = True, now, 0
+        elif action == "start_penalties":
+            if not penalties_allowed:
+                raise InvalidClockAction("Penalty shootout is not enabled for this competition.")
+            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.SECOND_HALF, Match.MatchPeriod.EXTRA_TIME}:
+                raise InvalidClockAction("Penalties can only start after regulation or extra time.")
+            if (match.home_score or 0) != (match.away_score or 0):
+                raise InvalidClockAction("Penalties are only available when the match is drawn.")
+            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.PENALTIES, 120
+            clock_running, clock_started_at, elapsed_seconds = False, None, 0
+        elif action == "finish_match":
+            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.SECOND_HALF, Match.MatchPeriod.EXTRA_TIME, Match.MatchPeriod.PENALTIES}:
+                raise InvalidClockAction("The match can only finish during active play or penalties.")
+            if current_period == Match.MatchPeriod.PENALTIES:
+                if home_penalty_score is None or away_penalty_score is None or int(home_penalty_score) == int(away_penalty_score):
+                    raise InvalidClockAction("A penalty shootout must have a decisive score.")
+                match.home_penalty_score = int(home_penalty_score)
+                match.away_penalty_score = int(away_penalty_score)
             next_status, next_period, next_minute = Match.MatchStatus.FINISHED, Match.MatchPeriod.FULLTIME, 90
             clock_running, clock_started_at = False, None
             elapsed_seconds = 0
@@ -132,6 +163,7 @@ class MatchService:
             "status", "current_period", "current_minute", "clock_running",
             "clock_started_at", "clock_elapsed_seconds", "stoppage_time_minutes",
             "clock_version", "updated_at",
+            "home_penalty_score", "away_penalty_score",
         ])
         publish_event(Event(
             type="MatchClockChanged",

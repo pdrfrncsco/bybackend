@@ -107,6 +107,8 @@ class Match(BaseModel):
     # Results (populated when status = finished or live)
     home_score = models.IntegerField(null=True, blank=True, verbose_name="Home Score")
     away_score = models.IntegerField(null=True, blank=True, verbose_name="Away Score")
+    home_penalty_score = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Home Penalty Shootout Score")
+    away_penalty_score = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Away Penalty Shootout Score")
     
     venue = models.CharField(
         max_length=255,
