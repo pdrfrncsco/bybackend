@@ -41,7 +41,9 @@ class CanManageClubLineup(BasePermission):
     """
 
     message = "You are not authorized to manage this club's lineup."
-    CLUB_ROLES = ("manager", "coach", "assistant_coach")
+    # The club affiliation workflow assigns its owner as president.
+    # Keep this list aligned with ClubService.assert_is_club_admin().
+    CLUB_ROLES = ("president", "manager", "coach", "assistant_coach")
 
     @classmethod
     def user_can_manage(cls, *, user, tenant, match, club) -> bool:
