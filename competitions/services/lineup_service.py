@@ -113,9 +113,15 @@ class LineupService:
             club=club,
         )
         
-        # Check if already locked
-        if submission.status == LineupSubmission.SubmissionStatus.LOCKED:
-            raise LineupAlreadySubmitted("Lineup is locked and cannot be changed")
+        # Only a new or rejected submission can start a review cycle.
+        editable_statuses = {
+            LineupSubmission.SubmissionStatus.PENDING,
+            LineupSubmission.SubmissionStatus.REJECTED,
+        }
+        if submission.status not in editable_statuses:
+            raise LineupAlreadySubmitted(
+                f"Lineup cannot be changed from status '{submission.get_status_display()}'"
+            )
         
         # Validate lineup
         LineupService._validate_lineup(players)
@@ -413,6 +419,12 @@ class LineupService:
         except LineupSubmission.DoesNotExist:
             raise LineupValidationError("Lineup has not been submitted yet")
         
+        if submission.status != LineupSubmission.SubmissionStatus.CONFIRMED:
+            raise LineupValidationError(
+                f"Cannot lock lineup with status '{submission.get_status_display()}'. "
+                "The lineup must be confirmed first."
+            )
+
         submission.lock()
         return submission
 
@@ -426,6 +438,7 @@ class LineupService:
         LineupSubmission.objects.filter(
             tenant=tenant,
             match=match,
+            status=LineupSubmission.SubmissionStatus.CONFIRMED,
         ).update(status=LineupSubmission.SubmissionStatus.LOCKED)
 
     # ─── Player Updates ────────────────────────────────────────────────────────

@@ -320,7 +320,17 @@ class LineupSubmission(BaseModel):
         self.status = self.SubmissionStatus.SUBMITTED
         self.submitted_at = timezone.now()
         self.submitted_by = user
-        self.save(update_fields=["status", "submitted_at", "submitted_by", "updated_at"])
+        # A rejected submission starts a fresh review cycle.
+        self.reviewed_at = None
+        self.reviewed_by = None
+        self.review_notes = ""
+        self.confirmed_at = None
+        self.confirmed_by = None
+        self.save(update_fields=[
+            "status", "submitted_at", "submitted_by",
+            "reviewed_at", "reviewed_by", "review_notes",
+            "confirmed_at", "confirmed_by", "updated_at",
+        ])
 
     def confirm(self, user) -> None:
         """Confirm the lineup."""

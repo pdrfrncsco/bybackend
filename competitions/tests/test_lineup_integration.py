@@ -429,6 +429,26 @@ class TestLineupSubmission(TestCase):
             submitted_by=self.user,
         )
 
+        rejected = LineupService.review_lineup_submission(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            reviewed_by=self.user,
+            approve=False,
+            review_notes="Corrigir o banco.",
+        )
+
+        assert rejected.status == LineupSubmission.SubmissionStatus.REJECTED
+        assert rejected.review_notes == "Corrigir o banco."
+
+        LineupService.submit_lineup(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            players=players,
+            submitted_by=self.user,
+        )
+
         approved = LineupService.review_lineup_submission(
             tenant=self.tenant,
             match=self.match,
@@ -441,26 +461,6 @@ class TestLineupSubmission(TestCase):
         assert approved.status == LineupSubmission.SubmissionStatus.CONFIRMED
         assert approved.review_notes == "Tudo certo."
         assert approved.reviewed_by == self.user
-
-        LineupService.submit_lineup(
-            tenant=self.tenant,
-            match=self.match,
-            club=self.home_club,
-            players=players,
-            submitted_by=self.user,
-        )
-
-        rejected = LineupService.review_lineup_submission(
-            tenant=self.tenant,
-            match=self.match,
-            club=self.home_club,
-            reviewed_by=self.user,
-            approve=False,
-            review_notes="Corrigir o banco.",
-        )
-
-        assert rejected.status == LineupSubmission.SubmissionStatus.REJECTED
-        assert rejected.review_notes == "Corrigir o banco."
 
     def test_lock_lineup(self):
         """Test locking a confirmed lineup."""
@@ -534,6 +534,13 @@ class TestLineupSubmission(TestCase):
             club=self.home_club,
             players=players,
             submitted_by=self.user,
+        )
+
+        LineupService.confirm_lineup(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            confirmed_by=self.user,
         )
 
         LineupService.lock_all_lineups(
