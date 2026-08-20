@@ -148,8 +148,11 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         tenant = get_request_tenant(request)
         if tenant is None:
             return Response(
-                {"error": "Tenant não identificado. Verifica o cabeçalho X-Tenant-ID ou o subdomínio."},
-                status=status.HTTP_401_UNAUTHORIZED
+                {
+                    "error": "Tenant não identificado. Verifica o cabeçalho X-Tenant-ID ou o subdomínio.",
+                    "code": "tenant_context_required",
+                },
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         match_id = self.kwargs.get('match_id')
