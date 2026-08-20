@@ -28,6 +28,11 @@ class InvalidMatchTransition(Exception):
     pass
 
 
+class InvalidClockAction(Exception):
+    """Raised when a clock command is not valid for the current match state."""
+    pass
+
+
 class MatchService:
     """
     Handles match life cycle: scheduling, scoring, and status updates.
@@ -44,6 +49,108 @@ class MatchService:
         Match.MatchStatus.ARCHIVED: set(),
         Match.MatchStatus.CANCELLED: set(),
     }
+
+    CLOCK_ACTIONS = {
+        "start_first_half",
+        "end_first_half",
+        "start_second_half",
+        "resume_clock",
+        "finish_match",
+        "set_stoppage_time",
+    }
+
+    @staticmethod
+    @transaction.atomic
+    def apply_clock_action(*, tenant: Tenant, match_id: str, action: str,
+                           expected_version: int | None = None,
+                           stoppage_time_minutes: int | None = None) -> Match:
+        """Apply an explicit referee clock command with optimistic concurrency."""
+        try:
+            match = Match.objects.select_for_update().get(id=match_id, tenant=tenant)
+        except Match.DoesNotExist:
+            raise MatchNotFound("Match not found.")
+
+        if action not in MatchService.CLOCK_ACTIONS:
+            raise InvalidClockAction(f"Unknown clock action '{action}'.")
+        if expected_version is not None and int(expected_version) != match.clock_version:
+            raise InvalidClockAction("The match clock changed. Refresh before applying this action.")
+
+        now = timezone.now()
+        current_period = match.current_period
+        next_status = match.status
+        next_period = current_period
+        next_minute = match.current_minute
+        clock_running = match.clock_running
+        clock_started_at = match.clock_started_at
+        elapsed_seconds = match.clock_elapsed_seconds
+
+        if action == "start_first_half":
+            if match.status != Match.MatchStatus.PRE_MATCH:
+                raise InvalidClockAction("The first half can only start from pre-match.")
+            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.FIRST_HALF, 0
+            clock_running, clock_started_at, elapsed_seconds = True, now, 0
+        elif action == "end_first_half":
+            if match.status != Match.MatchStatus.LIVE or current_period != Match.MatchPeriod.FIRST_HALF:
+                raise InvalidClockAction("The first half is not currently running.")
+            next_status, next_period, next_minute = Match.MatchStatus.HALFTIME, Match.MatchPeriod.HALFTIME, 45
+            clock_running, clock_started_at = False, None
+            elapsed_seconds = 0
+        elif action == "start_second_half":
+            if match.status != Match.MatchStatus.HALFTIME:
+                raise InvalidClockAction("The second half can only start from halftime.")
+            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.SECOND_HALF, 45
+            clock_running, clock_started_at, elapsed_seconds = True, now, 0
+        elif action == "resume_clock":
+            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.FIRST_HALF, Match.MatchPeriod.SECOND_HALF}:
+                raise InvalidClockAction("The clock can only be resumed during a live half.")
+            period_base = 45 if current_period == Match.MatchPeriod.SECOND_HALF else 0
+            elapsed_seconds = max(0, int(match.current_minute - period_base) * 60)
+            clock_running, clock_started_at = True, now
+        elif action == "finish_match":
+            if match.status != Match.MatchStatus.LIVE or current_period != Match.MatchPeriod.SECOND_HALF:
+                raise InvalidClockAction("The match can only finish during the second half.")
+            next_status, next_period, next_minute = Match.MatchStatus.FINISHED, Match.MatchPeriod.FULLTIME, 90
+            clock_running, clock_started_at = False, None
+            elapsed_seconds = 0
+        elif action == "set_stoppage_time":
+            if match.status not in {Match.MatchStatus.LIVE, Match.MatchStatus.HALFTIME}:
+                raise InvalidClockAction("Stoppage time is only available during live play or halftime.")
+            if stoppage_time_minutes is None or int(stoppage_time_minutes) < 0 or int(stoppage_time_minutes) > 30:
+                raise InvalidClockAction("Stoppage time must be between 0 and 30 minutes.")
+
+        if action == "set_stoppage_time":
+            match.stoppage_time_minutes = int(stoppage_time_minutes)
+        else:
+            match.status = next_status
+            match.current_period = next_period
+            match.current_minute = next_minute
+            match.clock_running = clock_running
+            match.clock_started_at = clock_started_at
+            match.clock_elapsed_seconds = elapsed_seconds
+        match.clock_version += 1
+        match.save(update_fields=[
+            "status", "current_period", "current_minute", "clock_running",
+            "clock_started_at", "clock_elapsed_seconds", "stoppage_time_minutes",
+            "clock_version", "updated_at",
+        ])
+        publish_event(Event(
+            type="MatchClockChanged",
+            tenant_id=str(tenant.id),
+            payload={
+                "match_id": str(match.id),
+                "action": action,
+                "status": match.status,
+                "current_period": match.current_period,
+                "current_minute": match.current_minute,
+                "clock_running": match.clock_running,
+                "clock_started_at": match.clock_started_at.isoformat() if match.clock_started_at else None,
+                "clock_elapsed_seconds": match.clock_elapsed_seconds,
+                "stoppage_time_minutes": match.stoppage_time_minutes,
+                "clock_version": match.clock_version,
+            },
+            origin="competitions.match_clock",
+        ))
+        return match
 
     @staticmethod
     @transaction.atomic

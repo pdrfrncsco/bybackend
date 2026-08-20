@@ -81,6 +81,28 @@ class Match(BaseModel):
         verbose_name="Current Minute",
         help_text="Live minute value for the current period.",
     )
+    clock_running = models.BooleanField(
+        default=False,
+        verbose_name="Clock Running",
+    )
+    clock_started_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Clock Started At",
+    )
+    clock_elapsed_seconds = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Clock Elapsed Seconds",
+        help_text="Elapsed seconds in the current period when the clock is paused or last synchronised.",
+    )
+    stoppage_time_minutes = models.PositiveSmallIntegerField(
+        default=0,
+        verbose_name="Stoppage Time Minutes",
+    )
+    clock_version = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Clock Version",
+    )
     
     # Results (populated when status = finished or live)
     home_score = models.IntegerField(null=True, blank=True, verbose_name="Home Score")

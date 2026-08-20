@@ -23,7 +23,7 @@ from competitions.models import Competition, Match, Standing
 from competitions.selectors import CompetitionSelector, CompetitionRegistrationSelector, MatchSelector, StandingSelector
 from competitions.services.competition_registration_service import CompetitionRegistrationService, ClubAlreadyRegistered
 from competitions.services.competition_format_service import CompetitionFormatService
-from competitions.services.match_service import MatchService, MatchNotFound, InvalidMatchTransition
+from competitions.services.match_service import MatchService, MatchNotFound, InvalidMatchTransition, InvalidClockAction
 from competitions.permissions import IsMatchEventOperator
 from competitions.services.standing_service import StandingService
 from competitions.serializers.v2_serializers import (
@@ -376,6 +376,29 @@ class MatchTransitionView(APIView):
         except (MatchNotFound, InvalidMatchTransition, ValueError) as exc:
             return error_response(message=str(exc), status_code=400)
         return success_response(data=MatchSerializer(match).data, message="Match transition applied.")
+
+
+class MatchClockActionView(APIView):
+    """POST: execute an explicit, permission-protected match clock command."""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsMatchEventOperator]
+
+    def post(self, request, match_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        action = request.data.get("action")
+        if not action:
+            return error_response(message="action is required.", status_code=400)
+        try:
+            match = MatchService.apply_clock_action(
+                tenant=tenant,
+                match_id=match_id,
+                action=str(action),
+                expected_version=request.data.get("expected_version"),
+                stoppage_time_minutes=request.data.get("stoppage_time_minutes"),
+            )
+        except (MatchNotFound, InvalidClockAction, ValueError) as exc:
+            return error_response(message=str(exc), status_code=400)
+        return success_response(data=MatchSerializer(match).data, message="Match clock action applied.")
 
 
 class CompetitionStandingListView(APIView):
