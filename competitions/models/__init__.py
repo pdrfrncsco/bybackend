@@ -9,6 +9,7 @@ from competitions.models.player_suspension import PlayerSuspension
 from competitions.models.regulation import CompetitionRegulation
 from competitions.models.standing import Standing
 from competitions.models.tactical_positions import TacticalPositions
+from competitions.models.match_clock_action import MatchClockAction
 
 __all__ = [
     "Competition",
@@ -25,4 +26,5 @@ __all__ = [
     "CompetitionRegulation",
     "Standing",
     "TacticalPositions",
+    "MatchClockAction",
 ]

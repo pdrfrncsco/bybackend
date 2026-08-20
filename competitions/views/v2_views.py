@@ -393,6 +393,7 @@ class MatchClockActionView(APIView):
                 tenant=tenant,
                 match_id=match_id,
                 action=str(action),
+                actor=request.user,
                 expected_version=request.data.get("expected_version"),
                 stoppage_time_minutes=request.data.get("stoppage_time_minutes"),
                 home_penalty_score=request.data.get("home_penalty_score"),

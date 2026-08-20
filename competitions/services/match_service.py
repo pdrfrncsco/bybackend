@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from core.models import Tenant
 from clubs.models import Club
-from competitions.models import Competition, CompetitionRegistration, Match
+from competitions.models import Competition, CompetitionRegistration, Match, MatchClockAction
 from competitions.services.standing_service import StandingService
 from core.events import Event, EventType, publish_event
 
@@ -66,6 +66,7 @@ class MatchService:
     @staticmethod
     @transaction.atomic
     def apply_clock_action(*, tenant: Tenant, match_id: str, action: str,
+                           actor=None,
                            expected_version: int | None = None,
                            stoppage_time_minutes: int | None = None,
                            home_penalty_score: int | None = None,
@@ -81,6 +82,9 @@ class MatchService:
         if expected_version is not None and int(expected_version) != match.clock_version:
             raise InvalidClockAction("The match clock changed. Refresh before applying this action.")
 
+        status_before = match.status
+        period_before = match.current_period or ""
+        minute_before = match.current_minute
         now = timezone.now()
         current_period = match.current_period
         next_status = match.status
@@ -177,6 +181,24 @@ class MatchService:
             "clock_version", "updated_at",
             "home_penalty_score", "away_penalty_score",
         ])
+        MatchClockAction.objects.create(
+            match=match,
+            tenant=tenant,
+            actor=actor,
+            action=action,
+            status_before=status_before,
+            status_after=match.status,
+            period_before=period_before,
+            period_after=match.current_period or "",
+            minute_before=minute_before,
+            minute_after=match.current_minute,
+            clock_version=match.clock_version,
+            metadata={
+                "stoppage_time_minutes": match.stoppage_time_minutes,
+                "home_penalty_score": match.home_penalty_score,
+                "away_penalty_score": match.away_penalty_score,
+            },
+        )
         publish_event(Event(
             type="MatchClockChanged",
             tenant_id=str(tenant.id),

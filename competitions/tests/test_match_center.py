@@ -13,7 +13,7 @@ from accounts.models.membership import TenantMembership
 from clubs.models import Club
 from core.models import Tenant
 from players.models import Player
-from competitions.models import Competition, CompetitionRegistration, Match, MatchEvent, MatchReport, Standing
+from competitions.models import Competition, CompetitionRegistration, Match, MatchEvent, MatchReport, Standing, MatchClockAction
 from competitions.services.match_event_service import (
     MatchEventService, InvalidMatchEventData, MatchEventNotFound
 )
@@ -227,6 +227,52 @@ class MatchLifecycleServiceTestCase(TestCase):
             MatchService.transition_match(
                 tenant=self.tenant, match_id=str(self.match.id), status="archived"
             )
+
+    def test_clock_actions_record_periods_and_audit(self):
+        MatchService.transition_match(tenant=self.tenant, match_id=str(self.match.id), status="pre_match")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="start_first_half")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="end_first_half")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="start_second_half")
+        self.match.refresh_from_db()
+        self.assertEqual(self.match.current_period, Match.MatchPeriod.SECOND_HALF)
+        self.assertTrue(self.match.clock_running)
+        self.assertEqual(MatchClockAction.objects.filter(match=self.match).count(), 3)
+
+    def test_clock_rejects_stale_version(self):
+        from competitions.services.match_service import InvalidClockAction
+        MatchService.transition_match(tenant=self.tenant, match_id=str(self.match.id), status="pre_match")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="start_first_half")
+        with self.assertRaises(InvalidClockAction):
+            MatchService.apply_clock_action(
+                tenant=self.tenant,
+                match_id=str(self.match.id),
+                action="end_first_half",
+                expected_version=0,
+            )
+
+    def test_extra_time_and_penalty_shootout_flow(self):
+        self.comp.config = {"extraTimeOnDraw": True, "penaltiesOnDraw": True}
+        self.comp.save(update_fields=["config"])
+        self.match.status = Match.MatchStatus.LIVE
+        self.match.current_period = Match.MatchPeriod.SECOND_HALF
+        self.match.home_score = 1
+        self.match.away_score = 1
+        self.match.clock_running = True
+        self.match.save(update_fields=["status", "current_period", "home_score", "away_score", "clock_running"])
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="start_extra_time")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="end_extra_first_half")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="start_extra_second_half")
+        MatchService.apply_clock_action(tenant=self.tenant, match_id=str(self.match.id), action="start_penalties")
+        match = MatchService.apply_clock_action(
+            tenant=self.tenant,
+            match_id=str(self.match.id),
+            action="finish_match",
+            home_penalty_score=5,
+            away_penalty_score=4,
+        )
+        self.assertEqual(match.status, Match.MatchStatus.FINISHED)
+        self.assertEqual(match.home_penalty_score, 5)
+        self.assertEqual(match.away_penalty_score, 4)
 
 
 class MatchCenterAPITestCase(TestCase):

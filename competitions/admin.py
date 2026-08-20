@@ -14,6 +14,7 @@ from competitions.models import (
     Standing,
     PlayerSuspension,
     TacticalPositions,
+    MatchClockAction,
 )
 
 @admin.register(Competition)
@@ -76,6 +77,27 @@ class MatchEventAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return request.method in ("GET", "HEAD")
+
+@admin.register(MatchClockAction)
+class MatchClockActionAdmin(admin.ModelAdmin):
+    list_display = ("match", "action", "actor", "status_before", "status_after", "period_before", "period_after", "created_at")
+    list_filter = ("action", "status_before", "status_after", "period_after", "match__competition")
+    search_fields = ("match__home_club__name", "match__away_club__name", "actor__email")
+    readonly_fields = (
+        "match", "tenant", "actor", "action", "status_before", "status_after",
+        "period_before", "period_after", "minute_before", "minute_after",
+        "clock_version", "metadata", "created_at", "updated_at",
+    )
+    list_select_related = ("match", "actor", "tenant")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 @admin.register(MatchLineup)
 class MatchLineupAdmin(admin.ModelAdmin):
