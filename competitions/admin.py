@@ -13,6 +13,7 @@ from competitions.models import (
     MatchStats,
     Standing,
     PlayerSuspension,
+    TacticalPositions,
 )
 
 @admin.register(Competition)
@@ -45,17 +46,36 @@ class CompetitionRegulationAdmin(admin.ModelAdmin):
 
 @admin.register(Match)
 class MatchAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "match_date", "status", "phase", "group_id", "tenant")
-    list_filter = ("status", "competition")
+    list_display = ("__str__", "match_date", "status", "current_period", "current_minute", "phase", "tenant")
+    list_filter = ("status", "current_period", "competition", "phase")
     search_fields = ("home_club__name", "away_club__name", "competition__name")
+    date_hierarchy = "match_date"
+    list_select_related = ("competition", "home_club", "away_club", "tenant")
+    ordering = ("-match_date", "round_number")
     readonly_fields = ("created_at", "updated_at")
 
 @admin.register(MatchEvent)
 class MatchEventAdmin(admin.ModelAdmin):
-    list_display = ("__str__", "match", "event_type", "minute", "player")
-    list_filter = ("event_type", "match__competition")
-    search_fields = ("player__first_name", "player__last_name", "match__home_club__name", "match__away_club__name")
+    list_display = ("__str__", "match", "event_type", "minute", "extra_time", "club", "player", "idempotency_key")
+    list_filter = ("event_type", "extra_time", "match__status", "match__competition")
+    search_fields = (
+        "idempotency_key", "player__first_name", "player__last_name",
+        "club__name", "match__home_club__name", "match__away_club__name",
+    )
+    list_select_related = ("match", "club", "player", "player_off", "tenant")
+    ordering = ("-created_at", "-minute")
     readonly_fields = ("created_at", "updated_at")
+
+    # Event creation/removal must go through MatchEventService so score,
+    # player stats, notifications and domain events stay consistent.
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return request.method in ("GET", "HEAD")
 
 @admin.register(MatchLineup)
 class MatchLineupAdmin(admin.ModelAdmin):
@@ -70,13 +90,18 @@ class LineupSubmissionAdmin(admin.ModelAdmin):
     list_filter = ("status", "match__competition")
     search_fields = ("club__name", "match__home_club__name", "match__away_club__name")
     readonly_fields = ("created_at", "updated_at", "submitted_at")
+    list_select_related = ("match", "club", "submitted_by", "confirmed_by")
 
 @admin.register(MatchReport)
 class MatchReportAdmin(admin.ModelAdmin):
     list_display = ("match", "status", "home_score", "away_score", "generated_at")
     list_filter = ("status", "match__competition")
     search_fields = ("match__home_club__name", "match__away_club__name")
-    readonly_fields = ("created_at", "updated_at", "generated_at", "finalized_at")
+    readonly_fields = (
+        "created_at", "updated_at", "generated_at", "finalized_at",
+        "requested_at", "requested_by", "finalized_by", "generated_by",
+    )
+    list_select_related = ("match", "match__competition")
 
 @admin.register(Goal)
 class GoalAdmin(admin.ModelAdmin):
@@ -91,6 +116,7 @@ class MatchStatsAdmin(admin.ModelAdmin):
     list_filter = ("match__competition",)
     search_fields = ("club__name",)
     readonly_fields = ("created_at", "updated_at")
+    list_select_related = ("match", "club")
 
 @admin.register(Standing)
 class StandingAdmin(admin.ModelAdmin):
@@ -105,3 +131,12 @@ class PlayerSuspensionAdmin(admin.ModelAdmin):
     list_filter = ("suspension_type", "status", "competition")
     search_fields = ("player__first_name", "player__last_name", "competition__name")
     readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(TacticalPositions)
+class TacticalPositionsAdmin(admin.ModelAdmin):
+    list_display = ("match", "club", "version", "updated_at", "tenant")
+    list_filter = ("match__competition",)
+    search_fields = ("club__name", "match__home_club__name", "match__away_club__name")
+    list_select_related = ("match", "club", "tenant")
+    readonly_fields = ("created_at", "updated_at", "version")
