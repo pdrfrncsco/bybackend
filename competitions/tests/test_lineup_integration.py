@@ -13,7 +13,7 @@ import uuid
 
 from core.models import Tenant
 from players.models import Player
-from clubs.models import Club
+from clubs.models import Club, ClubMember
 from competitions.models import (
     Competition, CompetitionRegistration, Match, MatchLineup, LineupSubmission, MatchReport, Goal
 )
@@ -22,6 +22,7 @@ from competitions.services.lineup_service import (
 )
 from competitions.services.match_report_service import MatchReportService
 from competitions.services.fair_play_service import FairPlayService
+from competitions.permissions import CanManageClubLineup
 
 User = get_user_model()
 
@@ -153,6 +154,7 @@ class TestLineupSubmission(TestCase):
             email="testuser@example.com",
             password="testpass123",
         )
+        self.user.activate()
 
     def _create_valid_lineup(self):
         """Helper to create a valid 11-player starting lineup."""
@@ -249,6 +251,22 @@ class TestLineupSubmission(TestCase):
                 "shirt_number": 13,
             },
         ]
+
+    def test_club_president_can_manage_lineup(self):
+        """The owner assigned as club president can manage the lineup."""
+        ClubMember.objects.create(
+            club=self.home_club,
+            user=self.user,
+            role="president",
+            is_active=True,
+        )
+
+        assert CanManageClubLineup.user_can_manage(
+            user=self.user,
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+        ) is True
 
     def test_submit_valid_lineup(self):
         """Test submitting a valid lineup."""
