@@ -58,6 +58,8 @@ class MatchService:
         "finish_match",
         "set_stoppage_time",
         "start_extra_time",
+        "end_extra_first_half",
+        "start_extra_second_half",
         "start_penalties",
     }
 
@@ -121,19 +123,29 @@ class MatchService:
                 raise InvalidClockAction("Extra time can only start after the second half.")
             if (match.home_score or 0) != (match.away_score or 0):
                 raise InvalidClockAction("Extra time is only available when the match is drawn.")
-            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.EXTRA_TIME, 90
+            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.EXTRA_FIRST_HALF, 90
+            clock_running, clock_started_at, elapsed_seconds = True, now, 0
+        elif action == "end_extra_first_half":
+            if match.status != Match.MatchStatus.LIVE or current_period != Match.MatchPeriod.EXTRA_FIRST_HALF:
+                raise InvalidClockAction("The first extra-time period is not currently running.")
+            next_status, next_period, next_minute = Match.MatchStatus.HALFTIME, Match.MatchPeriod.EXTRA_HALFTIME, 105
+            clock_running, clock_started_at, elapsed_seconds = False, None, 0
+        elif action == "start_extra_second_half":
+            if match.status != Match.MatchStatus.HALFTIME or current_period != Match.MatchPeriod.EXTRA_HALFTIME:
+                raise InvalidClockAction("The second extra-time period can only start from its interval.")
+            next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.EXTRA_SECOND_HALF, 105
             clock_running, clock_started_at, elapsed_seconds = True, now, 0
         elif action == "start_penalties":
             if not penalties_allowed:
                 raise InvalidClockAction("Penalty shootout is not enabled for this competition.")
-            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.SECOND_HALF, Match.MatchPeriod.EXTRA_TIME}:
+            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.SECOND_HALF, Match.MatchPeriod.EXTRA_TIME, Match.MatchPeriod.EXTRA_SECOND_HALF}:
                 raise InvalidClockAction("Penalties can only start after regulation or extra time.")
             if (match.home_score or 0) != (match.away_score or 0):
                 raise InvalidClockAction("Penalties are only available when the match is drawn.")
             next_status, next_period, next_minute = Match.MatchStatus.LIVE, Match.MatchPeriod.PENALTIES, 120
             clock_running, clock_started_at, elapsed_seconds = False, None, 0
         elif action == "finish_match":
-            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.SECOND_HALF, Match.MatchPeriod.EXTRA_TIME, Match.MatchPeriod.PENALTIES}:
+            if match.status != Match.MatchStatus.LIVE or current_period not in {Match.MatchPeriod.SECOND_HALF, Match.MatchPeriod.EXTRA_TIME, Match.MatchPeriod.EXTRA_FIRST_HALF, Match.MatchPeriod.EXTRA_SECOND_HALF, Match.MatchPeriod.PENALTIES}:
                 raise InvalidClockAction("The match can only finish during active play or penalties.")
             if current_period == Match.MatchPeriod.PENALTIES:
                 if home_penalty_score is None or away_penalty_score is None or int(home_penalty_score) == int(away_penalty_score):
