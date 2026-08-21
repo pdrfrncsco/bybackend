@@ -293,6 +293,21 @@ class TestLineupSubmission(TestCase):
         )
         assert lineup_entries.count() == 13
 
+    def test_submit_valid_lineup_during_pre_match(self):
+        """Pre-match is an open window for club lineup submission."""
+        self.match.status = Match.MatchStatus.PRE_MATCH
+        self.match.save(update_fields=["status", "updated_at"])
+
+        submission = LineupService.submit_lineup(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            players=self._create_valid_lineup(),
+            submitted_by=self.user,
+        )
+
+        assert submission.status == LineupSubmission.SubmissionStatus.SUBMITTED
+
     def test_cannot_submit_empty_lineup(self):
         """Test that empty lineup is rejected."""
         with pytest.raises(LineupValidationError):

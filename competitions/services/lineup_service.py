@@ -97,7 +97,11 @@ class LineupService:
             PlayerNotEligible: If player is suspended
         """
         # Check if match allows lineup submission
-        if match.status not in [Match.MatchStatus.SCHEDULED, Match.MatchStatus.POSTPONED]:
+        if match.status not in [
+            Match.MatchStatus.SCHEDULED,
+            Match.MatchStatus.PRE_MATCH,
+            Match.MatchStatus.POSTPONED,
+        ]:
             raise LineupValidationError(
                 f"Cannot submit lineup for match with status '{match.get_status_display()}'"
             )
