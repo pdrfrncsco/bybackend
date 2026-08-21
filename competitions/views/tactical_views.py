@@ -18,14 +18,14 @@ class TacticalPositionsViewSet(viewsets.ViewSet):
         # Use default DRF permission flow; custom checks happen in methods
         return []
 
-    def list(self, request, match_pk=None):
-        return self.retrieve(request, match_pk)
+    def list(self, request, match_id=None):
+        return self.retrieve(request, match_id=match_id)
 
-    def retrieve(self, request, match_pk=None):
+    def retrieve(self, request, match_id=None):
         tenant = get_request_tenant(request)
         club_id = request.query_params.get('club')
 
-        qs = TacticalPositions.objects.filter(match_id=match_pk)
+        qs = TacticalPositions.objects.filter(match_id=match_id)
         if club_id:
             qs = qs.filter(club_id=club_id)
         if tenant:
@@ -38,7 +38,7 @@ class TacticalPositionsViewSet(viewsets.ViewSet):
         })
         return Response({'data': serializer.data})
 
-    def create(self, request, match_pk=None):
+    def create(self, request, match_id=None):
         tenant = get_request_tenant(request)
         if tenant is None:
             return Response({"error": "Tenant not identified"}, status=status.HTTP_401_UNAUTHORIZED)
@@ -57,7 +57,7 @@ class TacticalPositionsViewSet(viewsets.ViewSet):
             return Response({"error": "User not permitted to modify tactical positions for this club."}, status=status.HTTP_403_FORBIDDEN)
 
         try:
-            tp_qs = TacticalPositions.objects.filter(match_id=match_pk, club_id=club_id)
+            tp_qs = TacticalPositions.objects.filter(match_id=match_id, club_id=club_id)
             if tenant:
                 tp_qs = tp_qs.filter(tenant=tenant)
             tp_obj = tp_qs.first()
@@ -77,7 +77,7 @@ class TacticalPositionsViewSet(viewsets.ViewSet):
                 return Response({'data': serializer_out.data}, status=status.HTTP_200_OK)
             else:
                 club = Club.objects.get(id=club_id)
-                tp_new = TacticalPositions.objects.create(tenant=tenant, match_id=match_pk, club=club, positions=positions)
+                tp_new = TacticalPositions.objects.create(tenant=tenant, match_id=match_id, club=club, positions=positions)
                 serializer_out = TacticalPositionsSerializer({
                     'match': str(tp_new.match_id), 'club': str(tp_new.club_id), 'positions': tp_new.positions, 'version': tp_new.version, 'updated_at': tp_new.updated_at
                 })
