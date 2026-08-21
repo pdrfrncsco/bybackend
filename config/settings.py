@@ -253,6 +253,13 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 
+# Tenant context is sent by the authenticated frontend client. Keep the
+# default django-cors-headers values and explicitly allow this custom header
+# for browser preflight requests.
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = (*default_headers, "x-tenant-id")
+
 # ─────────────────────────────────────────────────────────────────────
 # SPECTACULAR (OpenAPI)
 # ─────────────────────────────────────────────────────────────────────
