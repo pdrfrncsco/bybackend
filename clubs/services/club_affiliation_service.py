@@ -3,7 +3,8 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
-from accounts.models import User
+from accounts.constants import MembershipRole
+from accounts.models import TenantMembership, User
 from clubs.constants import ClubMemberRole, ClubStatus
 from clubs.exceptions import DuplicateClubAffiliationRequest, DuplicateClubName
 from clubs.models import Club, ClubAffiliationRequest, ClubMember
@@ -14,6 +15,23 @@ logger = logging.getLogger(__name__)
 
 
 class ClubAffiliationService:
+    @staticmethod
+    def _ensure_tenant_membership_for_submitter(
+        *, request_obj: ClubAffiliationRequest
+    ) -> None:
+        """Grant the approved club owner access to the parent tenant."""
+        if not request_obj.submitted_by_id:
+            return
+
+        TenantMembership.objects.update_or_create(
+            user_id=request_obj.submitted_by_id,
+            tenant_id=request_obj.tenant_id,
+            defaults={
+                "role": MembershipRole.MEMBER,
+                "is_active": True,
+            },
+        )
+
     @staticmethod
     def _ensure_club_for_request(*, request_obj: ClubAffiliationRequest) -> Club:
         club = request_obj.club
@@ -103,8 +121,9 @@ class ClubAffiliationService:
         approve: bool,
         review_notes: str = "",
     ) -> ClubAffiliationRequest:
-        # Repair case: already approved but missing club reference
-        if request_obj.status == ClubAffiliationRequest.Status.APPROVED and request_obj.club_id is None:
+        # Repair/idempotency case: approved requests may already have been
+        # partially processed by the model signal or an older code path.
+        if request_obj.status == ClubAffiliationRequest.Status.APPROVED:
             club = ClubAffiliationService._ensure_club_for_request(request_obj=request_obj)
             # Activate and assign membership if needed
             if club.status != ClubStatus.ACTIVE:
@@ -117,6 +136,9 @@ class ClubAffiliationService:
                         "role": ClubMemberRole.PRESIDENT,
                         "is_active": True,
                     },
+                )
+                ClubAffiliationService._ensure_tenant_membership_for_submitter(
+                    request_obj=request_obj
                 )
             request_obj.save(update_fields=["club", "updated_at"])
             logger.info("Approved club affiliation request repaired: %s", request_obj.id)
@@ -146,6 +168,9 @@ class ClubAffiliationService:
                         "role": ClubMemberRole.PRESIDENT,
                         "is_active": True,
                     },
+                )
+                ClubAffiliationService._ensure_tenant_membership_for_submitter(
+                    request_obj=request_obj
                 )
 
             request_obj.status = ClubAffiliationRequest.Status.APPROVED

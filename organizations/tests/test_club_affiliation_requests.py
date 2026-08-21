@@ -72,6 +72,24 @@ class ClubAffiliationRequestAPITestCase(TestCase):
                 is_active=True,
             ).exists()
         )
+        self.assertTrue(
+            TenantMembership.objects.filter(
+                user=self.user,
+                tenant=self.tenant,
+                role="member",
+                is_active=True,
+            ).exists()
+        )
+
+        self.client.force_authenticate(user=self.user)
+        memberships_response = self.client.get("/api/v1/auth/me/memberships/")
+        self.assertEqual(memberships_response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            any(
+                str(membership["tenant"]) == str(self.tenant.id)
+                for membership in memberships_response.data["data"]
+            )
+        )
 
     def test_review_club_affiliation_request_rejects(self):
         request_obj = ClubAffiliationRequest.objects.create(
@@ -121,6 +139,14 @@ class ClubAffiliationRequestAPITestCase(TestCase):
                 club=request_obj.club,
                 user=self.user,
                 role=ClubMemberRole.PRESIDENT,
+                is_active=True,
+            ).exists()
+        )
+        self.assertTrue(
+            TenantMembership.objects.filter(
+                user=self.user,
+                tenant=self.tenant,
+                role="member",
                 is_active=True,
             ).exists()
         )
