@@ -250,3 +250,41 @@ tenant is being accessed and also ch...
   vinculado à organização FAF e já pode
   submeter convocatórias e escalações sem
   qualquer aviso de tenant não identificado. 
+
+
+
+
+
+
+
+  A auditoria está completa. Aqui está o resumo dos principais achados:
+  ──────
+  ## Resultado da Auditoria Visual — Páginas Públicas
+  ### 🔴 Problemas Críticos (3)
+
+  1. Componentes UI existem mas não são usados em lado nenhum — <Button>, <Input>, <Card> estão implementados mas todas as
+  páginas públicas reinventam os mesmos elementos com classes Tailwind inline. Existem 5 variações diferentes do mesmo botão
+  primário espalhadas pelo código.
+  2. Sistema de border-radius inconsistente — O tailwind.config.ts define rounded-xl = 8px, mas as páginas também usam rounded-
+  2xl (24px), rounded-[2rem] (32px), rounded-[1.5rem] — fora da escala configurada, criando 4+ raios sem intenção documentada.
+  3. 3 tokens em falta — warning, 2xl (spacing) e title-lg (font) são usados em produção mas não estão definidos em tailwind.
+  config.ts.
+  ### 🟠 Problemas Graves (2)
+
+  4. inputClass copiado-colado em 4 ficheiros — Com uma variação ligeiramente diferente no ResetPasswordPage (bug silencioso de
+  border-outline-variant em falta).
+  5. Hierarquia tipográfica inconsistente — ForgotPasswordPage e ResetPasswordPage usam text-headline-md (que nem está definido
+  no config!), enquanto as outras auth pages usam text-headline-lg.
+
+  ### Plano de Refatoração
+
+  O plano está organizado em 5 Fases com um checklist executável:
+
+  • Fase 1 — Completar tokens no design system (pré-requisito de tudo)
+  • Fase 2 — Criar 3 componentes partilhados (AuthCard, AuthHeading, AuthFormField) e substituir <Button> em 6 páginas
+  • Fase 3 — Normalizar tipografia
+  • Fase 4 — Corrigir estrutura de layout
+  • Fase 5 — Limpeza de cores e tokens
+
+  Quer que eu comece a implementar as fases? Posso começar pela Fase 1 (tokens do design system) e Fase 2 (criação dos
+  componentes partilhados) que são as mudanças de maior impacto.
