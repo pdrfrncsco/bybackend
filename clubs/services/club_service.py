@@ -32,6 +32,7 @@ from clubs.selectors import ClubSelector
 from clubs.validators import validate_logo_file
 from core.events import EventType
 from core.models import Tenant
+from media_assets.constants import AssetVisibility
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +122,7 @@ class ClubService:
 
     @staticmethod
     @transaction.atomic
-    def upload_logo(*, club: Club, logo_file, uploaded_by: User = None) -> Club:
+    def upload_logo(*, club: Club, logo_file=None, file=None, uploaded_by: User = None) -> Club:
         """
         Upload a logo for a club via DAM (Digital Asset Management).
 
@@ -130,6 +131,10 @@ class ClubService:
 
         See: 08A_DIGITAL_ASSET_MANAGEMENT.md
         """
+        logo_file = logo_file or file
+        if logo_file is None:
+            raise InvalidLogoFile(detail="No logo file provided.")
+
         validate_logo_file(logo_file)
 
         from media_assets.exceptions import (
@@ -140,14 +145,15 @@ class ClubService:
         from media_assets.services import MediaAssetService
 
         try:
-            asset = MediaAssetService.upload_asset(
+            asset = MediaAssetService.upload_for_owner(
                 file=logo_file,
                 owner_type="club",
                 owner_id=str(club.id),
+                name=getattr(logo_file, "name", "Club logo"),
                 tenant=club.tenant,
                 uploaded_by=uploaded_by,
                 role="logo",
-                is_public=True,
+                visibility=AssetVisibility.PUBLIC,
             )
         except (InvalidMediaFile, MediaAssetTooLarge, UnsupportedMediaType) as exc:
             raise InvalidLogoFile(detail=str(exc.detail)) from exc

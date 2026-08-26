@@ -131,7 +131,7 @@ class ClubLogoView(APIView):
                 status_code=400,
             )
 
-        club = ClubService.upload_logo(club=club, file=file)
+        club = ClubService.upload_logo(club=club, logo_file=file, uploaded_by=request.user)
 
         return success_response(
             data=ClubSerializer(club).data,
