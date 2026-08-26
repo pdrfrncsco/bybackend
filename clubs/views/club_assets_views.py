@@ -23,6 +23,7 @@ from clubs.services import ClubDocumentService, ClubSponsorService
 from clubs.permissions import IsClubAdmin
 from common.pagination import StandardPagination
 from common.responses import created_response, error_response, not_found_response, success_response
+from media_assets.models import MediaAsset
 
 
 def _get_club(*, slug: str, tenant=None, public_only: bool = False) -> Club:
@@ -62,12 +63,17 @@ class ClubDocumentsView(APIView):
         serializer = ClubDocumentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        asset = MediaAsset.objects.filter(id=serializer.validated_data.get("asset"), tenant=club.tenant).first()
+        if serializer.validated_data.get("asset") and not asset:
+            return error_response(message="Asset not found in the club tenant.", status_code=404)
+
         document = ClubDocumentService.upload_document(
             club=club,
             tenant=club.tenant,
             title=serializer.validated_data["title"],
             category=serializer.validated_data["category"],
-            document=serializer.validated_data["document"],
+            document=serializer.validated_data.get("document"),
+            asset=asset,
             description=serializer.validated_data.get("description", ""),
             is_public=serializer.validated_data.get("is_public", False),
             valid_until=serializer.validated_data.get("valid_until"),
@@ -127,6 +133,10 @@ class ClubSponsorsView(APIView):
         serializer = ClubSponsorCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        logo_asset = MediaAsset.objects.filter(id=serializer.validated_data.get("logo_asset"), tenant=club.tenant).first()
+        if serializer.validated_data.get("logo_asset") and not logo_asset:
+            return error_response(message="Logo asset not found in the club tenant.", status_code=404)
+
         sponsor = ClubSponsorService.create_sponsor(
             club=club,
             tenant=club.tenant,
@@ -135,6 +145,7 @@ class ClubSponsorsView(APIView):
             description=serializer.validated_data.get("description", ""),
             website=serializer.validated_data.get("website"),
             logo=serializer.validated_data.get("logo"),
+            logo_asset=logo_asset,
             is_active=serializer.validated_data.get("is_active", True),
             sort_order=serializer.validated_data.get("sort_order", 0),
             uploaded_by=request.user,

@@ -22,12 +22,16 @@ class ClubSponsorService:
         description: str = "",
         website: str | None = None,
         logo=None,
+        logo_asset=None,
         is_active: bool = True,
         sort_order: int = 0,
         uploaded_by=None,
     ) -> ClubSponsor:
         logo_asset = None
-        if logo is not None:
+        if logo_asset is not None:
+            if logo_asset.tenant_id != tenant.id:
+                raise ValueError("Logo asset does not belong to the club tenant.")
+        elif logo is not None:
             logo_asset = MediaAssetService.upload_for_owner(
                 file=logo,
                 owner_type=OwnerType.CLUB,

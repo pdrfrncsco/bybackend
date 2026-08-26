@@ -134,6 +134,8 @@ class PlayerAchievementListView(APIView):
                 club=club,
                 trophy_image_file=validated.get("trophy_image"),
                 certificate_file=validated.get("certificate"),
+                trophy_asset_id=validated.get("trophy_asset"),
+                certificate_asset_id=validated.get("certificate_asset"),
                 trophy_image_url=validated.get("trophy_image_url", ""),
                 certificate_url=validated.get("certificate_url", ""),
                 stats_snapshot=validated.get("stats_snapshot"),

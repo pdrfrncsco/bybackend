@@ -89,16 +89,18 @@ class PlayerAchievementCreateSerializer(serializers.Serializer):
     club = serializers.UUIDField(required=False, allow_null=True)
     trophy_image = serializers.FileField(required=False)
     certificate = serializers.FileField(required=False)
+    trophy_asset = serializers.UUIDField(required=False)
+    certificate_asset = serializers.UUIDField(required=False)
     trophy_image_url = serializers.URLField(required=False, allow_blank=True, default="")
     certificate_url = serializers.URLField(required=False, allow_blank=True, default="")
     stats_snapshot = serializers.JSONField(required=False, allow_null=True)
 
     def validate(self, data):
-        if data.get("trophy_image") and data.get("trophy_image_url"):
+        if (data.get("trophy_image") or data.get("trophy_asset")) and data.get("trophy_image_url"):
             raise serializers.ValidationError(
                 "Provide either trophy_image file or trophy_image_url, not both."
             )
-        if data.get("certificate") and data.get("certificate_url"):
+        if (data.get("certificate") or data.get("certificate_asset")) and data.get("certificate_url"):
             raise serializers.ValidationError(
                 "Provide either certificate file or certificate_url, not both."
             )

@@ -47,7 +47,15 @@ class ClubDocumentCreateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=255)
     category = serializers.ChoiceField(choices=ClubDocument.Category.choices, default=ClubDocument.Category.OTHER)
     description = serializers.CharField(required=False, allow_blank=True, default="")
-    document = serializers.FileField()
+    document = serializers.FileField(required=False)
+    asset = serializers.UUIDField(required=False)
+
+    def validate(self, data):
+        if not data.get("document") and not data.get("asset"):
+            raise serializers.ValidationError("Provide either document file or asset UUID.")
+        if data.get("document") and data.get("asset"):
+            raise serializers.ValidationError("Provide either document file or asset UUID, not both.")
+        return data
     is_public = serializers.BooleanField(required=False, default=False)
     valid_until = serializers.DateField(required=False, allow_null=True)
 

@@ -20,12 +20,13 @@ class ClubDocumentService:
         title: str,
         category: str,
         document,
+        asset=None,
         description: str = "",
         is_public: bool = False,
         valid_until=None,
         uploaded_by=None,
     ) -> ClubDocument:
-        asset = MediaAssetService.upload_for_owner(
+        asset = asset or MediaAssetService.upload_for_owner(
             file=document,
             owner_type=OwnerType.CLUB,
             owner_id=club.id,

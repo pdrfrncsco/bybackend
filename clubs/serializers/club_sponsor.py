@@ -50,6 +50,7 @@ class ClubSponsorCreateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True, default="")
     website = serializers.URLField(required=False, allow_null=True, allow_blank=True)
     logo = serializers.FileField(required=False, allow_null=True)
+    logo_asset = serializers.UUIDField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False, default=True)
     sort_order = serializers.IntegerField(required=False, default=0, min_value=0)
 
@@ -60,5 +61,6 @@ class ClubSponsorUpdateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     website = serializers.URLField(required=False, allow_null=True, allow_blank=True)
     logo = serializers.FileField(required=False, allow_null=True)
+    logo_asset = serializers.UUIDField(required=False, allow_null=True)
     is_active = serializers.BooleanField(required=False)
     sort_order = serializers.IntegerField(required=False, min_value=0)

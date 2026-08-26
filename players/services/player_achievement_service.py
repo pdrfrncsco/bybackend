@@ -54,6 +54,8 @@ class PlayerAchievementService:
         club=None,
         trophy_image_file=None,
         certificate_file=None,
+        trophy_asset_id=None,
+        certificate_asset_id=None,
         trophy_image_url: str = "",
         certificate_url: str = "",
         stats_snapshot=None,
@@ -63,6 +65,14 @@ class PlayerAchievementService:
         certificate_asset = None
         resolved_trophy_url = trophy_image_url or None
         resolved_certificate_url = certificate_url or None
+
+        from media_assets.models import MediaAsset
+        trophy_asset = MediaAsset.objects.filter(id=trophy_asset_id, tenant=player.tenant).first() if trophy_asset_id else None
+        certificate_asset = MediaAsset.objects.filter(id=certificate_asset_id, tenant=player.tenant).first() if certificate_asset_id else None
+        if trophy_asset_id and not trophy_asset:
+            raise ValueError("Trophy asset not found in the player's tenant.")
+        if certificate_asset_id and not certificate_asset:
+            raise ValueError("Certificate asset not found in the player's tenant.")
 
         try:
             if trophy_image_file:
