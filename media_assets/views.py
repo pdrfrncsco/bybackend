@@ -28,16 +28,19 @@ from common.pagination import StandardPagination
 from common.responses import (
     created_response,
     error_response,
+    no_content_response,
     success_response,
 )
 from media_assets.constants import AssetCategory, AssetVisibility, OwnerType
 from media_assets.exceptions import MediaAssetNotFound
-from media_assets.models import MediaAsset
-from media_assets.selectors import MediaAssetSelector
+from media_assets.models import MediaAsset, MediaUsage
+from media_assets.selectors import MediaAssetSelector, MediaUsageSelector
 from media_assets.serializers import (
     MediaAssetListSerializer,
     MediaAssetSerializer,
     MediaAssetUploadSerializer,
+    MediaUsageCreateSerializer,
+    MediaUsageSerializer,
 )
 from media_assets.services import MediaAssetService
 
@@ -304,3 +307,121 @@ class MediaAssetSignedUrlView(APIView):
         return success_response(
             data={"url": signed_url, "is_signed": True, "expires_in": expires_in},
         )
+
+
+class MediaUsageView(APIView):
+    """List usages for an owner or link an existing asset to an owner."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        tags=["media"],
+        summary="List or create media usages",
+        parameters=[
+            OpenApiParameter("owner_type", str, required=True),
+            OpenApiParameter("owner_id", str, required=True),
+        ],
+        request=MediaUsageCreateSerializer,
+        responses=MediaUsageSerializer,
+    )
+    def get(self, request):
+        owner_type = request.query_params.get("owner_type")
+        owner_id = request.query_params.get("owner_id")
+        if not owner_type or not owner_id:
+            return error_response(
+                message="owner_type e owner_id são obrigatórios.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        membership = _get_user_membership(user=request.user)
+        if not membership or not _owner_belongs_to_tenant(
+            owner_type=owner_type,
+            owner_id=owner_id,
+            tenant=membership.tenant,
+        ):
+            return error_response(
+                message="Owner não pertence ao tenant autenticado.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        usages = MediaUsageSelector.get_all_for_owner(
+            owner_type=owner_type,
+            owner_id=owner_id,
+        )
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(usages, request)
+        return paginator.get_paginated_response(MediaUsageSerializer(page, many=True).data)
+
+    def post(self, request):
+        serializer = MediaUsageCreateSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                message="Dados de associação inválidos.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        membership = _get_user_membership(user=request.user)
+        if not membership:
+            return error_response(
+                message="Sem permissão para associar media neste tenant.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        data = serializer.validated_data
+        if not _owner_belongs_to_tenant(
+            owner_type=data["owner_type"],
+            owner_id=data["owner_id"],
+            tenant=membership.tenant,
+        ):
+            return error_response(
+                message="Owner não pertence ao tenant autenticado.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        asset = MediaAssetSelector.get_by_id(asset_id=data["asset_id"])
+        if not asset or asset.tenant_id != membership.tenant_id:
+            return error_response(
+                message="Asset não encontrado neste tenant.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        usage = MediaUsage.replace_for(
+            owner_type=data["owner_type"],
+            owner_id=data["owner_id"],
+            role=data["role"],
+            new_asset=asset,
+        )
+        return created_response(
+            data=MediaUsageSerializer(usage).data,
+            message="Asset associado com sucesso.",
+        )
+
+
+class MediaUsageDetailView(APIView):
+    """Deactivate a media usage without deleting its asset."""
+
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, usage_id: str):
+        usage = MediaUsage.objects.select_related("asset").filter(id=usage_id).first()
+        membership = _get_user_membership(user=request.user)
+        if not usage or not membership or usage.asset.tenant_id != membership.tenant_id:
+            return error_response(
+                message="Utilização de media não encontrada.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not _owner_belongs_to_tenant(
+            owner_type=usage.owner_type,
+            owner_id=usage.owner_id,
+            tenant=membership.tenant,
+        ):
+            return error_response(
+                message="Owner não pertence ao tenant autenticado.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        usage.is_active = False
+        usage.save(update_fields=["is_active", "updated_at"])
+        return no_content_response()

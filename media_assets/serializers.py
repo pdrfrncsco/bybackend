@@ -4,6 +4,7 @@ BOLAYETU — Media Asset Serializers
 
 from rest_framework import serializers
 
+from media_assets.constants import AssetCategory, OwnerType
 from media_assets.models import MediaAsset, MediaVariant, MediaUsage
 
 
@@ -113,3 +114,12 @@ class MediaUsageSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+
+class MediaUsageCreateSerializer(serializers.Serializer):
+    """Input serializer for linking an existing asset to an owner."""
+
+    asset_id = serializers.UUIDField()
+    owner_type = serializers.ChoiceField(choices=OwnerType.choices)
+    owner_id = serializers.UUIDField()
+    role = serializers.ChoiceField(choices=AssetCategory.choices)

@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 from accounts.models import TenantMembership
 from core.models import Tenant
 from media_assets.constants import AssetCategory, AssetType, AssetVisibility, OwnerType
-from media_assets.models import MediaAsset
+from media_assets.models import MediaAsset, MediaUsage
 
 
 User = get_user_model()
@@ -127,3 +127,63 @@ class MediaAssetTenantAccessTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_user_can_list_and_associate_asset_usage_in_own_tenant(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        list_response = self.client.get(
+            "/api/v1/media/usage/",
+            {"owner_type": OwnerType.ORGANIZATION, "owner_id": str(self.tenant_a.id)},
+        )
+
+        self.assertEqual(list_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_response.data["data"]["results"], [])
+
+        create_response = self.client.post(
+            "/api/v1/media/usage/",
+            {
+                "asset_id": str(self.asset_a.id),
+                "owner_type": OwnerType.ORGANIZATION,
+                "owner_id": str(self.tenant_a.id),
+                "role": AssetCategory.LOGO,
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(create_response.data["data"]["asset"]["id"], str(self.asset_a.id))
+        self.assertTrue(MediaUsage.objects.filter(asset=self.asset_a, is_active=True).exists())
+
+    def test_user_cannot_associate_asset_from_other_tenant(self):
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.post(
+            "/api/v1/media/usage/",
+            {
+                "asset_id": str(self.asset_b.id),
+                "owner_type": OwnerType.ORGANIZATION,
+                "owner_id": str(self.tenant_a.id),
+                "role": AssetCategory.LOGO,
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertFalse(MediaUsage.objects.filter(asset=self.asset_b).exists())
+
+    def test_user_can_unlink_usage_without_deleting_asset(self):
+        usage = MediaUsage.replace_for(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role=AssetCategory.LOGO,
+            new_asset=self.asset_a,
+        )
+        self.client.force_authenticate(user=self.user_a)
+
+        response = self.client.delete(f"/api/v1/media/usage/{usage.id}/")
+
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+        usage.refresh_from_db()
+        self.asset_a.refresh_from_db()
+        self.assertFalse(usage.is_active)
+        self.assertNotEqual(self.asset_a.status, "deleted")

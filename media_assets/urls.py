@@ -9,11 +9,15 @@ from media_assets.views import (
     MediaAssetListView,
     MediaAssetSignedUrlView,
     MediaAssetUploadView,
+    MediaUsageDetailView,
+    MediaUsageView,
 )
 
 app_name = "media_assets"
 
 urlpatterns = [
+    path("usage/", MediaUsageView.as_view(), name="usage"),
+    path("usage/<uuid:usage_id>/", MediaUsageDetailView.as_view(), name="usage-detail"),
     # Upload
     path("upload/", MediaAssetUploadView.as_view(), name="upload"),
     # List
