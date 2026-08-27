@@ -404,6 +404,40 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
         self.assertFalse(payload["has_player_profile"])
         self.assertEqual(payload["next_step"], "profile")
 
+    def test_player_can_create_and_link_own_profile(self):
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/v1/players/me/",
+            {
+                "first_name": "Ana",
+                "last_name": "Mendes",
+                "date_of_birth": "2001-04-02",
+                "nationality": "Angolana",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Player.objects.get(user=self.user).first_name, "Ana")
+
+    def test_player_cannot_create_a_second_profile(self):
+        Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            user=self.user,
+            status="active",
+        )
+        self.client.force_authenticate(user=self.user)
+
+        response = self.client.post(
+            "/api/v1/players/me/",
+            {"first_name": "Outra", "last_name": "Pessoa"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+
     def test_status_requires_basic_info_and_specific_position(self):
         Player.objects.create(
             first_name="Ana",
@@ -435,7 +469,7 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
             status="active",
         )
         from players.services.onboarding_service import PlayerOnboardingService
-        for step in ["contact", "documents", "club", "review"]:
+        for step in ["contact", "club", "review"]:
             PlayerOnboardingService.complete_step(player, step)
 
         self.client.force_authenticate(user=self.user)
@@ -460,7 +494,7 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
             status="active",
         )
         from players.services.onboarding_service import PlayerOnboardingService
-        for step in ["personal", "football", "contact", "documents", "club", "review"]:
+        for step in ["personal", "football", "contact", "club", "review"]:
             PlayerOnboardingService.complete_step(player, step)
 
         self.client.force_authenticate(user=self.user)
@@ -471,6 +505,19 @@ class PlayerOnboardingStatusViewTestCase(TestCase):
         payload = response.data["data"]
         self.assertFalse(payload["onboarding_required"])
         self.assertEqual(payload["next_step"], None)
+
+    def test_documents_step_is_not_part_of_onboarding(self):
+        player = Player.objects.create(
+            first_name="Ana",
+            last_name="Mendes",
+            user=self.user,
+            primary_position="multiple",
+            status="active",
+        )
+        from players.services.onboarding_service import PlayerOnboardingService
+
+        with self.assertRaisesMessage(ValueError, "Documents are not part of player onboarding"):
+            PlayerOnboardingService.complete_step(player, "documents")
 
     def test_complete_identity_step_advances_to_personal(self):
         Player.objects.create(

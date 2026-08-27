@@ -6,7 +6,7 @@ from common.models import BaseModel
 class PlayerOnboardingStatus(BaseModel):
     """Tracks player onboarding progress through multiple steps.
 
-    Onboarding is a multi-step process: account → identity → personal → football → contact → guardian → documents → club → review.
+    Onboarding is a multi-step process: account → identity → personal → football → contact → guardian → club → review.
     Each step has a completion flag and optional data payload.
     """
 
@@ -28,7 +28,6 @@ class PlayerOnboardingStatus(BaseModel):
         Steps.FOOTBALL,
         Steps.CONTACT,
         Steps.GUARDIAN,
-        Steps.DOCUMENTS,
         Steps.CLUB,
         Steps.REVIEW,
     ]
@@ -79,7 +78,6 @@ class PlayerOnboardingStatus(BaseModel):
             self.football_complete,
             self.contact_complete,
             # guardian_complete may not apply to all players (adults)
-            self.documents_complete,
             self.club_complete,
             self.review_complete,
         ])
@@ -96,7 +94,6 @@ class PlayerOnboardingStatus(BaseModel):
                 self.football_complete,
                 self.contact_complete,
                 self.guardian_complete,
-                self.documents_complete,
                 self.club_complete,
                 self.review_complete,
             ])
@@ -108,12 +105,10 @@ class PlayerOnboardingStatus(BaseModel):
                 self.personal_complete,
                 self.football_complete,
                 self.contact_complete,
-                self.documents_complete,
                 self.club_complete,
                 self.review_complete,
             ])
-            total_steps -= 1
-        
+
         return int((completed / total_steps * 100)) if total_steps > 0 else 0
 
     def get_next_step(self) -> str | None:

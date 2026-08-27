@@ -16,7 +16,6 @@ class PlayerOnboardingStatusSerializer(serializers.ModelSerializer):
             'football_complete',
             'contact_complete',
             'guardian_complete',
-            'documents_complete',
             'club_complete',
             'review_complete',
             'completed_at',

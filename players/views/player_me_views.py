@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from common.responses import error_response, success_response
+from players.models import Player
 from players.permissions import CanManagePlayerProfile
 from players.selectors import PlayerSelector
 from players.serializers import PlayerDetailSerializer, PlayerSerializer
@@ -57,7 +58,6 @@ def build_onboarding_status_data(player, status):
         "football_complete": status.football_complete,
         "contact_complete": status.contact_complete,
         "guardian_complete": status.guardian_complete,
-        "documents_complete": status.documents_complete,
         "club_complete": status.club_complete,
         "review_complete": status.review_complete,
         "progress_percentage": status.progress_percentage,
@@ -107,6 +107,43 @@ class PlayerMeView(APIView):
     """
 
     permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        """Create and link the authenticated user's player profile."""
+        try:
+            PlayerService.get_player_for_user(request.user)
+        except NoPlayerProfile:
+            pass
+        else:
+            return error_response(message="A player profile is already linked to this account.", status_code=409)
+
+        first_name = str(request.data.get("first_name", "")).strip()
+        last_name = str(request.data.get("last_name", "")).strip()
+        if not first_name or not last_name:
+            return error_response(message="first_name and last_name are required.", status_code=400)
+
+        try:
+            player = PlayerService.create_player(
+                first_name=first_name,
+                last_name=last_name,
+                date_of_birth=request.data.get("date_of_birth") or None,
+                nationality=request.data.get("nationality") or None,
+                primary_position=request.data.get("primary_position", Player.Position.MULTIPLE),
+                height_cm=request.data.get("height_cm"),
+                weight_kg=request.data.get("weight_kg"),
+                foot=request.data.get("foot"),
+                bio=request.data.get("bio"),
+                avatar=request.data.get("avatar"),
+                user_id=request.user.id,
+            )
+        except Exception as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return success_response(
+            data=PlayerSerializer(player).data,
+            message="Player profile created successfully.",
+            status_code=201,
+        )
 
     @extend_schema(
         tags=["players"],

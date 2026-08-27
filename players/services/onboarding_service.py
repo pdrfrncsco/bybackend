@@ -13,7 +13,6 @@ class PlayerOnboardingService:
         "football",
         "contact",
         "guardian",
-        "documents",
         "club",
         "review",
     ]
@@ -35,6 +34,8 @@ class PlayerOnboardingService:
         status = PlayerOnboardingService.get_status(player)
         if step == "profile":
             step = "personal"
+        if step == "documents":
+            raise ValueError("Documents are not part of player onboarding")
         field = f"{step}_complete"
         if not hasattr(status, field):
             raise ValueError("Unknown onboarding step")
