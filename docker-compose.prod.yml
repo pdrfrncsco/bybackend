@@ -1,0 +1,74 @@
+name: by-backend
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: by-backend-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env.production.local}
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env.production.local}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production.local}
+    volumes:
+      - by_backend_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: by-backend-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - by_backend_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - internal
+
+  app:
+    build:
+      context: .
+    container_name: by-backend
+    env_file:
+      - .env.production.local
+    environment:
+      DB_ENGINE: django.db.backends.postgresql
+      DB_HOST: db
+      DB_PORT: "5432"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # Bound to loopback only — the VPS's native Nginx reverse-proxies to this
+    # port. The port must never be reachable from outside the host directly.
+    ports:
+      - "127.0.0.1:${BACKEND_HTTP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/liveness/')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - internal
+
+volumes:
+  by_backend_postgres_data:
+  by_backend_redis_data:
+
+networks:
+  internal:
