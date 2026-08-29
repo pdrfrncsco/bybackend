@@ -11,6 +11,8 @@ echo "======================================================"
 
 wait_for_postgres() {
   echo "[entrypoint] Waiting for PostgreSQL at ${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}..."
+  max_attempts="${POSTGRES_WAIT_MAX_ATTEMPTS:-30}"
+  attempts=0
   until python -c "
 import os, sys
 import psycopg2
@@ -26,6 +28,11 @@ try:
 except Exception:
     sys.exit(1)
 "; do
+    attempts=$((attempts + 1))
+    if [ "$attempts" -ge "$max_attempts" ]; then
+      echo "[entrypoint] PostgreSQL did not become ready after ${max_attempts} attempts."
+      exit 1
+    fi
     echo "[entrypoint] PostgreSQL not ready — retrying in 2s..."
     sleep 2
   done

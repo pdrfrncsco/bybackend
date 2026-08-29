@@ -73,6 +73,22 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+### Docker local
+
+O perfil local publica a API em `http://localhost:8008`, usa PostgreSQL e Redis
+em containers, permite os frontends locais nas portas 3000 e 5173, e não exige
+TLS/Nginx.
+
+```bash
+docker compose --env-file .env.docker.local -f docker-compose.prod.yml up --build
+```
+
+Para parar os serviços:
+
+```bash
+docker compose --env-file .env.docker.local -f docker-compose.prod.yml down
+```
+
 ### Credenciais de Teste
 
 - **Email:** admin@bolayetu.com

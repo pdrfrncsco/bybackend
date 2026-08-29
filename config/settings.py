@@ -500,7 +500,9 @@ if not DEBUG:
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
     X_FRAME_OPTIONS = "DENY"
-    SECURE_SSL_REDIRECT = True
+    # Production keeps HTTPS mandatory by default. Local Docker can opt out
+    # while it runs without a TLS-terminating reverse proxy.
+    SECURE_SSL_REDIRECT = os.environ.get("SECURE_SSL_REDIRECT", "True").lower() in ("true", "1", "yes")
     # Health checks hit this container directly over plain HTTP (Docker
     # HEALTHCHECK, native Nginx upstream probes) — exempt them so they are
     # never redirected to HTTPS.

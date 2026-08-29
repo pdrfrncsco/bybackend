@@ -42,6 +42,7 @@ static/*
 .env.local
 .env.production
 .env.staging
+.env.docker.local
 
 # Virtual environment
 venv/
