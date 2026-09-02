@@ -60,21 +60,14 @@ INSTALLED_APPS = [
     # Bolayetu — Infrastructure
     "common",
     "core",
-    # Bolayetu — Global Domain (Phase 2)
     "players",
-    # Bolayetu — Domains (Phase 1)
     "accounts",
-    # Bolayetu — Domains (Phase 2)
     "organizations",
     "clubs",
-    "competitions",
-    # Bolayetu — Analytics (Phase 4)
+    "competitions", 
     "analytics",
-    # Bolayetu — Transfers (Phase 7)
     "transfers",
-    # Bolayetu — DAM (Phase 1 — Digital Asset Management)
     "media_assets",
-    # Bolayetu — Notifications & Subscriptions (Phase 5)
     "notifications",
 ]
 
@@ -83,10 +76,10 @@ INSTALLED_APPS = [
 # ─────────────────────────────────────────────────────────────────────
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "core.middleware.TenantMiddleware",
@@ -429,6 +422,9 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "Bolayetu <noreply@bol
 
 # Frontend base URL used in password reset links
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+# Optional HTTP webhook used by notifications.tasks for push delivery.
+NOTIFICATION_PUSH_ENDPOINT = os.environ.get("NOTIFICATION_PUSH_ENDPOINT", "")
 
 
 # ─────────────────────────────────────────────────────────────────────
