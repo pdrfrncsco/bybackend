@@ -29,6 +29,7 @@ from competitions.selectors import CompetitionSelector
 from common.responses import (
     success_response, created_response, not_found_response, error_response
 )
+from common.renderers import ServerSentEventsRenderer
 from organizations.permissions import IsOrganizationAdmin
 from competitions.permissions import IsMatchEventOperator
 from organizations.services import OrganizationService
@@ -220,6 +221,7 @@ class MatchStreamView(APIView):
     """Authenticated SSE stream for one match; HTTP polling remains the fallback."""
 
     permission_classes = []
+    renderer_classes = [ServerSentEventsRenderer]
     POLL_INTERVAL = 2
 
     @staticmethod

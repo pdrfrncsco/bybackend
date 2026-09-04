@@ -12,6 +12,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from django.contrib.auth import get_user_model
 
 from common.pagination import StandardPagination
+from common.renderers import ServerSentEventsRenderer
 
 from .models import Notification
 from .serializers import NotificationSerializer
@@ -75,6 +76,7 @@ class NotificationStreamView(APIView):
     """
 
     permission_classes = []  # Auth handled manually via query param
+    renderer_classes = [ServerSentEventsRenderer]
     POLL_INTERVAL = 15  # seconds between checks
 
     def _authenticate_token(self, request):
