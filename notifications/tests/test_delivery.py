@@ -26,6 +26,9 @@ class DeliveryTest(TestCase):
         self.assertEqual(response["Content-Type"].split(";", 1)[0], "text/event-stream")
         self.assertIn("event: init", next(iter(response.streaming_content)).decode())
 
+    def test_notification_stream_duration_is_below_worker_timeout(self):
+        self.assertLess(NotificationStreamView.MAX_STREAM_DURATION, 30)
+
     def test_send_notification_email_sync_updates_status_and_sends_email(self):
         notif = Notification.objects.create(type='TestEmail', payload={'msg': 'hello'})
         send_notification_email_sync(notif.id)

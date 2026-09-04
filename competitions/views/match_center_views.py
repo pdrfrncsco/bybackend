@@ -223,6 +223,7 @@ class MatchStreamView(APIView):
     permission_classes = []
     renderer_classes = [ServerSentEventsRenderer]
     POLL_INTERVAL = 2
+    MAX_STREAM_DURATION = 20
 
     @staticmethod
     def _event(name, payload):
@@ -264,9 +265,14 @@ class MatchStreamView(APIView):
         def stream():
             last_match_updated = None
             last_event_updated = None
+            started_at = time.monotonic()
             yield self._event("snapshot", {"match": MatchSerializer(match).data})
             while True:
-                time.sleep(self.POLL_INTERVAL)
+                remaining = self.MAX_STREAM_DURATION - (time.monotonic() - started_at)
+                if remaining <= 0:
+                    return
+
+                time.sleep(min(self.POLL_INTERVAL, remaining))
                 current = Match.objects.select_related("home_club", "away_club", "competition").get(id=match.id)
                 current_updated = str(current.updated_at)
                 if current_updated != last_match_updated:

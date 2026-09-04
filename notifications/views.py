@@ -78,6 +78,7 @@ class NotificationStreamView(APIView):
     permission_classes = []  # Auth handled manually via query param
     renderer_classes = [ServerSentEventsRenderer]
     POLL_INTERVAL = 15  # seconds between checks
+    MAX_STREAM_DURATION = 20  # Keep below Gunicorn's worker timeout.
 
     def _authenticate_token(self, request):
         """Validate JWT from query param and return the User or None."""
@@ -95,9 +96,10 @@ class NotificationStreamView(APIView):
         return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
     def _stream(self, user):
-        """Generator that yields SSE messages until the client disconnects."""
+        """Yield a bounded SSE stream so synchronous workers are released."""
         last_unread = -1
         last_check = timezone.now()
+        started_at = time.monotonic()
 
         # Emit initial snapshot immediately
         unread = Notification.objects.filter(
@@ -107,7 +109,11 @@ class NotificationStreamView(APIView):
         yield self._event("init", {"unread": unread})
 
         while True:
-            time.sleep(self.POLL_INTERVAL)
+            remaining = self.MAX_STREAM_DURATION - (time.monotonic() - started_at)
+            if remaining <= 0:
+                return
+
+            time.sleep(min(self.POLL_INTERVAL, remaining))
             now = timezone.now()
 
             # Check for new notifications since last poll
