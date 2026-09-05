@@ -9,6 +9,15 @@ from clubs.models import Club
 from competitions.constants import CompetitionStatus
 from competitions.models import Competition, CompetitionRegistration
 from players.models import Player, PlayerRegistration, PlayerRegistrationRequest
+from players.events.types import (
+    PLAYER_REGISTRATION_INVITATION_ACCEPTED,
+    PLAYER_REGISTRATION_INVITATION_CREATED,
+    PLAYER_REGISTRATION_INVITATION_REJECTED,
+    PLAYER_REGISTRATION_REQUEST_APPROVED,
+    PLAYER_REGISTRATION_REQUEST_REJECTED,
+    PLAYER_REGISTRATION_REQUEST_SUBMITTED,
+    publish_registration_request_event,
+)
 from players.services import PlayerRegistrationConflict, PlayerRegistrationService
 
 logger = logging.getLogger(__name__)
@@ -101,6 +110,9 @@ class PlayerRegistrationRequestService:
             club.name,
             request.id,
         )
+        publish_registration_request_event(
+            PLAYER_REGISTRATION_REQUEST_SUBMITTED, request, actor_id=submitted_by.id if submitted_by else None
+        )
         return request
 
     @staticmethod
@@ -166,6 +178,9 @@ class PlayerRegistrationRequestService:
             player.full_name,
             request.id,
         )
+        publish_registration_request_event(
+            PLAYER_REGISTRATION_INVITATION_CREATED, request, actor_id=invited_by.id
+        )
         return request
 
     @staticmethod
@@ -202,6 +217,11 @@ class PlayerRegistrationRequestService:
             "Player registration request reviewed: %s (%s)",
             request_obj.id,
             request_obj.status,
+        )
+        publish_registration_request_event(
+            PLAYER_REGISTRATION_REQUEST_APPROVED if approve else PLAYER_REGISTRATION_REQUEST_REJECTED,
+            request_obj,
+            actor_id=reviewed_by.id,
         )
         return request_obj
 
@@ -243,5 +263,28 @@ class PlayerRegistrationRequestService:
             "Player registration request accepted: %s by %s",
             request_obj.id,
             accepted_by.email,
+        )
+        publish_registration_request_event(
+            PLAYER_REGISTRATION_INVITATION_ACCEPTED, request_obj, actor_id=accepted_by.id
+        )
+        return request_obj
+
+    @staticmethod
+    @transaction.atomic
+    def decline_invitation(
+        *, request_obj: PlayerRegistrationRequest, declined_by: User, review_notes: str = ""
+    ) -> PlayerRegistrationRequest:
+        """Decline a club invitation, atomically and exactly once."""
+        request_obj = PlayerRegistrationRequest.objects.select_for_update().get(pk=request_obj.pk)
+        if request_obj.status != PlayerRegistrationRequest.Status.INVITED:
+            raise RequestAlreadyReviewed("This registration invitation cannot be declined in its current state.")
+
+        request_obj.status = PlayerRegistrationRequest.Status.REJECTED
+        request_obj.review_notes = review_notes
+        request_obj.reviewed_by = declined_by
+        request_obj.reviewed_at = timezone.now()
+        request_obj.save(update_fields=["status", "review_notes", "reviewed_by", "reviewed_at", "updated_at"])
+        publish_registration_request_event(
+            PLAYER_REGISTRATION_INVITATION_REJECTED, request_obj, actor_id=declined_by.id
         )
         return request_obj

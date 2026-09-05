@@ -24,6 +24,14 @@ PLAYER_SEASON_STATISTICS_UPDATED = "players.player.season_statistics.updated"
 PLAYER_INVITE_CREATED = "players.player.invite.created"
 PLAYER_INVITE_REDEEMED = "players.player.invite.redeemed"
 
+# Player ↔ club registration request lifecycle
+PLAYER_REGISTRATION_REQUEST_SUBMITTED = "players.player.registration_request.submitted"
+PLAYER_REGISTRATION_INVITATION_CREATED = "players.player.registration_invitation.created"
+PLAYER_REGISTRATION_REQUEST_APPROVED = "players.player.registration_request.approved"
+PLAYER_REGISTRATION_REQUEST_REJECTED = "players.player.registration_request.rejected"
+PLAYER_REGISTRATION_INVITATION_ACCEPTED = "players.player.registration_invitation.accepted"
+PLAYER_REGISTRATION_INVITATION_REJECTED = "players.player.registration_invitation.rejected"
+
 # Phase 3 events (Professional)
 PLAYER_CONTRACT_SIGNED = "players.player.contract.signed"
 PLAYER_CONTRACT_RENEWED = "players.player.contract.renewed"
@@ -99,6 +107,29 @@ def publish_invite_redeemed(invite_id: str, email: str, token: str, redeemed_at:
         "redeemed_by_user_id": str(redeemed_by_user_id) if redeemed_by_user_id else None,
     }
     _publish(PLAYER_INVITE_REDEEMED, payload, tenant_id=tenant_id)
+
+
+def publish_registration_request_event(event_type: str, request, *, actor_id: Optional[str] = None) -> None:
+    """Publish a persisted registration-request lifecycle event.
+
+    The payload intentionally contains IDs only, keeping event delivery
+    independent from ORM instances and safe to retry after commit.
+    """
+    payload = {
+        "request_id": str(request.id),
+        "player_id": str(request.player_id),
+        "player_user_id": str(request.player.user_id) if request.player.user_id else None,
+        "club_id": str(request.club_id),
+        "competition_id": str(request.competition_id) if request.competition_id else None,
+        "status": request.status,
+        "review_notes": request.review_notes,
+    }
+    _publish(
+        event_type,
+        payload,
+        user_id=str(actor_id) if actor_id else None,
+        tenant_id=str(request.tenant_id),
+    )
 
 
 def publish_player_contract_signed(contract_id: str, player_id: str, club_id: str, start_date: str, end_date: str, user_id: Optional[str] = None, tenant_id: Optional[str] = None) -> None:

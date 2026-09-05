@@ -46,6 +46,7 @@ from players.views.player_onboarding_views import PlayerOnboardingCompleteStepVi
 from players.views.player_registration_request_views import (
     PlayerMeRegistrationRequestListCreateView,
     PlayerAcceptRegistrationRequestView,
+    PlayerDeclineRegistrationRequestView,
 )
 from players.views.player_document_views import (
     PlayerDocumentListView,
@@ -114,6 +115,7 @@ urlpatterns = [
     path("me/avatar/", PlayerAvatarView.as_view(), name="player-me-avatar"),
     path("me/registration-requests/", PlayerMeRegistrationRequestListCreateView.as_view(), name="player-me-registration-requests"),
     path("me/registration-requests/<uuid:request_id>/accept/", PlayerAcceptRegistrationRequestView.as_view(), name="player-me-registration-request-accept"),
+    path("me/registration-requests/<uuid:request_id>/decline/", PlayerDeclineRegistrationRequestView.as_view(), name="player-me-registration-request-decline"),
     path("<slug:slug>/", PlayerDetailUpdateView.as_view(), name="player-detail-update"),
     path("<slug:slug>/avatar/", PlayerAvatarView.as_view(), name="player-avatar"),
     path("<slug:slug>/register/", PlayerRegisterView.as_view(), name="player-register"),

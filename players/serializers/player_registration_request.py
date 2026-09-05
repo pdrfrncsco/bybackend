@@ -63,3 +63,7 @@ class PlayerRegistrationRequestCreateSerializer(serializers.Serializer):
 class PlayerRegistrationRequestReviewSerializer(serializers.Serializer):
     approve = serializers.BooleanField()
     review_notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class PlayerRegistrationRequestDeclineSerializer(serializers.Serializer):
+    review_notes = serializers.CharField(required=False, allow_blank=True, default="")

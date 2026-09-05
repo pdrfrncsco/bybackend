@@ -12,6 +12,7 @@ from common.responses import created_response, error_response, success_response
 from players.permissions import CanManagePlayerProfile
 from players.serializers.player_registration_request import (
     PlayerRegistrationRequestCreateSerializer,
+    PlayerRegistrationRequestDeclineSerializer,
     PlayerRegistrationRequestSerializer,
 )
 from players.services import NoPlayerProfile, PlayerService, PlayerRegistrationConflict
@@ -171,3 +172,38 @@ class PlayerAcceptRegistrationRequestView(APIView):
             data=output.data,
             message="Registration request accepted successfully.",
         )
+
+
+class PlayerDeclineRegistrationRequestView(APIView):
+    """POST /api/v1/players/me/registration-requests/{id}/decline/"""
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(
+        tags=["players"],
+        request=PlayerRegistrationRequestDeclineSerializer,
+        responses={200: PlayerRegistrationRequestSerializer},
+    )
+    def post(self, request, request_id):
+        try:
+            player = PlayerService.get_player_for_user(request.user)
+            registration_request = PlayerRegistrationRequest.objects.get(id=request_id, player=player)
+        except (NoPlayerProfile, PlayerRegistrationRequest.DoesNotExist):
+            return error_response(message="Registration request not found.", status_code=404)
+
+        if not CanManagePlayerProfile.can_manage(user=request.user, player=player):
+            return error_response(message="You do not have permission to decline this request.", status_code=403)
+
+        serializer = PlayerRegistrationRequestDeclineSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            registration_request = PlayerRegistrationRequestService.decline_invitation(
+                request_obj=registration_request,
+                declined_by=request.user,
+                review_notes=serializer.validated_data.get("review_notes", ""),
+            )
+        except RequestAlreadyReviewed as exc:
+            return error_response(message=str(exc), status_code=409)
+
+        output = PlayerRegistrationRequestSerializer(registration_request)
+        return success_response(data=output.data, message="Registration invitation declined successfully.")
