@@ -50,6 +50,7 @@ urlpatterns = router.urls + [
     path("me/standings/", ClubMeStandingsView.as_view(), name="club-me-standings"),
     path("me/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-me-player-registration-requests"),
     path("me/player-registration-requests/<uuid:request_id>/", ClubMePlayerRegistrationRequestReviewView.as_view(), name="club-me-player-registration-request-review"),
+    path("<uuid:club_id>/competitions/", ClubCompetitionListView.as_view(), name="club-competitions"),
     path("<uuid:club_id>/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-player-registration-requests"),
     path(
         "<uuid:club_id>/player-registration-requests/<uuid:request_id>/",

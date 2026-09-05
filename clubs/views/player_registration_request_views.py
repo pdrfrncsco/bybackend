@@ -32,7 +32,7 @@ class ClubMePlayerRegistrationRequestsView(APIView):
         tags=["clubs"],
         responses={200: PlayerRegistrationRequestSerializer(many=True)},
     )
-    def get(self, request):
+    def get(self, request, club_id=None):
         club_id = self.kwargs.get("club_id")
         club = ClubService.get_club_and_verify_admin(user=request.user, club_id=club_id) if club_id else ClubService.get_club_for_user(user=request.user)
 
