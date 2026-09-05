@@ -18,6 +18,7 @@ from players.services import NoPlayerProfile, PlayerService, PlayerRegistrationC
 from players.services.player_registration_request_service import (
     DuplicatePlayerRegistrationRequest,
     PlayerRegistrationRequestService,
+    RequestAlreadyReviewed,
 )
 from players.models import PlayerRegistrationRequest
 
@@ -154,6 +155,8 @@ class PlayerAcceptRegistrationRequestView(APIView):
                 request_obj=registration_request,
                 accepted_by=request.user,
             )
+        except RequestAlreadyReviewed as exc:
+            return error_response(message=str(exc), status_code=409)
         except ValueError as exc:
             return error_response(message=str(exc), status_code=400)
         except Exception as exc:

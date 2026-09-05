@@ -15,7 +15,10 @@ from players.serializers.player_registration_request import (
     PlayerRegistrationRequestReviewSerializer,
     PlayerRegistrationRequestSerializer,
 )
-from players.services.player_registration_request_service import PlayerRegistrationRequestService
+from players.services.player_registration_request_service import (
+    PlayerRegistrationRequestService,
+    RequestAlreadyReviewed,
+)
 
 
 class ClubMePlayerRegistrationRequestsView(APIView):
@@ -77,6 +80,8 @@ class ClubMePlayerRegistrationRequestReviewView(APIView):
                 approve=serializer.validated_data["approve"],
                 review_notes=serializer.validated_data.get("review_notes", ""),
             )
+        except RequestAlreadyReviewed as exc:
+            return error_response(message=str(exc), status_code=409)
         except ValueError as exc:
             return error_response(message=str(exc), status_code=400)
 

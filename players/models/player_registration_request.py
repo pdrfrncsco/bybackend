@@ -88,6 +88,44 @@ class PlayerRegistrationRequest(BaseModel):
             models.Index(fields=["player", "status"]),
             models.Index(fields=["tenant", "status"]),
         ]
+        constraints = [
+            # A nullable foreign key cannot be relied on in a regular unique
+            # constraint: PostgreSQL (and SQLite) allow more than one NULL.
+            # Keep the no-competition case separate so both request variants
+            # are protected by the database, not only by service-level checks.
+            models.UniqueConstraint(
+                fields=["player", "club"],
+                condition=models.Q(
+                    status="pending",
+                    competition__isnull=True,
+                ),
+                name="unique_pending_player_club_without_competition",
+            ),
+            models.UniqueConstraint(
+                fields=["player", "club", "competition"],
+                condition=models.Q(
+                    status="pending",
+                    competition__isnull=False,
+                ),
+                name="unique_pending_player_club_competition",
+            ),
+            models.UniqueConstraint(
+                fields=["player", "club"],
+                condition=models.Q(
+                    status="invited",
+                    competition__isnull=True,
+                ),
+                name="unique_invited_player_club_without_competition",
+            ),
+            models.UniqueConstraint(
+                fields=["player", "club", "competition"],
+                condition=models.Q(
+                    status="invited",
+                    competition__isnull=False,
+                ),
+                name="unique_invited_player_club_competition",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.player.full_name} → {self.club.name} ({self.status})"

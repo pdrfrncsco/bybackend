@@ -1,7 +1,7 @@
 import logging
 from datetime import date
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from accounts.models import User
@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 
 class DuplicatePlayerRegistrationRequest(Exception):
     """Raised when an identical pending request already exists."""
+
+
+class RequestAlreadyReviewed(Exception):
+    """Raised when a request has left the state that can be reviewed."""
 
 
 class PlayerRegistrationRequestService:
@@ -74,15 +78,23 @@ class PlayerRegistrationRequestService:
                 "A pending registration request already exists for this player and club."
             )
 
-        request = PlayerRegistrationRequest.objects.create(
-            player=player,
-            club=club,
-            tenant=club.tenant,
-            competition=competition,
-            submitted_by=submitted_by,
-            joined_date=joined_date,
-            shirt_number=shirt_number,
-        )
+        try:
+            # A savepoint lets us translate a database race into the same
+            # domain result as the optimistic check above.
+            with transaction.atomic():
+                request = PlayerRegistrationRequest.objects.create(
+                    player=player,
+                    club=club,
+                    tenant=club.tenant,
+                    competition=competition,
+                    submitted_by=submitted_by,
+                    joined_date=joined_date,
+                    shirt_number=shirt_number,
+                )
+        except IntegrityError as exc:
+            raise DuplicatePlayerRegistrationRequest(
+                "A pending registration request already exists for this player and club."
+            ) from exc
         logger.info(
             "Player registration request submitted: %s → %s (%s)",
             player.full_name,
@@ -132,16 +144,22 @@ class PlayerRegistrationRequestService:
                 "An active invitation already exists for this player and club."
             )
 
-        request = PlayerRegistrationRequest.objects.create(
-            player=player,
-            club=club,
-            tenant=club.tenant,
-            competition=competition,
-            submitted_by=invited_by,
-            joined_date=joined_date,
-            shirt_number=shirt_number,
-            status=PlayerRegistrationRequest.Status.INVITED,
-        )
+        try:
+            with transaction.atomic():
+                request = PlayerRegistrationRequest.objects.create(
+                    player=player,
+                    club=club,
+                    tenant=club.tenant,
+                    competition=competition,
+                    submitted_by=invited_by,
+                    joined_date=joined_date,
+                    shirt_number=shirt_number,
+                    status=PlayerRegistrationRequest.Status.INVITED,
+                )
+        except IntegrityError as exc:
+            raise DuplicatePlayerRegistrationRequest(
+                "An active invitation already exists for this player and club."
+            ) from exc
         logger.info(
             "Player invitation created: %s → %s (%s)",
             club.name,
@@ -162,8 +180,12 @@ class PlayerRegistrationRequestService:
         """
         Club reviews a PENDING request.
         """
+        # The view may have fetched this object before another reviewer made a
+        # decision. Lock and reload it inside the transaction before checking
+        # its state, so only one decision can win.
+        request_obj = PlayerRegistrationRequest.objects.select_for_update().get(pk=request_obj.pk)
         if request_obj.status != PlayerRegistrationRequest.Status.PENDING:
-            raise ValueError("Only pending requests can be reviewed.")
+            raise RequestAlreadyReviewed("This registration request has already been reviewed.")
 
         request_obj.review_notes = review_notes
         request_obj.reviewed_by = reviewed_by
@@ -193,11 +215,12 @@ class PlayerRegistrationRequestService:
         """
         Player accepts an INVITED or APPROVED request, creating the actual registration.
         """
+        request_obj = PlayerRegistrationRequest.objects.select_for_update().get(pk=request_obj.pk)
         if request_obj.status not in [
             PlayerRegistrationRequest.Status.INVITED,
             PlayerRegistrationRequest.Status.APPROVED,
         ]:
-            raise ValueError("This request cannot be accepted in its current state.")
+            raise RequestAlreadyReviewed("This registration request cannot be accepted in its current state.")
 
         try:
             registration = PlayerRegistrationService.register_player(
