@@ -8,6 +8,8 @@ from rest_framework.test import APIClient
 from accounts.models import TenantMembership
 from clubs.constants import ClubMemberRole
 from clubs.models import Club, ClubMember
+from competitions.constants import CompetitionStatus
+from competitions.models import Competition
 from core.models import Tenant
 from players.models import Player, PlayerRegistration, PlayerRegistrationRequest
 
@@ -74,6 +76,33 @@ class PlayerRegistrationRequestAPITestCase(TestCase):
             ).exists()
         )
 
+    def test_player_cannot_request_unregistered_competition(self):
+        competition = Competition.objects.create(
+            tenant=self.tenant,
+            name="Test League",
+            season="2026",
+            status=CompetitionStatus.ACTIVE,
+        )
+
+        self.client.force_authenticate(user=self.player_user)
+        response = self.client.post(
+            "/api/v1/players/me/registration-requests/",
+            {
+                "club_id": str(self.club.id),
+                "joined_date": "2026-07-01",
+                "competition_id": str(competition.id),
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(
+            PlayerRegistrationRequest.objects.filter(
+                player=self.player,
+                club=self.club,
+            ).exists()
+        )
+
     def test_player_lists_own_registration_requests(self):
         PlayerRegistrationRequest.objects.create(
             player=self.player,
@@ -104,7 +133,7 @@ class PlayerRegistrationRequestAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["data"]), 1)
 
-    def test_club_admin_approves_request_creates_registration(self):
+    def test_club_admin_approves_request_and_player_accepts_registration(self):
         request_obj = PlayerRegistrationRequest.objects.create(
             player=self.player,
             club=self.club,
@@ -125,6 +154,15 @@ class PlayerRegistrationRequestAPITestCase(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         request_obj.refresh_from_db()
         self.assertEqual(request_obj.status, PlayerRegistrationRequest.Status.APPROVED)
+
+        self.client.force_authenticate(user=self.player_user)
+        response = self.client.post(
+            f"/api/v1/players/me/registration-requests/{request_obj.id}/accept/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        request_obj.refresh_from_db()
         self.assertIsNotNone(request_obj.registration)
         self.assertTrue(
             PlayerRegistration.objects.filter(player=self.player, club=self.club, status="registered").exists()

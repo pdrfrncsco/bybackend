@@ -315,6 +315,8 @@ class ClubService:
         """
         Retrieve the club that a user belongs to.
 
+        DEPRECATED: Use get_club_and_verify_admin for administrative operations.
+
         Args:
             user: The user to look up.
 
@@ -334,6 +336,54 @@ class ClubService:
             raise NoClubMembership()
 
         return membership.club
+
+    @staticmethod
+    def get_club_and_verify_admin(*, user: User, club_id: str) -> Club:
+        """
+        Retrieve a club by ID and verify that the user has administrative rights to it.
+
+        Args:
+            user: The user to verify.
+            club_id: The UUID of the club.
+
+        Returns:
+            The Club instance.
+
+        Raises:
+            ClubNotFound: If no club exists with the given ID.
+            NotClubAdmin: If the user is not a club admin or tenant admin.
+        """
+        try:
+            club = Club.objects.get(pk=club_id)
+        except Club.DoesNotExist:
+            raise ClubNotFound()
+
+        from accounts.constants import MembershipRole
+        from accounts.models import TenantMembership
+
+        # 1. Check if user is a club admin
+        is_club_admin = ClubMember.objects.filter(
+            user=user,
+            club=club,
+            is_active=True,
+            role__in=["president", "manager", "coach"],
+        ).exists()
+
+        if is_club_admin:
+            return club
+
+        # 2. Check if user is a tenant admin for this club's tenant
+        is_tenant_admin = TenantMembership.objects.filter(
+            user=user,
+            tenant=club.tenant,
+            is_active=True,
+            role__in=MembershipRole.ADMIN_ROLES,
+        ).exists()
+
+        if is_tenant_admin:
+            return club
+
+        raise NotClubAdmin()
 
     @staticmethod
     def assert_is_club_admin(*, user: User, club: Club) -> None:

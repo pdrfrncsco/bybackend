@@ -10,7 +10,7 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from datetime import date
 
-from players.models import Player, PlayerRegistration
+from players.models import Player, PlayerRegistration, PlayerRegistrationRequest
 from clubs.models import Club
 from clubs.models import ClubMember
 from clubs.constants import ClubMemberRole
@@ -320,7 +320,7 @@ class PlayerRegisterViewTestCase(TestCase):
             is_active=True,
         )
 
-    def test_tenant_member_can_register_player(self):
+    def test_tenant_member_can_invite_player(self):
         self.client.force_authenticate(user=self.org_member)
         response = self.client.post(
             f"/api/v1/players/{self.player.slug}/register/",
@@ -336,7 +336,11 @@ class PlayerRegisterViewTestCase(TestCase):
         payload = response.json()
         self.assertTrue(payload["success"])
         self.assertEqual(
-            PlayerRegistration.objects.filter(player=self.player, club=self.club).count(),
+            PlayerRegistrationRequest.objects.filter(
+                player=self.player,
+                club=self.club,
+                status=PlayerRegistrationRequest.Status.INVITED,
+            ).count(),
             1,
         )
 
@@ -569,7 +573,7 @@ class PlayerRegisterClubUserTestCase(TestCase):
             is_active=True,
         )
 
-    def test_club_user_can_register_player_without_tenant_membership(self):
+    def test_club_user_can_invite_player_without_tenant_membership(self):
         self.client.force_authenticate(user=self.club_user)
 
         response = self.client.post(
@@ -582,4 +586,11 @@ class PlayerRegisterClubUserTestCase(TestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(PlayerRegistration.objects.filter(player=self.player, club=self.club).count(), 1)
+        self.assertEqual(
+            PlayerRegistrationRequest.objects.filter(
+                player=self.player,
+                club=self.club,
+                status=PlayerRegistrationRequest.Status.INVITED,
+            ).count(),
+            1,
+        )

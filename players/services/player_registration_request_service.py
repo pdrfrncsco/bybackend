@@ -6,6 +6,8 @@ from django.utils import timezone
 
 from accounts.models import User
 from clubs.models import Club
+from competitions.constants import CompetitionStatus
+from competitions.models import Competition, CompetitionRegistration
 from players.models import Player, PlayerRegistration, PlayerRegistrationRequest
 from players.services import PlayerRegistrationConflict, PlayerRegistrationService
 
@@ -18,6 +20,21 @@ class DuplicatePlayerRegistrationRequest(Exception):
 
 class PlayerRegistrationRequestService:
     @staticmethod
+    def _validate_competition(*, club: Club, competition: Competition | None) -> None:
+        if competition is None:
+            return
+
+        if competition.tenant_id != club.tenant_id or competition.status != CompetitionStatus.ACTIVE:
+            raise ValueError("Competition is not available for this club.")
+
+        if not CompetitionRegistration.objects.filter(
+            competition=competition,
+            club=club,
+            tenant_id=club.tenant_id,
+        ).exists():
+            raise ValueError("Competition is not registered for this club.")
+
+    @staticmethod
     @transaction.atomic
     def submit_request(
         *,
@@ -28,6 +45,11 @@ class PlayerRegistrationRequestService:
         shirt_number: int | None = None,
         competition=None,
     ) -> PlayerRegistrationRequest:
+        """
+        Player requests to join a club.
+        """
+        PlayerRegistrationRequestService._validate_competition(club=club, competition=competition)
+
         # Check if player has any active registration
         active_reg = PlayerRegistration.objects.filter(
             player=player,
@@ -71,6 +93,65 @@ class PlayerRegistrationRequestService:
 
     @staticmethod
     @transaction.atomic
+    def create_invitation(
+        *,
+        player: Player,
+        club: Club,
+        invited_by: User,
+        joined_date: date,
+        shirt_number: int | None = None,
+        competition=None,
+    ) -> PlayerRegistrationRequest:
+        """
+        Club invites a player to join.
+        """
+        PlayerRegistrationRequestService._validate_competition(club=club, competition=competition)
+
+        # Check if player has any active registration
+        active_reg = PlayerRegistration.objects.filter(
+            player=player,
+            status__in=[
+                PlayerRegistration.RegistrationStatus.REGISTERED,
+                PlayerRegistration.RegistrationStatus.LOANED,
+            ],
+        ).select_related("club").first()
+        if active_reg:
+            raise PlayerRegistrationConflict(
+                f"{player.full_name} is already actively registered at {active_reg.club.name}."
+            )
+
+        # Prevent duplicate invitations
+        pending_invitation = PlayerRegistrationRequest.objects.filter(
+            player=player,
+            club=club,
+            competition=competition,
+            status=PlayerRegistrationRequest.Status.INVITED,
+        ).exists()
+        if pending_invitation:
+            raise DuplicatePlayerRegistrationRequest(
+                "An active invitation already exists for this player and club."
+            )
+
+        request = PlayerRegistrationRequest.objects.create(
+            player=player,
+            club=club,
+            tenant=club.tenant,
+            competition=competition,
+            submitted_by=invited_by,
+            joined_date=joined_date,
+            shirt_number=shirt_number,
+            status=PlayerRegistrationRequest.Status.INVITED,
+        )
+        logger.info(
+            "Player invitation created: %s → %s (%s)",
+            club.name,
+            player.full_name,
+            request.id,
+        )
+        return request
+
+    @staticmethod
+    @transaction.atomic
     def review_request(
         *,
         request_obj: PlayerRegistrationRequest,
@@ -78,27 +159,18 @@ class PlayerRegistrationRequestService:
         approve: bool,
         review_notes: str = "",
     ) -> PlayerRegistrationRequest:
+        """
+        Club reviews a PENDING request.
+        """
         if request_obj.status != PlayerRegistrationRequest.Status.PENDING:
-            raise ValueError("This request has already been reviewed.")
+            raise ValueError("Only pending requests can be reviewed.")
 
         request_obj.review_notes = review_notes
         request_obj.reviewed_by = reviewed_by
         request_obj.reviewed_at = timezone.now()
 
         if approve:
-            try:
-                registration = PlayerRegistrationService.register_player(
-                    player=request_obj.player,
-                    club=request_obj.club,
-                    tenant=request_obj.tenant,
-                    joined_date=request_obj.joined_date,
-                    shirt_number=request_obj.shirt_number,
-                    competition=request_obj.competition,
-                )
-            except PlayerRegistrationConflict as exc:
-                raise ValueError(str(exc)) from exc
-
-            request_obj.registration = registration
+            # Club approves, but registration only created after player acceptance
             request_obj.status = PlayerRegistrationRequest.Status.APPROVED
         else:
             request_obj.status = PlayerRegistrationRequest.Status.REJECTED
@@ -108,5 +180,45 @@ class PlayerRegistrationRequestService:
             "Player registration request reviewed: %s (%s)",
             request_obj.id,
             request_obj.status,
+        )
+        return request_obj
+
+    @staticmethod
+    @transaction.atomic
+    def accept_request(
+        *,
+        request_obj: PlayerRegistrationRequest,
+        accepted_by: User,
+    ) -> PlayerRegistrationRequest:
+        """
+        Player accepts an INVITED or APPROVED request, creating the actual registration.
+        """
+        if request_obj.status not in [
+            PlayerRegistrationRequest.Status.INVITED,
+            PlayerRegistrationRequest.Status.APPROVED,
+        ]:
+            raise ValueError("This request cannot be accepted in its current state.")
+
+        try:
+            registration = PlayerRegistrationService.register_player(
+                player=request_obj.player,
+                club=request_obj.club,
+                tenant=request_obj.tenant,
+                joined_date=request_obj.joined_date,
+                shirt_number=request_obj.shirt_number,
+                competition=request_obj.competition,
+            )
+        except PlayerRegistrationConflict as exc:
+            raise ValueError(str(exc)) from exc
+
+        request_obj.registration = registration
+        # Mark as approved since it's now effectively active
+        request_obj.status = PlayerRegistrationRequest.Status.APPROVED
+        request_obj.save()
+
+        logger.info(
+            "Player registration request accepted: %s by %s",
+            request_obj.id,
+            accepted_by.email,
         )
         return request_obj

@@ -125,9 +125,43 @@ class CompetitionDetailView(APIView):
             **serializer.validated_data,
         )
 
+
+class ClubCompetitionListView(APIView):
+    """
+    GET /api/v1/clubs/{club_id}/competitions/
+    List competitions that a club is registered in.
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(
+        tags=["competitions"],
+        responses={200: CompetitionSerializer(many=True)},
+    )
+    def get(self, request, club_id):
+        from clubs.models import Club
+        from competitions.models import CompetitionRegistration
+        from competitions.constants import CompetitionStatus
+
+        try:
+            club = Club.objects.get(pk=club_id)
+        except Club.DoesNotExist:
+            return not_found_response(message="Club not found.")
+
+        # Get competitions that the club is registered in and are active
+        competitions = CompetitionRegistration.objects.filter(
+            club=club,
+            competition__status=CompetitionStatus.ACTIVE
+        ).select_related("competition").values_list("competition", flat=True)
+
+        # We need to get the actual Competition objects
+        from competitions.models import Competition
+        competition_objs = Competition.objects.filter(id__in=competitions)
+
+        serializer = CompetitionSerializer(competition_objs, many=True)
         return success_response(
-            data=CompetitionSerializer(competition).data,
-            message="Competition updated successfully.",
+            data=serializer.data,
+            message="Competitions for this club retrieved successfully.",
         )
 
 

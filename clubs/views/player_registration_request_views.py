@@ -20,7 +20,7 @@ from players.services.player_registration_request_service import PlayerRegistrat
 
 class ClubMePlayerRegistrationRequestsView(APIView):
     """
-    GET /api/v1/clubs/me/player-registration-requests/
+    GET /api/v1/clubs/{club_id}/player-registration-requests/
     """
 
     permission_classes = [IsAuthenticated, IsActiveAccount, IsClubAdmin]
@@ -30,8 +30,8 @@ class ClubMePlayerRegistrationRequestsView(APIView):
         responses={200: PlayerRegistrationRequestSerializer(many=True)},
     )
     def get(self, request):
-        club = ClubService.get_club_for_user(user=request.user)
-        ClubService.assert_is_club_admin(user=request.user, club=club)
+        club_id = self.kwargs.get("club_id")
+        club = ClubService.get_club_and_verify_admin(user=request.user, club_id=club_id) if club_id else ClubService.get_club_for_user(user=request.user)
 
         requests = (
             PlayerRegistrationRequest.objects.filter(club=club)
@@ -47,7 +47,7 @@ class ClubMePlayerRegistrationRequestsView(APIView):
 
 class ClubMePlayerRegistrationRequestReviewView(APIView):
     """
-    PATCH /api/v1/clubs/me/player-registration-requests/{request_id}/
+    PATCH /api/v1/clubs/{club_id}/player-registration-requests/{request_id}/
     """
 
     permission_classes = [IsAuthenticated, IsActiveAccount, IsClubAdmin]
@@ -57,9 +57,8 @@ class ClubMePlayerRegistrationRequestReviewView(APIView):
         request=PlayerRegistrationRequestReviewSerializer,
         responses={200: PlayerRegistrationRequestSerializer},
     )
-    def patch(self, request, request_id):
-        club = ClubService.get_club_for_user(user=request.user)
-        ClubService.assert_is_club_admin(user=request.user, club=club)
+    def patch(self, request, request_id, club_id=None):
+        club = ClubService.get_club_and_verify_admin(user=request.user, club_id=club_id) if club_id else ClubService.get_club_for_user(user=request.user)
 
         try:
             registration_request = PlayerRegistrationRequest.objects.select_related(

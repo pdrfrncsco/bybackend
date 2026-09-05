@@ -28,9 +28,8 @@ class IsClubAdmin(BasePermission):
     """
     Allow access only to users who are admins of a club.
 
-    This checks if the user is either:
-        1. A tenant admin/owner of the club's organization, OR
-        2. A MANAGER or PRESIDENT of any club.
+    If the view has a 'club_id' in the URL, access is restricted to that specific club.
+    Otherwise, it checks if the user is an admin of any club.
     """
 
     message = "You must be a club administrator to perform this action."
@@ -45,8 +44,37 @@ class IsClubAdmin(BasePermission):
         from accounts.constants import MembershipRole
         from accounts.models import TenantMembership
         from clubs.constants import ClubMemberRole
-        from clubs.models import ClubMember
+        from clubs.models import ClubMember, Club
 
+        # 1. Specific Club Validation (if club_id is in URL)
+        club_id = getattr(view.kwargs, "club_id", None)
+        if club_id:
+            # Verify tenant context and admin status for this specific club
+            try:
+                club = Club.objects.get(pk=club_id)
+            except Club.DoesNotExist:
+                return False
+
+            # Check if user is a tenant admin for this club's tenant
+            is_tenant_admin = TenantMembership.objects.filter(
+                user=request.user,
+                tenant=club.tenant,
+                is_active=True,
+                role__in=MembershipRole.ADMIN_ROLES,
+            ).exists()
+
+            if is_tenant_admin:
+                return True
+
+            # Check if user is a club admin for this specific club
+            return ClubMember.objects.filter(
+                user=request.user,
+                club=club,
+                is_active=True,
+                role__in=ClubMemberRole.ADMIN_ROLES,
+            ).exists()
+
+        # 2. General Validation (Fallback for views without club_id)
         # Check if user is a tenant admin
         is_tenant_admin = TenantMembership.objects.filter(
             user=request.user,

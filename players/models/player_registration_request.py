@@ -14,6 +14,7 @@ from common.models import BaseModel
 class PlayerRegistrationRequest(BaseModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pendente"
+        INVITED = "invited", "Convidado"
         APPROVED = "approved", "Aprovado"
         REJECTED = "rejected", "Rejeitado"
 

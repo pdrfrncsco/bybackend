@@ -78,11 +78,24 @@ class PlayerMeRegistrationRequestListCreateView(APIView):
         competition_id = serializer.validated_data.get("competition_id")
         if competition_id:
             from competitions.models import Competition
+            from competitions.models import CompetitionRegistration
+            from competitions.constants import CompetitionStatus
 
             try:
-                competition = Competition.objects.get(id=competition_id)
+                competition = Competition.objects.get(
+                    id=competition_id,
+                    tenant_id=club.tenant_id,
+                    status=CompetitionStatus.ACTIVE,
+                )
             except Competition.DoesNotExist:
-                return error_response(message="Competition not found.", status_code=404)
+                return error_response(message="Competition is not available for this club.", status_code=400)
+
+            if not CompetitionRegistration.objects.filter(
+                competition=competition,
+                club=club,
+                tenant_id=club.tenant_id,
+            ).exists():
+                return error_response(message="Competition is not registered for this club.", status_code=400)
 
         try:
             registration_request = PlayerRegistrationRequestService.submit_request(
@@ -106,4 +119,52 @@ class PlayerMeRegistrationRequestListCreateView(APIView):
         return created_response(
             data=output.data,
             message="Player registration request submitted successfully.",
+        )
+
+
+class PlayerAcceptRegistrationRequestView(APIView):
+    """
+    POST /api/v1/players/me/registration-requests/{id}/accept/
+    """
+
+    permission_classes = [IsAuthenticated, IsActiveAccount]
+
+    @extend_schema(
+        tags=["players"],
+        responses={200: PlayerRegistrationRequestSerializer},
+    )
+    def post(self, request, request_id):
+        try:
+            player = PlayerService.get_player_for_user(request.user)
+        except NoPlayerProfile:
+            return error_response(message="No player profile linked to this account.", status_code=404)
+
+        try:
+            registration_request = PlayerRegistrationRequest.objects.get(
+                id=request_id, player=player
+            )
+        except PlayerRegistrationRequest.DoesNotExist:
+            return error_response(message="Registration request not found.", status_code=404)
+
+        if not CanManagePlayerProfile.can_manage(user=request.user, player=player):
+            return error_response(message="You do not have permission to accept this request.", status_code=403)
+
+        try:
+            registration_request = PlayerRegistrationRequestService.accept_request(
+                request_obj=registration_request,
+                accepted_by=request.user,
+            )
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=400)
+        except Exception as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        output = PlayerRegistrationRequestSerializer(
+            PlayerRegistrationRequest.objects.select_related(
+                "club", "competition", "submitted_by", "reviewed_by", "player"
+            ).get(id=registration_request.id)
+        )
+        return success_response(
+            data=output.data,
+            message="Registration request accepted successfully.",
         )

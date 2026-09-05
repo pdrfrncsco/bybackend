@@ -36,6 +36,7 @@ from clubs.views import (
     ClubMeStandingsView,
     TransferViewSet,
 )
+from competitions.views.competition_views import ClubCompetitionListView
 
 router = DefaultRouter()
 router.register(r"transfers", TransferViewSet, basename="transfer")
@@ -47,9 +48,11 @@ urlpatterns = router.urls + [
     path("me/competitions/", ClubMeCompetitionsView.as_view(), name="club-me-competitions"),
     path("me/matches/", ClubMeMatchesView.as_view(), name="club-me-matches"),
     path("me/standings/", ClubMeStandingsView.as_view(), name="club-me-standings"),
-    path("me/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-player-registration-requests"),
+    path("me/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-me-player-registration-requests"),
+    path("me/player-registration-requests/<uuid:request_id>/", ClubMePlayerRegistrationRequestReviewView.as_view(), name="club-me-player-registration-request-review"),
+    path("<uuid:club_id>/player-registration-requests/", ClubMePlayerRegistrationRequestsView.as_view(), name="club-player-registration-requests"),
     path(
-        "me/player-registration-requests/<uuid:request_id>/",
+        "<uuid:club_id>/player-registration-requests/<uuid:request_id>/",
         ClubMePlayerRegistrationRequestReviewView.as_view(),
         name="club-player-registration-request-review",
     ),

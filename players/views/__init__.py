@@ -28,6 +28,10 @@ from common.pagination import StandardPagination
 from players.models import Player, PlayerRegistration
 from players.selectors import PlayerSelector, PlayerRegistrationSelector
 from players.serializers import PlayerSerializer, PlayerDetailSerializer, PlayerRegistrationSerializer
+from players.serializers.player_registration_request import (
+    PlayerRegistrationRequestCreateSerializer,
+    PlayerRegistrationRequestSerializer,
+)
 from players.services import NoPlayerProfile, PlayerNotFound, PlayerRegistrationService, PlayerService, PlayerRegistrationConflict
 from players.permissions import IsStaffOrReadOnly, CanManagePlayerRegistrations
 
@@ -244,18 +248,19 @@ class PlayerRegisterView(APIView):
         from clubs.models import Club
         from clubs.services import ClubService
         from accounts.selectors import TenantMembershipSelector
+        from players.services.player_registration_request_service import (
+            PlayerRegistrationRequestService,
+            DuplicatePlayerRegistrationRequest,
+        )
 
         player = PlayerSelector.get_by_slug(slug)
         if not player:
             return error_response(message="Player not found.", status_code=404)
 
-        club_id = request.data.get("club_id")
-        if not club_id:
-            return error_response(message="club_id is required.", status_code=400)
-
-        joined_date = request.data.get("joined_date")
-        if not joined_date:
-            return error_response(message="joined_date is required.", status_code=400)
+        input_serializer = PlayerRegistrationRequestCreateSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
+        club_id = input_serializer.validated_data["club_id"]
+        joined_date = input_serializer.validated_data["joined_date"]
 
         try:
             club = Club.objects.get(id=club_id)
@@ -278,7 +283,7 @@ class PlayerRegisterView(APIView):
             )
 
         competition = None
-        competition_id = request.data.get("competition_id")
+        competition_id = input_serializer.validated_data.get("competition_id")
         if competition_id:
             from competitions.models import Competition
             try:
@@ -287,22 +292,23 @@ class PlayerRegisterView(APIView):
                 return error_response(message="Competition not found.", status_code=404)
 
         try:
-            registration = PlayerRegistrationService.register_player(
+            # Convert direct registration to an invitation
+            invitation = PlayerRegistrationRequestService.create_invitation(
                 player=player,
                 club=club,
-                tenant=club.tenant,
+                invited_by=request.user,
                 joined_date=joined_date,
-                shirt_number=request.data.get("shirt_number"),
+                shirt_number=input_serializer.validated_data.get("shirt_number"),
                 competition=competition,
             )
-        except PlayerRegistrationConflict as exc:
+        except (DuplicatePlayerRegistrationRequest, PlayerRegistrationConflict) as exc:
             return error_response(message=str(exc), status_code=409)
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
-        serializer = PlayerRegistrationSerializer(registration)
+        serializer = PlayerRegistrationRequestSerializer(invitation)
         return success_response(
             data=serializer.data,
-            message="Player registered successfully.",
+            message="Player invitation sent successfully.",
             status_code=201,
         )
