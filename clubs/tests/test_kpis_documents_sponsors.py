@@ -86,6 +86,21 @@ class ClubKpisTestCase(TestCase):
         self.assertEqual(data["clean_sheets"], 1)
         self.assertEqual(data["active_competitions"], 1)
 
+    def test_list_club_competitions_by_uuid(self):
+        from competitions.models import CompetitionRegistration
+        CompetitionRegistration.objects.create(
+            competition=self.competition,
+            club=self.club,
+            tenant=self.tenant,
+        )
+
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(f"/api/v1/clubs/{self.club.id}/competitions/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(len(response.data["data"]), 1)
+        self.assertEqual(response.data["data"][0]["id"], str(self.competition.id))
+
 
 class ClubDocumentsAndSponsorsAPITestCase(TestCase):
     def setUp(self):
@@ -147,3 +162,5 @@ class ClubDocumentsAndSponsorsAPITestCase(TestCase):
         self.assertEqual(public_response.status_code, status.HTTP_200_OK)
         self.assertEqual(public_response.data["data"]["count"], 1)
         self.assertEqual(public_response.data["data"]["results"][0]["name"], "Banco Teste")
+
+
