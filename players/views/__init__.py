@@ -248,6 +248,7 @@ class PlayerRegisterView(APIView):
         from clubs.models import Club
         from clubs.services import ClubService
         from accounts.selectors import TenantMembershipSelector
+        from players.services import PlayerRegistrationConflict
         from players.services.player_registration_request_service import (
             PlayerRegistrationRequestService,
             DuplicatePlayerRegistrationRequest,

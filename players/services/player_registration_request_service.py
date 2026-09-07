@@ -242,17 +242,14 @@ class PlayerRegistrationRequestService:
         ]:
             raise RequestAlreadyReviewed("This registration request cannot be accepted in its current state.")
 
-        try:
-            registration = PlayerRegistrationService.register_player(
-                player=request_obj.player,
-                club=request_obj.club,
-                tenant=request_obj.tenant,
-                joined_date=request_obj.joined_date,
-                shirt_number=request_obj.shirt_number,
-                competition=request_obj.competition,
-            )
-        except PlayerRegistrationConflict as exc:
-            raise ValueError(str(exc)) from exc
+        registration = PlayerRegistrationService.register_player(
+            player=request_obj.player,
+            club=request_obj.club,
+            tenant=request_obj.tenant,
+            joined_date=request_obj.joined_date,
+            shirt_number=request_obj.shirt_number,
+            competition=request_obj.competition,
+        )
 
         request_obj.registration = registration
         # Mark as approved since it's now effectively active

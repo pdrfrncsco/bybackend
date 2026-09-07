@@ -217,6 +217,7 @@ class PlayerRegistrationRequestAPITestCase(TestCase):
         )
 
         self.client.force_authenticate(user=self.player_user)
+
         response = self.client.get("/api/v1/players/me/registration-requests/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -294,3 +295,32 @@ class PlayerRegistrationRequestAPITestCase(TestCase):
         self.assertEqual(request_obj.status, PlayerRegistrationRequest.Status.REJECTED)
         self.assertIsNone(request_obj.registration)
         self.assertFalse(PlayerRegistration.objects.filter(player=self.player, club=self.club).exists())
+
+    def test_player_accept_conflict_returns_409(self):
+        # Active registration at other club
+        PlayerRegistration.objects.create(
+            player=self.player,
+            club=self.other_club,
+            tenant=self.tenant,
+            joined_date=date(2025, 1, 1),
+            status=PlayerRegistration.RegistrationStatus.REGISTERED,
+        )
+
+        request_obj = PlayerRegistrationRequest.objects.create(
+            player=self.player,
+            club=self.club,
+            tenant=self.tenant,
+            submitted_by=self.club_admin,
+            joined_date=date(2026, 7, 1),
+            status=PlayerRegistrationRequest.Status.INVITED,
+        )
+
+        self.client.force_authenticate(user=self.player_user)
+        response = self.client.post(
+            f"/api/v1/players/me/registration-requests/{request_obj.id}/accept/",
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertFalse(response.data["success"])
+        self.assertIn("already actively registered", response.data["message"])

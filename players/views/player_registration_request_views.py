@@ -156,7 +156,7 @@ class PlayerAcceptRegistrationRequestView(APIView):
                 request_obj=registration_request,
                 accepted_by=request.user,
             )
-        except RequestAlreadyReviewed as exc:
+        except (RequestAlreadyReviewed, PlayerRegistrationConflict) as exc:
             return error_response(message=str(exc), status_code=409)
         except ValueError as exc:
             return error_response(message=str(exc), status_code=400)
