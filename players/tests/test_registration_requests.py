@@ -268,6 +268,7 @@ class PlayerRegistrationRequestAPITestCase(TestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         request_obj.refresh_from_db()
+        self.assertEqual(request_obj.status, PlayerRegistrationRequest.Status.ACCEPTED)
         self.assertIsNotNone(request_obj.registration)
         self.assertTrue(
             PlayerRegistration.objects.filter(player=self.player, club=self.club, status="registered").exists()

@@ -252,8 +252,8 @@ class PlayerRegistrationRequestService:
         )
 
         request_obj.registration = registration
-        # Mark as approved since it's now effectively active
-        request_obj.status = PlayerRegistrationRequest.Status.APPROVED
+        # Mark as accepted since the player has accepted and registration is active
+        request_obj.status = PlayerRegistrationRequest.Status.ACCEPTED
         request_obj.save()
 
         logger.info(

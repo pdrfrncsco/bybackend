@@ -15,7 +15,8 @@ class PlayerRegistrationRequest(BaseModel):
     class Status(models.TextChoices):
         PENDING = "pending", "Pendente"
         INVITED = "invited", "Convidado"
-        APPROVED = "approved", "Aprovado"
+        APPROVED = "approved", "Aprovado pelo Clube"
+        ACCEPTED = "accepted", "Aceito"
         REJECTED = "rejected", "Rejeitado"
 
     player = models.ForeignKey(
@@ -89,10 +90,6 @@ class PlayerRegistrationRequest(BaseModel):
             models.Index(fields=["tenant", "status"]),
         ]
         constraints = [
-            # A nullable foreign key cannot be relied on in a regular unique
-            # constraint: PostgreSQL (and SQLite) allow more than one NULL.
-            # Keep the no-competition case separate so both request variants
-            # are protected by the database, not only by service-level checks.
             models.UniqueConstraint(
                 fields=["player", "club"],
                 condition=models.Q(
