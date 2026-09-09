@@ -17,6 +17,7 @@ Architecture (08_MEDIA_STORAGE_ARCHITECTURE.md §25):
 
 import logging
 
+from django.db import models
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
@@ -78,14 +79,67 @@ def _get_upload_tenant(request, tenant_id=None):
 
 
 def _asset_visible_to_user(*, asset: MediaAsset, user) -> bool:
-    if asset.tenant_id is None:
-        return user.is_staff or asset.uploaded_by_id == user.id
+    if not user or not user.is_authenticated:
+        return False
 
-    return TenantMembership.objects.filter(
+    if user.is_staff:
+        return True
+
+    if asset.tenant_id is None:
+        if asset.uploaded_by_id == user.id:
+            return True
+        # If linked to a player, check if user is that player
+        if asset.owner_type == OwnerType.PLAYER:
+            try:
+                from players.selectors import PlayerSelector
+
+                linked = PlayerSelector.get_for_user(user)
+                if linked and str(linked.id) == str(asset.owner_id):
+                    return True
+            except Exception:
+                pass
+        return False
+
+    membership = TenantMembership.objects.filter(
         user=user,
         tenant_id=asset.tenant_id,
         is_active=True,
-    ).exists()
+    ).first()
+    if not membership:
+        return False
+
+    if asset.visibility in (AssetVisibility.PRIVATE, AssetVisibility.INTERNAL):
+        return membership.role in ("owner", "admin") or asset.uploaded_by_id == user.id
+
+    return True
+
+
+def _user_can_delete_asset(*, asset: MediaAsset, user) -> bool:
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_staff or asset.uploaded_by_id == user.id:
+        return True
+
+    if asset.owner_type == OwnerType.PLAYER:
+        try:
+            from players.selectors import PlayerSelector
+
+            linked = PlayerSelector.get_for_user(user)
+            if linked and str(linked.id) == str(asset.owner_id):
+                return True
+        except Exception:
+            pass
+
+    if asset.tenant_id:
+        membership = TenantMembership.objects.filter(
+            user=user,
+            tenant_id=asset.tenant_id,
+            is_active=True,
+        ).first()
+        if membership and membership.role in ("owner", "admin"):
+            return True
+
+    return False
 
 
 def _get_user_scoped_asset(*, user, asset_id: str) -> MediaAsset:
@@ -97,29 +151,43 @@ def _get_user_scoped_asset(*, user, asset_id: str) -> MediaAsset:
     return asset
 
 
-def _owner_belongs_to_tenant(*, owner_type: str, owner_id, tenant) -> bool:
+def _owner_belongs_to_tenant(*, owner_type: str, owner_id, tenant, user=None) -> bool:
     if owner_type == OwnerType.ORGANIZATION:
-        return str(owner_id) == str(tenant.id)
+        return bool(tenant and str(owner_id) == str(tenant.id))
 
     if owner_type == OwnerType.CLUB:
         from clubs.models import Club
 
-        return Club.objects.filter(id=owner_id, tenant=tenant).exists()
+        return bool(tenant and Club.objects.filter(id=owner_id, tenant=tenant).exists())
 
     if owner_type == OwnerType.COMPETITION:
         from competitions.models import Competition
 
-        return Competition.objects.filter(id=owner_id, tenant=tenant).exists()
+        return bool(tenant and Competition.objects.filter(id=owner_id, tenant=tenant).exists())
 
     if owner_type == OwnerType.MATCH:
         from competitions.models import Match
 
-        return Match.objects.filter(id=owner_id, tenant=tenant).exists()
+        return bool(tenant and Match.objects.filter(id=owner_id, tenant=tenant).exists())
+
+    if owner_type == OwnerType.PLAYER:
+        from players.models import Player
+
+        player = Player.objects.filter(id=owner_id).first()
+        if not player:
+            return False
+        if tenant and player.registrations.filter(club__tenant=tenant, status__in=("registered", "loaned")).exists():
+            return True
+        if user and getattr(player, "user_id", None) == getattr(user, "id", None):
+            return True
+        if user and getattr(user, "is_staff", False):
+            return True
+        return False
 
     if owner_type == OwnerType.SYSTEM:
         return False
 
-    return True
+    return False
 
 
 class MediaAssetUploadView(APIView):
@@ -166,21 +234,51 @@ class MediaAssetUploadView(APIView):
             )
 
         tenant = _get_upload_tenant(request, tenant_id=tenant_id)
-        if not tenant:
-            return error_response(
-                message="Sem permissão para carregar ficheiros neste tenant.",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+        if owner_type == OwnerType.PLAYER:
+            from players.models import Player
+            from players.permissions import CanManagePlayerProfile
 
-        if not _owner_belongs_to_tenant(
-            owner_type=owner_type,
-            owner_id=owner_id,
-            tenant=tenant,
-        ):
-            return error_response(
-                message="Owner não pertence ao tenant autenticado.",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
+            player = Player.objects.filter(id=owner_id).first()
+            if not player:
+                return error_response(
+                    message="Jogador não encontrado.",
+                    status_code=status.HTTP_404_NOT_FOUND,
+                )
+
+            if tenant:
+                if not _owner_belongs_to_tenant(
+                    owner_type=owner_type,
+                    owner_id=owner_id,
+                    tenant=tenant,
+                    user=request.user,
+                ):
+                    return error_response(
+                        message="Jogador não pertence ao tenant autenticado.",
+                        status_code=status.HTTP_403_FORBIDDEN,
+                    )
+            else:
+                if not CanManagePlayerProfile.can_manage(user=request.user, player=player):
+                    return error_response(
+                        message="Sem permissão para carregar ficheiros para este jogador.",
+                        status_code=status.HTTP_403_FORBIDDEN,
+                    )
+        else:
+            if not tenant:
+                return error_response(
+                    message="Sem permissão para carregar ficheiros neste tenant.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
+
+            if not _owner_belongs_to_tenant(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                tenant=tenant,
+                user=request.user,
+            ):
+                return error_response(
+                    message="Owner não pertence ao tenant autenticado.",
+                    status_code=status.HTTP_403_FORBIDDEN,
+                )
 
         try:
             asset = MediaAssetService.upload_for_owner(
@@ -207,8 +305,8 @@ class MediaAssetListView(APIView):
     """
     GET /api/v1/media/
 
-    List media assets for the authenticated user's organization.
-    Supports filtering by asset_type, category, and search query.
+    List media assets scoped to the user or tenant.
+    Supports filtering by owner_type, owner_id, asset_type, category, and search query.
     """
 
     permission_classes = [IsAuthenticated]
@@ -217,28 +315,96 @@ class MediaAssetListView(APIView):
         tags=["media"],
         summary="List media assets",
         parameters=[
+            OpenApiParameter("owner_type", str, description="Filter by owner type (organization, club, player)"),
+            OpenApiParameter("owner_id", str, description="Filter by owner UUID"),
             OpenApiParameter("asset_type", str, description="Filter by type (image, video, etc.)"),
             OpenApiParameter("category", str, description="Filter by category (logo, banner, etc.)"),
             OpenApiParameter("q", str, description="Search in asset names"),
         ],
     )
     def get(self, request):
+        owner_type = request.query_params.get("owner_type")
+        owner_id = request.query_params.get("owner_id")
+        asset_type = request.query_params.get("asset_type")
+        category = request.query_params.get("category")
+        q = request.query_params.get("q")
+
         # Get the user's tenant
         membership = TenantMembership.objects.filter(user=request.user, is_active=True).select_related("tenant").first()
 
         if not membership:
+            from players.selectors import PlayerSelector
+
+            linked_player = PlayerSelector.get_for_user(request.user)
+
+            if owner_type == OwnerType.PLAYER and owner_id:
+                if not (request.user.is_staff or (linked_player and str(linked_player.id) == str(owner_id))):
+                    return error_response(
+                        message="Sem permissão para aceder aos ficheiros deste jogador.",
+                        status_code=status.HTTP_403_FORBIDDEN,
+                    )
+
+                assets = MediaAssetSelector.search(
+                    owner_type=owner_type,
+                    owner_id=owner_id,
+                    asset_type=asset_type,
+                    category=category,
+                    query=q,
+                )
+            else:
+                assets = MediaAssetSelector.search(
+                    uploaded_by_id=request.user.id,
+                    asset_type=asset_type,
+                    category=category,
+                    query=q,
+                )
+                if linked_player:
+                    player_assets = MediaAssetSelector.search(
+                        owner_type=OwnerType.PLAYER,
+                        owner_id=linked_player.id,
+                        asset_type=asset_type,
+                        category=category,
+                        query=q,
+                    )
+                    assets = (assets | player_assets).distinct().order_by("-created_at")
+
             paginator = StandardPagination()
-            page = paginator.paginate_queryset(MediaAsset.objects.none(), request)
+            page = paginator.paginate_queryset(assets, request)
             return paginator.get_paginated_response(MediaAssetListSerializer(page, many=True).data)
 
         tenant_id = membership.tenant_id
 
-        assets = MediaAssetSelector.search(
-            tenant_id=tenant_id,
-            asset_type=request.query_params.get("asset_type"),
-            category=request.query_params.get("category"),
-            query=request.query_params.get("q"),
-        )
+        if owner_type and owner_id:
+            if not _owner_belongs_to_tenant(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                tenant=membership.tenant,
+                user=request.user,
+            ):
+                paginator = StandardPagination()
+                page = paginator.paginate_queryset(MediaAsset.objects.none(), request)
+                return paginator.get_paginated_response([])
+
+            assets = MediaAssetSelector.search(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                asset_type=asset_type,
+                category=category,
+                query=q,
+            )
+        else:
+            assets = MediaAssetSelector.search(
+                tenant_id=tenant_id,
+                asset_type=asset_type,
+                category=category,
+                query=q,
+            )
+
+        # Non-staff/non-admin members do not see private/internal assets uploaded by others
+        if not (request.user.is_staff or membership.role in ("owner", "admin")):
+            assets = assets.filter(
+                models.Q(visibility=AssetVisibility.PUBLIC) | models.Q(uploaded_by=request.user)
+            )
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(assets, request)
@@ -263,7 +429,13 @@ class MediaAssetDetailView(APIView):
 
     @extend_schema(tags=["media"], summary="Delete a media asset")
     def delete(self, request, asset_id: str):
-        _get_user_scoped_asset(user=request.user, asset_id=asset_id)
+        asset = _get_user_scoped_asset(user=request.user, asset_id=asset_id)
+
+        if not _user_can_delete_asset(asset=asset, user=request.user):
+            return error_response(
+                message="Não tem permissão para eliminar este asset.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         try:
             MediaAssetService.delete_asset(asset_id=asset_id)
@@ -334,10 +506,12 @@ class MediaUsageView(APIView):
             )
 
         membership = _get_user_membership(user=request.user)
-        if not membership or not _owner_belongs_to_tenant(
+        tenant = membership.tenant if membership else None
+        if not _owner_belongs_to_tenant(
             owner_type=owner_type,
             owner_id=owner_id,
-            tenant=membership.tenant,
+            tenant=tenant,
+            user=request.user,
         ):
             return error_response(
                 message="Owner não pertence ao tenant autenticado.",
@@ -361,18 +535,15 @@ class MediaUsageView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        membership = _get_user_membership(user=request.user)
-        if not membership:
-            return error_response(
-                message="Sem permissão para associar media neste tenant.",
-                status_code=status.HTTP_403_FORBIDDEN,
-            )
-
         data = serializer.validated_data
+        membership = _get_user_membership(user=request.user)
+        tenant = membership.tenant if membership else None
+
         if not _owner_belongs_to_tenant(
             owner_type=data["owner_type"],
             owner_id=data["owner_id"],
-            tenant=membership.tenant,
+            tenant=tenant,
+            user=request.user,
         ):
             return error_response(
                 message="Owner não pertence ao tenant autenticado.",
@@ -380,13 +551,19 @@ class MediaUsageView(APIView):
             )
 
         asset = MediaAssetSelector.get_by_id(asset_id=data["asset_id"])
-        if not asset or asset.tenant_id != membership.tenant_id:
+        if not asset or not _asset_visible_to_user(asset=asset, user=request.user):
             return error_response(
                 message="Asset não encontrado neste tenant.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        usage = MediaUsage.replace_for(
+        if asset.tenant_id and membership and asset.tenant_id != membership.tenant_id:
+            return error_response(
+                message="Asset não pertence ao tenant autenticado.",
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        usage = MediaUsage.link_for(
             owner_type=data["owner_type"],
             owner_id=data["owner_id"],
             role=data["role"],
@@ -405,17 +582,20 @@ class MediaUsageDetailView(APIView):
 
     def delete(self, request, usage_id: str):
         usage = MediaUsage.objects.select_related("asset").filter(id=usage_id).first()
-        membership = _get_user_membership(user=request.user)
-        if not usage or not membership or usage.asset.tenant_id != membership.tenant_id:
+        if not usage:
             return error_response(
                 message="Utilização de media não encontrada.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
+        membership = _get_user_membership(user=request.user)
+        tenant = membership.tenant if membership else None
+
         if not _owner_belongs_to_tenant(
             owner_type=usage.owner_type,
             owner_id=usage.owner_id,
-            tenant=membership.tenant,
+            tenant=tenant,
+            user=request.user,
         ):
             return error_response(
                 message="Owner não pertence ao tenant autenticado.",

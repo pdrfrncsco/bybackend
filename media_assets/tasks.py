@@ -44,7 +44,14 @@ def generate_thumbnails(self, asset_id: str) -> dict:
     Returns:
         Dict with variant urls or skip reason.
     """
-    from media_assets.constants import AssetStatus, AssetType, AssetVariantType, THUMBNAIL_SIZES
+    from media_assets.constants import (
+        AssetCategory,
+        AssetStatus,
+        AssetType,
+        AssetVariantType,
+        AssetVisibility,
+        THUMBNAIL_SIZES,
+    )
     from media_assets.models import MediaAsset, MediaVariant
     from media_assets.storage import get_storage_provider
 
@@ -127,7 +134,7 @@ def generate_thumbnails(self, asset_id: str) -> dict:
                 file_obj=buffer,
                 object_key=variant_key,
                 content_type="image/jpeg",
-                public=True,
+                public=(asset.visibility == AssetVisibility.PUBLIC),
             )
 
             MediaVariant.objects.create(

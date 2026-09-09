@@ -192,8 +192,8 @@ class MediaAssetService:
             uploaded_by=uploaded_by,
         )
 
-        # 6. Link to owner via MediaUsage (replacing previous)
-        MediaUsage.replace_for(
+        # 6. Link to owner via MediaUsage (preserves collections like gallery/documents)
+        MediaUsage.link_for(
             owner_type=owner_type,
             owner_id=owner_id,
             role=role,

@@ -109,6 +109,73 @@ class MediaUsage(BaseModel):
             .first()
         )
 
+    COLLECTION_ROLES = {
+        AssetCategory.GALLERY,
+        AssetCategory.DOCUMENT,
+        AssetCategory.SPONSOR_LOGO,
+        AssetCategory.VIDEO,
+        AssetCategory.CERTIFICATE,
+        AssetCategory.REPORT,
+        AssetCategory.NEWS_IMAGE,
+    }
+
+    @classmethod
+    def is_collection_role(cls, role: str) -> bool:
+        """Return True if the role represents a multi-item collection (gallery, documents, etc.)."""
+        return role in cls.COLLECTION_ROLES
+
+    @classmethod
+    def link_for(
+        cls,
+        *,
+        owner_type: str,
+        owner_id,
+        role: str,
+        new_asset: "media_assets.MediaAsset | None" = None,  # noqa: F821
+        asset: "media_assets.MediaAsset | None" = None,  # noqa: F821
+        order: int = 0,
+    ) -> "MediaUsage":
+        """
+        Link an asset to an owner.
+
+        If the role is a singleton (logo, banner, avatar, cover), replaces previous active usages.
+        If the role is a collection (gallery, document, sponsor_logo, etc.), appends as an active item.
+        """
+        target_asset = new_asset or asset
+        if not target_asset:
+            raise ValueError("new_asset or asset is required")
+
+        if not cls.is_collection_role(role):
+            cls.objects.filter(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                role=role,
+                is_active=True,
+            ).update(is_active=False)
+
+        if order == 0 and cls.is_collection_role(role):
+            last_order = (
+                cls.objects.filter(
+                    owner_type=owner_type,
+                    owner_id=owner_id,
+                    role=role,
+                    is_active=True,
+                )
+                .order_by("-order")
+                .values_list("order", flat=True)
+                .first()
+            )
+            order = (last_order + 1) if last_order is not None else 0
+
+        return cls.objects.create(
+            asset=target_asset,
+            owner_type=owner_type,
+            owner_id=owner_id,
+            role=role,
+            order=order,
+            is_active=True,
+        )
+
     @classmethod
     def replace_for(
         cls,
@@ -119,7 +186,7 @@ class MediaUsage(BaseModel):
         new_asset: "media_assets.MediaAsset",  # noqa: F821
     ) -> "MediaUsage":
         """
-        Replace all existing active usages for this owner+role
+        Explicitly replace all existing active usages for this owner+role
         with a new asset, deactivating the previous ones.
 
         Returns the newly created MediaUsage.

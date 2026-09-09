@@ -187,3 +187,157 @@ class MediaAssetTenantAccessTestCase(TestCase):
         self.asset_a.refresh_from_db()
         self.assertFalse(usage.is_active)
         self.assertNotEqual(self.asset_a.status, "deleted")
+
+    def test_media_usage_link_for_appends_for_gallery_and_replaces_for_logo(self):
+        # Collection role: gallery
+        usage_g1 = MediaUsage.link_for(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role="gallery",
+            asset=self.asset_a,
+        )
+        usage_g2 = MediaUsage.link_for(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role="gallery",
+            asset=self.asset_b,
+        )
+        active_gallery = MediaUsage.objects.filter(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role="gallery",
+            is_active=True,
+        )
+        self.assertEqual(active_gallery.count(), 2)
+
+        # Singleton role: logo
+        usage_l1 = MediaUsage.link_for(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role="logo",
+            asset=self.asset_a,
+        )
+        self.assertTrue(usage_l1.is_active)
+
+        usage_l2 = MediaUsage.link_for(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role="logo",
+            asset=self.asset_b,
+        )
+        usage_l1.refresh_from_db()
+        self.assertFalse(usage_l1.is_active)
+        self.assertTrue(usage_l2.is_active)
+        active_logos = MediaUsage.objects.filter(
+            owner_type=OwnerType.ORGANIZATION,
+            owner_id=self.tenant_a.id,
+            role="logo",
+            is_active=True,
+        )
+        self.assertEqual(active_logos.count(), 1)
+
+    def test_rbac_asset_deletion_inside_tenant(self):
+        member_user = User.objects.create_user(
+            email="member@bolayetu.com",
+            password="SecurePass123!",
+            status="active",
+        )
+        TenantMembership.objects.create(
+            user=member_user,
+            tenant=self.tenant_a,
+            role="member",
+            is_active=True,
+        )
+        asset_by_member = self.create_asset(
+            tenant=self.tenant_a,
+            uploaded_by=member_user,
+            name="Member Uploaded",
+        )
+
+        # Member cannot delete asset uploaded by owner
+        self.client.force_authenticate(user=member_user)
+        res_fail = self.client.delete(f"/api/v1/media/{self.asset_a.id}/")
+        self.assertEqual(res_fail.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Member CAN delete asset uploaded by themselves
+        from unittest.mock import patch
+        with patch("media_assets.services.media_service.MediaAssetService.delete_asset") as mock_del:
+            res_member_del = self.client.delete(f"/api/v1/media/{asset_by_member.id}/")
+            self.assertEqual(res_member_del.status_code, status.HTTP_200_OK)
+            self.assertTrue(mock_del.called)
+
+        # Owner CAN delete asset uploaded by member
+        self.client.force_authenticate(user=self.user_a)
+        with patch("media_assets.services.media_service.MediaAssetService.delete_asset") as mock_del:
+            res_owner_del = self.client.delete(f"/api/v1/media/{asset_by_member.id}/")
+            self.assertEqual(res_owner_del.status_code, status.HTTP_200_OK)
+            self.assertTrue(mock_del.called)
+
+    def test_player_user_can_upload_and_list_media_without_tenant(self):
+        from unittest.mock import patch
+        from players.models import Player
+
+        player_user = User.objects.create_user(
+            email="athlete@bolayetu.com",
+            password="SecurePass123!",
+            status="active",
+        )
+        player = Player.objects.create(
+            first_name="Athlete",
+            last_name="One",
+            user=player_user,
+        )
+        other_player = Player.objects.create(
+            first_name="Athlete",
+            last_name="Two",
+        )
+
+        self.client.force_authenticate(user=player_user)
+
+        # Upload without tenant for own player profile succeeds
+        file = SimpleUploadedFile("avatar.jpg", b"fake-data", content_type="image/jpeg")
+        dummy_asset = self.create_asset(
+            tenant=self.tenant_a,
+            uploaded_by=player_user,
+            name="Athlete Avatar",
+        )
+        with patch("media_assets.services.media_service.MediaAssetService.upload_for_owner", return_value=dummy_asset):
+            res_upload = self.client.post(
+                "/api/v1/media/upload/",
+                {
+                    "file": file,
+                    "owner_type": OwnerType.PLAYER,
+                    "owner_id": str(player.id),
+                    "role": "avatar",
+                },
+                format="multipart",
+            )
+            self.assertEqual(res_upload.status_code, status.HTTP_201_CREATED)
+
+        # Upload for another player's profile is forbidden
+        file2 = SimpleUploadedFile("avatar.jpg", b"fake-data", content_type="image/jpeg")
+        res_forbidden = self.client.post(
+            "/api/v1/media/upload/",
+            {
+                "file": file2,
+                "owner_type": OwnerType.PLAYER,
+                "owner_id": str(other_player.id),
+                "role": "avatar",
+            },
+            format="multipart",
+        )
+        self.assertEqual(res_forbidden.status_code, status.HTTP_403_FORBIDDEN)
+
+        # List scoped to own player profile succeeds
+        res_list = self.client.get(
+            "/api/v1/media/",
+            {"owner_type": OwnerType.PLAYER, "owner_id": str(player.id)},
+        )
+        self.assertEqual(res_list.status_code, status.HTTP_200_OK)
+
+        # List for another player profile is forbidden
+        res_list_other = self.client.get(
+            "/api/v1/media/",
+            {"owner_type": OwnerType.PLAYER, "owner_id": str(other_player.id)},
+        )
+        self.assertEqual(res_list_other.status_code, status.HTTP_403_FORBIDDEN)

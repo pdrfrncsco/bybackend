@@ -49,6 +49,9 @@ class MediaAssetSelector:
     def search(
         *,
         tenant_id=None,
+        owner_type: str | None = None,
+        owner_id=None,
+        uploaded_by_id=None,
         asset_type: str | None = None,
         category: str | None = None,
         query: str | None = None,
@@ -57,10 +60,13 @@ class MediaAssetSelector:
         Search assets with optional filters.
 
         Args:
-            tenant_id:  Filter by tenant.
-            asset_type: Filter by AssetType.
-            category:   Filter by AssetCategory.
-            query:      Search in name field.
+            tenant_id:      Filter by tenant.
+            owner_type:     Filter by owner entity type.
+            owner_id:       Filter by owner entity ID.
+            uploaded_by_id: Filter by author user ID.
+            asset_type:     Filter by AssetType.
+            category:       Filter by AssetCategory.
+            query:          Search in name field.
         """
         from media_assets.constants import AssetStatus
 
@@ -68,6 +74,12 @@ class MediaAssetSelector:
 
         if tenant_id:
             qs = qs.filter(tenant_id=tenant_id)
+        if owner_type:
+            qs = qs.filter(owner_type=owner_type)
+        if owner_id:
+            qs = qs.filter(owner_id=owner_id)
+        if uploaded_by_id:
+            qs = qs.filter(uploaded_by_id=uploaded_by_id)
         if asset_type:
             qs = qs.filter(asset_type=asset_type)
         if category:

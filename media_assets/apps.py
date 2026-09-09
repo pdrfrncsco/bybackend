@@ -14,4 +14,7 @@ class MediaAssetsConfig(AppConfig):
     verbose_name = "Digital Asset Management"
 
     def ready(self):
-        pass  # noqa: signals registration placeholder
+        try:
+            from . import subscribers  # noqa: F401
+        except Exception:
+            pass

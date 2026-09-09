@@ -77,8 +77,7 @@ class R2StorageProvider(StorageProvider):
         client = self._get_client()
 
         extra_args = {"ContentType": content_type}
-        if public:
-            extra_args["ACL"] = "public-read"
+        # Cloudflare R2 uses bucket policies rather than S3 canned ACLs
 
         client.upload_fileobj(
             file_obj,

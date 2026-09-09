@@ -341,28 +341,30 @@ class MatchReportDocumentUploadView(APIView):
         except Match.DoesNotExist:
             return not_found_response(message="Match not found")
 
-        # Upload to DAM (Document Asset Management)
-        from media_assets.models import MediaAsset
-        from media_assets.services import DAMService
-        
+        # Upload to DAM (Digital Asset Management)
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.services import MediaAssetService
+
         try:
-            # Create media asset
-            asset = MediaAsset.objects.create(
-                tenant=tenant,
+            asset = MediaAssetService.upload_for_owner(
                 file=document,
+                owner_type=OwnerType.MATCH,
+                owner_id=match.id,
+                role=AssetCategory.REPORT,
                 name=f"match_report_{match.id}_{document.name}",
-                mime_type=document.content_type,
+                tenant=tenant,
                 uploaded_by=request.user,
+                images_only=False,
             )
-            
+
             return success_response(
-                data={'document_url': asset.file.url},
+                data={"document_url": asset.public_url, "asset_id": str(asset.id)},
                 message="Document uploaded successfully.",
-                status_code=201
+                status_code=201,
             )
-            
+
         except Exception as e:
             return error_response(
                 message=f"Failed to upload document: {str(e)}",
-                status_code=500
+                status_code=500,
             )
