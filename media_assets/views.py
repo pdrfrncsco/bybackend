@@ -484,7 +484,11 @@ class MediaAssetSignedUrlView(APIView):
 class MediaUsageView(APIView):
     """List usages for an owner or link an existing asset to an owner."""
 
-    permission_classes = [IsAuthenticated]
+    def get_permissions(self):
+        if self.request.method == "GET":
+            from rest_framework.permissions import AllowAny
+            return [AllowAny()]
+        return [IsAuthenticated()]
 
     @extend_schema(
         tags=["media"],
@@ -505,16 +509,33 @@ class MediaUsageView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-        membership = _get_user_membership(user=request.user)
+        user = request.user if request.user and request.user.is_authenticated else None
+        membership = _get_user_membership(user=user) if user else None
         tenant = membership.tenant if membership else None
-        if not _owner_belongs_to_tenant(
-            owner_type=owner_type,
-            owner_id=owner_id,
-            tenant=tenant,
-            user=request.user,
-        ):
+
+        is_owner_public = False
+        if owner_type == OwnerType.PLAYER:
+            from players.models import Player
+            is_owner_public = Player.objects.filter(id=owner_id, is_public=True).exists()
+        elif owner_type == OwnerType.CLUB:
+            from clubs.models import Club
+            is_owner_public = Club.objects.filter(id=owner_id, is_public=True).exists()
+        elif owner_type == OwnerType.ORGANIZATION:
+            from core.models import Tenant
+            is_owner_public = Tenant.objects.filter(id=owner_id, status="active").exists()
+
+        has_tenant_access = False
+        if user:
+            has_tenant_access = _owner_belongs_to_tenant(
+                owner_type=owner_type,
+                owner_id=owner_id,
+                tenant=tenant,
+                user=user,
+            )
+
+        if not (is_owner_public or has_tenant_access):
             return error_response(
-                message="Owner não pertence ao tenant autenticado.",
+                message="Owner não encontrado ou sem permissão de acesso.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
@@ -522,6 +543,10 @@ class MediaUsageView(APIView):
             owner_type=owner_type,
             owner_id=owner_id,
         )
+
+        if not has_tenant_access:
+            usages = usages.filter(asset__visibility=AssetVisibility.PUBLIC)
+
         paginator = StandardPagination()
         page = paginator.paginate_queryset(usages, request)
         return paginator.get_paginated_response(MediaUsageSerializer(page, many=True).data)

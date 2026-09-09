@@ -187,12 +187,28 @@ class Player(BaseModel):
 
     @property
     def profile_photo_url(self) -> str | None:
-        """Return the public URL of profile photo if available, else fallback to avatar URL."""
+        """Return the public URL of profile photo if available, else fallback to MediaUsage avatar, else avatar URL."""
         try:
             if self.profile_photo:
-                return getattr(self.profile_photo, 'public_url', None)
+                url = getattr(self.profile_photo, 'public_url', None)
+                if url:
+                    return url
         except Exception:
             pass
+
+        try:
+            from media_assets.models import MediaUsage
+            from media_assets.constants import AssetCategory, OwnerType
+            usage = MediaUsage.get_active_for(
+                owner_type=OwnerType.PLAYER,
+                owner_id=self.id,
+                role=AssetCategory.AVATAR,
+            )
+            if usage and usage.asset:
+                return usage.asset.public_url
+        except Exception:
+            pass
+
         return self.avatar
     
     @property

@@ -174,8 +174,21 @@ class PlayerService:
                 setattr(player, field, value)
                 updated.append(field)
 
+        # If avatar was updated, try to link matching MediaAsset as profile_photo
+        if "avatar" in kwargs and kwargs["avatar"]:
+            try:
+                from media_assets.models import MediaAsset
+                asset = MediaAsset.objects.filter(
+                    models.Q(cdn_url=kwargs["avatar"]) | models.Q(private_url=kwargs["avatar"])
+                ).first()
+                if asset and player.profile_photo_id != asset.id:
+                    player.profile_photo = asset
+                    updated.append("profile_photo")
+            except Exception:
+                pass
+
         if updated:
-            player.save(update_fields=updated)
+            player.save(update_fields=list(set(updated)))
             logger.info("Player updated: %s — fields: %s", player.full_name, updated)
 
         return player

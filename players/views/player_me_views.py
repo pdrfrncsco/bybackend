@@ -191,6 +191,7 @@ class PlayerMeView(APIView):
             "weight_kg",
             "foot",
             "bio",
+            "avatar",
             "is_public",
         }
         payload = {k: v for k, v in request.data.items() if k in allowed}

@@ -186,7 +186,7 @@ class PlayerDetailUpdateView(APIView):
         allowed = {
             "first_name", "last_name", "date_of_birth", "nationality",
             "primary_position", "email", "phone", "height_cm", "weight_kg",
-            "foot", "bio", "avatar", "status",
+            "foot", "bio", "avatar", "status", "is_public",
         }
         payload = {k: v for k, v in request.data.items() if k in allowed}
 
