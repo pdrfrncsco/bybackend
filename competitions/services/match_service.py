@@ -6,7 +6,7 @@ Handles scheduling (round-robin generator), score updates, and match status mana
 
 import logging
 from datetime import datetime, timedelta
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from core.models import Tenant
@@ -413,7 +413,19 @@ class MatchService:
         If double_round=True, generates home-and-away legs.
         """
         # Delete existing matches for this competition to avoid duplicates
-        Match.objects.filter(competition=competition, tenant=tenant).delete()
+        existing_matches = Match.objects.filter(competition=competition, tenant=tenant)
+        has_started_or_data = existing_matches.filter(
+            models.Q(status__in=[Match.MatchStatus.LIVE, Match.MatchStatus.FINISHED]) |
+            models.Q(events__isnull=False) |
+            models.Q(lineups__isnull=False)
+        ).distinct().exists()
+        if has_started_or_data:
+            raise ValueError(
+                "Não é possível gerar novo calendário porque a competição já possui jogos em andamento, "
+                "concluídos ou com dados de escalações/eventos associados."
+            )
+
+        existing_matches.delete()
 
         # Get all registered clubs
         registrations = CompetitionRegistration.objects.filter(competition=competition, tenant=tenant)

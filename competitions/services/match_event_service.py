@@ -104,8 +104,8 @@ class MatchEventService:
         if event_type not in MatchEvent.EventType.values:
             raise InvalidMatchEventData(f"Unknown event_type: {event_type!r}")
 
-        if not (0 <= minute <= 120):
-            raise InvalidMatchEventData("minute must be between 0 and 120.")
+        if not (0 <= minute <= 135):
+            raise InvalidMatchEventData("minute must be between 0 and 135.")
 
         # Validate club is in this match
         if club.id not in (match.home_club_id, match.away_club_id):
@@ -139,6 +139,34 @@ class MatchEventService:
         }
         if event_type in goal_types:
             MatchEventService._recalculate_score(match)
+
+        # Update substitution minutes on MatchLineup if applicable
+        if event_type == MatchEvent.EventType.SUBSTITUTION_IN:
+            from competitions.models import MatchLineup
+            if player:
+                MatchLineup.objects.filter(
+                    tenant=tenant, match=match, club=club, player=player
+                ).update(substituted_in_minute=minute)
+            if player_off:
+                MatchLineup.objects.filter(
+                    tenant=tenant, match=match, club=club, player=player_off
+                ).update(substituted_out_minute=minute)
+
+        # Auto-check Fair Play suspensions for cards
+        card_types = {
+            MatchEvent.EventType.YELLOW_CARD,
+            MatchEvent.EventType.RED_CARD,
+            MatchEvent.EventType.YELLOW_RED,
+        }
+        if event_type in card_types:
+            try:
+                from competitions.services.fair_play_service import FairPlayService, SuspensionAlreadyExists
+                FairPlayService.check_and_create_suspension_for_event(
+                    tenant=tenant, event=event
+                )
+            except Exception:
+                # Log or tolerate if already exists / handled
+                pass
 
         # Auto-sync player stats
         MatchEventService._sync_player_stats(event, operation="add")
@@ -177,6 +205,34 @@ class MatchEventService:
             MatchEvent.EventType.OWN_GOAL,
         }
         
+        # Clean up any automatic suspension triggered by this event
+        if event.event_type in {
+            MatchEvent.EventType.YELLOW_CARD,
+            MatchEvent.EventType.RED_CARD,
+            MatchEvent.EventType.YELLOW_RED,
+        }:
+            from competitions.models import PlayerSuspension
+            PlayerSuspension.objects.filter(
+                tenant=tenant,
+                trigger_event=event,
+                status__in=[
+                    PlayerSuspension.SuspensionStatus.PENDING,
+                    PlayerSuspension.SuspensionStatus.ACTIVE,
+                ],
+            ).delete()
+
+        # Clean up substitution minutes if it was a substitution
+        if event.event_type == MatchEvent.EventType.SUBSTITUTION_IN:
+            from competitions.models import MatchLineup
+            if event.player:
+                MatchLineup.objects.filter(
+                    tenant=tenant, match=match, club=event.club, player=event.player
+                ).update(substituted_in_minute=None)
+            if event.player_off:
+                MatchLineup.objects.filter(
+                    tenant=tenant, match=match, club=event.club, player=event.player_off
+                ).update(substituted_out_minute=None)
+
         # Sync player stats BEFORE deletion (need event data)
         MatchEventService._sync_player_stats(event, operation="remove")
 
@@ -186,7 +242,7 @@ class MatchEventService:
             payload={"match_id": str(match.id), "event_id": str(event.id)},
             origin="competitions.match_event_service",
         ))
-        
+
         event.delete()
 
         if was_goal:
@@ -211,7 +267,6 @@ class MatchEventService:
         Returns a list of dicts sorted by goals desc.
         """
         from django.db.models import Count, Q
-        from competitions.models import Match
 
         players_qs = (
             MatchEvent.objects.filter(

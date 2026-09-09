@@ -242,6 +242,8 @@ class MatchReportSerializer(serializers.ModelSerializer):
     )
     home_stats = serializers.SerializerMethodField()
     away_stats = serializers.SerializerMethodField()
+    incidents = serializers.SerializerMethodField()
+    notes = serializers.SerializerMethodField()
 
     class Meta:
         model = MatchReport
@@ -249,10 +251,21 @@ class MatchReportSerializer(serializers.ModelSerializer):
             'id', 'match', 'status', 'status_display',
             'home_score', 'away_score', 'home_goals_against',
             'away_goals_against', 'match_duration',
+            'incidents', 'notes', 'data',
             'goals', 'home_stats', 'away_stats',
             'created_at', 'updated_at'
         ]
         read_only_fields = fields
+
+    def get_incidents(self, obj):
+        if isinstance(obj.data, dict):
+            return obj.data.get('incidents', '')
+        return ''
+
+    def get_notes(self, obj):
+        if isinstance(obj.data, dict):
+            return obj.data.get('notes', '')
+        return ''
 
     def get_home_stats(self, obj):
         """Get home team stats."""
@@ -281,6 +294,8 @@ class MatchReportInputSerializer(serializers.Serializer):
         max_value=180,
         required=False
     )
+    incidents = serializers.CharField(required=False, allow_blank=True, default="")
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
 
 
 class GoalInputSerializer(serializers.Serializer):

@@ -20,6 +20,7 @@ from competitions.views import (
     LineupSubmissionViewSet,
     MatchReportViewSet,
 )
+from competitions.views.tactical_views import TacticalPositionsViewSet
 from competitions.views.match_center_views import (
     MatchEventListCreateView,
     MatchEventDeleteView,
@@ -147,7 +148,7 @@ urlpatterns = [
     # Tactical positions for a match (GET/POST)
     path(
         "matches/<uuid:match_id>/tactical_positions/",
-        __import__('competitions.views.tactical_views', fromlist=['TacticalPositionsViewSet']).TacticalPositionsViewSet.as_view({'get': 'retrieve', 'post': 'create'}),
+        TacticalPositionsViewSet.as_view({'get': 'retrieve', 'post': 'create'}),
         name="tactical-positions"
     ),
 ]

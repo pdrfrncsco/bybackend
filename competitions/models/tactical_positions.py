@@ -51,16 +51,22 @@ class TacticalPositions(BaseModel):
         self.version = uuid.uuid4()
         self.save(update_fields=["version", "updated_at"])
 
-        def can_user_modify(self, user):
-            """Check if a user can modify tactical positions for this club."""
-            # Allow superusers
-            if user.is_superuser:
-                return True
-            try:
-                from clubs.models import ClubMember
-                return ClubMember.objects.filter(club=self.club, user=user, is_active=True, role__in=["manager", "coach", "assistant_coach"]).exists()
-            except Exception:
-                return False
+    def can_user_modify(self, user):
+        """Check if a user can modify tactical positions for this club."""
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        try:
+            from clubs.models import ClubMember
+            return ClubMember.objects.filter(
+                club=self.club,
+                user=user,
+                is_active=True,
+                role__in=["manager", "coach", "assistant_coach"]
+            ).exists()
+        except Exception:
+            return False
 
     def __str__(self) -> str:
         return f"TacticalPositions(match={self.match}, club={self.club}, updated_at={self.updated_at})"

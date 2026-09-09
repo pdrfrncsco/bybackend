@@ -10,7 +10,7 @@ from collections import defaultdict
 from datetime import datetime
 import logging
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from clubs.models import Club
@@ -95,6 +95,12 @@ class CompetitionFormatService:
             return match.home_club
         if match.away_score > match.home_score:
             return match.away_club
+        # If regular/extra time is tied, check penalty shootout scores
+        if match.home_penalty_score is not None and match.away_penalty_score is not None:
+            if match.home_penalty_score > match.away_penalty_score:
+                return match.home_club
+            if match.away_penalty_score > match.home_penalty_score:
+                return match.away_club
         return None
 
     @staticmethod
@@ -114,7 +120,19 @@ class CompetitionFormatService:
         if len(clubs) < 2:
             return []
 
-        Match.objects.filter(competition=competition, tenant=tenant).delete()
+        existing_matches = Match.objects.filter(competition=competition, tenant=tenant)
+        has_started_or_data = existing_matches.filter(
+            models.Q(status__in=[Match.MatchStatus.LIVE, Match.MatchStatus.FINISHED]) |
+            models.Q(events__isnull=False) |
+            models.Q(lineups__isnull=False)
+        ).distinct().exists()
+        if has_started_or_data:
+            raise ValueError(
+                "Não é possível gerar novo sorteio porque a competição já possui jogos em andamento, "
+                "concluídos ou com dados de escalações/eventos associados."
+            )
+
+        existing_matches.delete()
 
         if timezone.is_naive(start_date):
             start_date = timezone.make_aware(start_date, timezone.get_current_timezone())

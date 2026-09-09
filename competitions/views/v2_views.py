@@ -88,6 +88,20 @@ class CompetitionRegisterClubView(APIView):
             message="Club registered in competition successfully.",
         )
 
+    def get(self, request, competition_id):
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+        if competition is None:
+            return not_found_response(message="Competition not found.")
+        from competitions.selectors import CompetitionRegistrationSelector
+        regs = CompetitionRegistrationSelector.list_by_competition(
+            tenant=competition.tenant, competition_id=competition.id
+        )
+        serializer = CompetitionRegistrationSerializer(regs, many=True)
+        return success_response(
+            data=serializer.data,
+            message="Registrations retrieved successfully.",
+        )
+
 
 class CompetitionGenerateScheduleView(APIView):
     """
@@ -434,6 +448,32 @@ class CompetitionStandingListView(APIView):
             group_id=group_id,
             phase=phase,
         )
+        if not standings.exists() and group_id is None and phase is None:
+            from competitions.models import Standing
+            from competitions.selectors import CompetitionRegistrationSelector
+            regs = CompetitionRegistrationSelector.list_by_competition(
+                tenant=competition.tenant,
+                competition_id=competition.id,
+            )
+            if regs.exists():
+                for reg in regs:
+                    Standing.objects.get_or_create(
+                        competition=competition,
+                        club=reg.club,
+                        tenant=competition.tenant,
+                        phase=None,
+                        group_id=None,
+                        defaults={
+                            "played": 0, "won": 0, "drawn": 0, "lost": 0,
+                            "goals_for": 0, "goals_against": 0, "points": 0, "position": 1,
+                        }
+                    )
+                standings = StandingSelector.list_by_competition(
+                    tenant=competition.tenant,
+                    competition_id=competition.id,
+                    group_id=group_id,
+                    phase=phase,
+                )
         serializer = StandingSerializer(standings, many=True)
         return success_response(
             data=serializer.data,

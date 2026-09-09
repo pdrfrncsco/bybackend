@@ -34,7 +34,25 @@ class LineupConfig:
     
     # Football rules
     MIN_GOALKEEPERS = 1
-    MAX_GOALKEEPERS = 2
+    MAX_GOALKEEPERS = 1
+
+    # Recognized tactical formations (def, mid, fwd)
+    SUPPORTED_FORMATIONS = {
+        "4-4-2": (4, 4, 2),
+        "4-3-3": (4, 3, 3),
+        "4-2-3-1": (4, 5, 1),
+        "3-5-2": (3, 5, 2),
+        "5-3-2": (5, 3, 2),
+        "3-4-3": (3, 4, 3),
+        "4-1-4-1": (4, 5, 1),
+        "4-5-1": (4, 5, 1),
+        "5-4-1": (5, 4, 1),
+    }
+
+    DEF_POSITIONS = {"cb", "lb", "rb", "lwb", "rwb", "df"}
+    MID_POSITIONS = {"cm", "cdm", "cam", "lm", "rm", "mf"}
+    FWD_POSITIONS = {"st", "cf", "fw"}
+    FLEX_POSITIONS = {"lw", "rw", "lm", "rm"}
 
 
 class LineupValidationError(Exception):
@@ -128,7 +146,7 @@ class LineupService:
             )
         
         # Validate lineup
-        LineupService._validate_lineup(players)
+        LineupService._validate_lineup(players, formation=formation)
         
         # Get all player IDs from the lineup
         player_ids = [player_entry["player_id"] for player_entry in players]
@@ -190,9 +208,9 @@ class LineupService:
         return submission
 
     @staticmethod
-    def _validate_lineup(players: List[dict]) -> None:
+    def _validate_lineup(players: List[dict], formation: str = "") -> None:
         """
-        Validate lineup composition.
+        Validate lineup composition and tactical formation.
         
         Raises:
             LineupValidationError: If validation fails
@@ -226,12 +244,65 @@ class LineupService:
                 f"Maximum {LineupConfig.MAX_TOTAL_PLAYERS} players allowed, got {len(players)}"
             )
         
-        # Check goalkeepers
-        goalkeepers = [p for p in starters if p.get("is_goalkeeper", False)]
-        if len(goalkeepers) < LineupConfig.MIN_GOALKEEPERS:
+        # Check goalkeepers: exactly 1 in starting XI
+        goalkeepers = [
+            p for p in starters
+            if p.get("is_goalkeeper", False) or str(p.get("position", "")).strip().lower() in ("gk", "gr")
+        ]
+        if len(goalkeepers) < 1:
             raise LineupValidationError(
-                f"At least {LineupConfig.MIN_GOALKEEPERS} goalkeeper required in starters"
+                "É obrigatório ter exatamente 1 guarda-redes na equipa titular."
             )
+        if len(goalkeepers) > 1:
+            raise LineupValidationError(
+                f"Apenas 1 guarda-redes é permitido na equipa titular (foram encontrados {len(goalkeepers)})."
+            )
+        
+        # Check tactical formation if provided
+        clean_formation = (formation or "").strip()
+        if clean_formation:
+            if clean_formation not in LineupConfig.SUPPORTED_FORMATIONS:
+                supported_list = ", ".join(LineupConfig.SUPPORTED_FORMATIONS.keys())
+                raise LineupValidationError(
+                    f"Formação tática inválida '{clean_formation}'. Formações suportadas: {supported_list}."
+                )
+
+            req_def, req_mid, req_fwd = LineupConfig.SUPPORTED_FORMATIONS[clean_formation]
+            outfield_starters = [
+                p for p in starters
+                if not (p.get("is_goalkeeper", False) or str(p.get("position", "")).strip().lower() in ("gk", "gr"))
+            ]
+
+            def_count = 0
+            mid_count = 0
+            fwd_count = 0
+            flex_count = 0
+
+            for p in outfield_starters:
+                pos = str(p.get("position", "")).strip().lower()
+                if pos in LineupConfig.DEF_POSITIONS:
+                    def_count += 1
+                elif pos in LineupConfig.FLEX_POSITIONS:
+                    flex_count += 1
+                elif pos in LineupConfig.MID_POSITIONS:
+                    mid_count += 1
+                elif pos in LineupConfig.FWD_POSITIONS:
+                    fwd_count += 1
+                else:
+                    mid_count += 1
+
+            if def_count != req_def:
+                raise LineupValidationError(
+                    f"A formação {clean_formation} requer {req_def} defesas, mas foram escalados {def_count} defesas."
+                )
+
+            needed_mid = max(0, req_mid - mid_count)
+            needed_fwd = max(0, req_fwd - fwd_count)
+            if (needed_mid + needed_fwd) != flex_count:
+                raise LineupValidationError(
+                    f"A formação {clean_formation} requer {req_def} defesas, {req_mid} médios e {req_fwd} avançados. "
+                    f"A distribuição atual dos titulares não é compatível com esta formação."
+                )
         
         # Check shirt numbers are unique
         shirt_numbers = [p["shirt_number"] for p in players]
