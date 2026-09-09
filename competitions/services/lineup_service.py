@@ -49,10 +49,71 @@ class LineupConfig:
         "5-4-1": (5, 4, 1),
     }
 
-    DEF_POSITIONS = {"cb", "lb", "rb", "lwb", "rwb", "df"}
-    MID_POSITIONS = {"cm", "cdm", "cam", "lm", "rm", "mf"}
-    FWD_POSITIONS = {"st", "cf", "fw"}
-    FLEX_POSITIONS = {"lw", "rw", "lm", "rm"}
+    GK_POSITIONS = {
+        "gk", "gr", "guarda-redes", "guarda_redes", "guarda redes", "golo", "goalkeeper", "porteiro"
+    }
+    DEF_POSITIONS = {
+        "cb", "dc", "lb", "le", "rb", "ld", "lwb", "rwb", "df", "def", "defesa", "lateral", "zagueiro"
+    }
+    MID_POSITIONS = {
+        "cm", "mc", "cdm", "mdf", "cam", "mco", "mo", "lm", "me", "rm", "md", "mf", "mid", "médio", "medio", "volante", "meio-campo"
+    }
+    FWD_POSITIONS = {
+        "st", "pl", "cf", "ac", "fw", "fwd", "att", "avançado", "avancado", "atacante", "ponta de lança", "ponta de lanca"
+    }
+    FLEX_POSITIONS = {
+        "lw", "rw", "ee", "ed", "lm", "rm", "me", "md"
+    }
+
+    @classmethod
+    def normalize_position(cls, pos: str) -> str:
+        if not pos:
+            return "mf"
+        clean = str(pos).strip().lower()
+        if clean in cls.GK_POSITIONS or "guarda" in clean or "keeper" in clean or clean == "golo":
+            return "gk"
+        if clean in {"cb", "dc", "defesa central", "zagueiro"}:
+            return "cb"
+        if clean in {"lb", "le", "lateral esquerdo"}:
+            return "lb"
+        if clean in {"rb", "ld", "lateral direito"}:
+            return "rb"
+        if clean in {"lwb", "ala esquerdo"}:
+            return "lwb"
+        if clean in {"rwb", "ala direito"}:
+            return "rwb"
+        if clean in {"df", "def", "defesa", "lateral"}:
+            return "df"
+        if clean in {"cdm", "mdf", "volante", "médio defensivo", "medio defensivo", "trinco"}:
+            return "cdm"
+        if clean in {"cam", "mco", "mo", "médio ofensivo", "medio ofensivo"}:
+            return "cam"
+        if clean in {"cm", "mc", "médio centro", "medio centro", "meio-campo"}:
+            return "cm"
+        if clean in {"lm", "me", "médio esquerdo", "medio esquerdo"}:
+            return "lm"
+        if clean in {"rm", "md", "médio direito", "medio direito"}:
+            return "rm"
+        if clean in {"mf", "mid", "médio", "medio"}:
+            return "mf"
+        if clean in {"lw", "ee", "extremo esquerdo", "ponta esquerda"}:
+            return "lw"
+        if clean in {"rw", "ed", "extremo direito", "ponta direita"}:
+            return "rw"
+        if clean in {"st", "pl", "ponta de lança", "ponta de lanca", "avançado", "avancado"}:
+            return "st"
+        if clean in {"cf", "ac", "avançado centro", "avancado centro"}:
+            return "cf"
+        if clean in {"fw", "fwd", "att", "atacante"}:
+            return "fw"
+        return clean
+
+    @classmethod
+    def is_goalkeeper_entry(cls, entry: dict) -> bool:
+        if entry.get("is_goalkeeper") is True:
+            return True
+        pos = cls.normalize_position(str(entry.get("position", "")))
+        return pos == "gk"
 
 
 class LineupValidationError(Exception):
@@ -145,9 +206,6 @@ class LineupService:
                 f"Lineup cannot be changed from status '{submission.get_status_display()}'"
             )
         
-        # Validate lineup
-        LineupService._validate_lineup(players, formation=formation)
-        
         # Get all player IDs from the lineup
         player_ids = [player_entry["player_id"] for player_entry in players]
         
@@ -159,6 +217,9 @@ class LineupService:
         missing_player_ids = [player_id for player_id in player_ids if str(player_id) not in players_by_id]
         if missing_player_ids:
             raise PlayerNotFound(f"Players not found: {missing_player_ids}")
+        
+        # Validate lineup with player DB context
+        LineupService._validate_lineup(players, formation=formation, players_by_id=players_by_id)
         
         # Check player eligibility
         for player_entry in players:
@@ -184,6 +245,15 @@ class LineupService:
         lineup_entries = []
         for entry in players:
             player = players_by_id[str(entry["player_id"])]
+            raw_pos = entry.get("position", "")
+            norm_pos = LineupConfig.normalize_position(raw_pos)
+            is_gk = (
+                entry.get("is_goalkeeper", False) is True
+                or norm_pos == "gk"
+                or (player and player.primary_position == Player.Position.GK)
+            )
+            if is_gk:
+                norm_pos = "gk"
             
             lineup_entry = MatchLineup.objects.create(
                 tenant=tenant,
@@ -191,10 +261,10 @@ class LineupService:
                 club=club,
                 player=player,
                 status=entry.get("status", MatchLineup.LineupStatus.SUBSTITUTE),
-                position=entry["position"],
+                position=norm_pos,
                 shirt_number=entry["shirt_number"],
                 is_captain=entry.get("is_captain", False),
-                is_goalkeeper=entry.get("is_goalkeeper", False),
+                is_goalkeeper=is_gk,
                 formation_position=entry.get("formation_position"),
                 submitted_by=submitted_by,
             )
@@ -208,7 +278,7 @@ class LineupService:
         return submission
 
     @staticmethod
-    def _validate_lineup(players: List[dict], formation: str = "") -> None:
+    def _validate_lineup(players: List[dict], formation: str = "", players_by_id: dict = None) -> None:
         """
         Validate lineup composition and tactical formation.
         
@@ -245,10 +315,18 @@ class LineupService:
             )
         
         # Check goalkeepers: exactly 1 in starting XI
-        goalkeepers = [
-            p for p in starters
-            if p.get("is_goalkeeper", False) or str(p.get("position", "")).strip().lower() in ("gk", "gr")
-        ]
+        goalkeepers = []
+        for p in starters:
+            p_id = str(p.get("player_id", ""))
+            db_player = players_by_id.get(p_id) if players_by_id else None
+            is_gk = (
+                p.get("is_goalkeeper") is True
+                or LineupConfig.is_goalkeeper_entry(p)
+                or (db_player and db_player.primary_position == Player.Position.GK)
+            )
+            if is_gk:
+                goalkeepers.append(p)
+
         if len(goalkeepers) < 1:
             raise LineupValidationError(
                 "É obrigatório ter exatamente 1 guarda-redes na equipa titular."
@@ -270,7 +348,7 @@ class LineupService:
             req_def, req_mid, req_fwd = LineupConfig.SUPPORTED_FORMATIONS[clean_formation]
             outfield_starters = [
                 p for p in starters
-                if not (p.get("is_goalkeeper", False) or str(p.get("position", "")).strip().lower() in ("gk", "gr"))
+                if p not in goalkeepers
             ]
 
             def_count = 0
@@ -279,14 +357,15 @@ class LineupService:
             flex_count = 0
 
             for p in outfield_starters:
-                pos = str(p.get("position", "")).strip().lower()
-                if pos in LineupConfig.DEF_POSITIONS:
+                raw_pos = str(p.get("position", "")).strip().lower()
+                norm_pos = LineupConfig.normalize_position(raw_pos)
+                if norm_pos in LineupConfig.DEF_POSITIONS or raw_pos in LineupConfig.DEF_POSITIONS:
                     def_count += 1
-                elif pos in LineupConfig.FLEX_POSITIONS:
+                elif norm_pos in LineupConfig.FLEX_POSITIONS or raw_pos in LineupConfig.FLEX_POSITIONS:
                     flex_count += 1
-                elif pos in LineupConfig.MID_POSITIONS:
+                elif norm_pos in LineupConfig.MID_POSITIONS or raw_pos in LineupConfig.MID_POSITIONS:
                     mid_count += 1
-                elif pos in LineupConfig.FWD_POSITIONS:
+                elif norm_pos in LineupConfig.FWD_POSITIONS or raw_pos in LineupConfig.FWD_POSITIONS:
                     fwd_count += 1
                 else:
                     mid_count += 1

@@ -14,7 +14,7 @@ from competitions.models import (
     Goal, MatchStats
 )
 from competitions.services.lineup_service import (
-    LineupService, LineupValidationError, PlayerNotEligible,
+    LineupService, LineupConfig, LineupValidationError, PlayerNotEligible,
     LineupAlreadySubmitted
 )
 
@@ -68,7 +68,7 @@ class MatchLineupInputSerializer(serializers.Serializer):
         choices=['starter', 'substitute'],
         required=True
     )
-    position = serializers.CharField(max_length=3)
+    position = serializers.CharField(max_length=30, required=False, allow_blank=True, default="mf")
     shirt_number = serializers.IntegerField(min_value=1, max_value=99)
     is_captain = serializers.BooleanField(required=False, default=False)
     is_goalkeeper = serializers.BooleanField(required=False, default=False)
@@ -77,6 +77,16 @@ class MatchLineupInputSerializer(serializers.Serializer):
         required=False,
         allow_null=True
     )
+
+    def validate(self, attrs):
+        raw_pos = attrs.get('position', '')
+        norm_pos = LineupConfig.normalize_position(raw_pos)
+        is_gk = attrs.get('is_goalkeeper', False) or norm_pos == 'gk'
+        if is_gk:
+            norm_pos = 'gk'
+            attrs['is_goalkeeper'] = True
+        attrs['position'] = norm_pos
+        return attrs
 
 
 # ─── Lineup Submission Serializers ─────────────────────────────────────────

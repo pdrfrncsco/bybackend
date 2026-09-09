@@ -613,6 +613,56 @@ class TestLineupSubmission(TestCase):
         assert entry.minutes_played == 85
         assert entry.substituted_out_minute == 75
 
+    def test_cannot_submit_multiple_goalkeepers(self):
+        """Test that lineup with more than 1 goalkeeper in starting XI is rejected."""
+        gk2 = Player.objects.create(
+            first_name="Reserve",
+            last_name="Keeper",
+            primary_position=Player.Position.GK,
+        )
+        players = self._create_valid_lineup()
+        # Replace CB2 with a second goalkeeper as a starter
+        players[2] = {
+            "player_id": gk2.id,
+            "status": "starter",
+            "position": "gk",
+            "shirt_number": 12,
+            "is_goalkeeper": True,
+            "formation_position": 3,
+        }
+
+        with pytest.raises(LineupValidationError) as excinfo:
+            LineupService.submit_lineup(
+                tenant=self.tenant,
+                match=self.match,
+                club=self.home_club,
+                players=players,
+                formation="4-3-3",
+                submitted_by=self.user,
+            )
+        assert "Apenas 1 guarda-redes é permitido" in str(excinfo.value)
+
+    def test_submit_portuguese_position_abbreviations(self):
+        """Test that Portuguese position codes like dc, le, ld, mdf, pl, gr are properly normalized."""
+        players = self._create_valid_lineup()
+        players[0]["position"] = "gr"
+        players[1]["position"] = "dc"
+        players[2]["position"] = "dc"
+        players[3]["position"] = "ld"
+        players[4]["position"] = "le"
+        players[5]["position"] = "mdf"
+        players[10]["position"] = "pl"
+
+        submission = LineupService.submit_lineup(
+            tenant=self.tenant,
+            match=self.match,
+            club=self.home_club,
+            players=players,
+            formation="4-3-3",
+            submitted_by=self.user,
+        )
+        assert submission.status == LineupSubmission.SubmissionStatus.SUBMITTED
+
 
 @pytest.mark.django_db
 class TestMatchReport(TestCase):
