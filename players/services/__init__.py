@@ -13,7 +13,7 @@ import logging
 from datetime import date
 from typing import Optional
 
-from django.db import transaction
+from django.db import models, transaction
 from django.utils.text import slugify
 
 from players.models import Player, PlayerRegistration
@@ -178,9 +178,23 @@ class PlayerService:
         if "avatar" in kwargs and kwargs["avatar"]:
             try:
                 from media_assets.models import MediaAsset
-                asset = MediaAsset.objects.filter(
-                    models.Q(cdn_url=kwargs["avatar"]) | models.Q(private_url=kwargs["avatar"])
-                ).first()
+                from urllib.parse import urlparse
+
+                avatar_val = str(kwargs["avatar"])
+                parsed = urlparse(avatar_val)
+                avatar_path = parsed.path if parsed.path else avatar_val
+
+                q = (
+                    models.Q(cdn_url=avatar_val)
+                    | models.Q(private_url=avatar_val)
+                    | models.Q(cdn_url=avatar_path)
+                    | models.Q(private_url=avatar_path)
+                )
+                if avatar_path.startswith("/media/"):
+                    rel_path = avatar_path[len("/media/"):]
+                    q |= models.Q(object_key=rel_path)
+
+                asset = MediaAsset.objects.filter(q).first()
                 if asset and player.profile_photo_id != asset.id:
                     player.profile_photo = asset
                     updated.append("profile_photo")

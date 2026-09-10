@@ -70,7 +70,7 @@ class PlayerListCreateView(APIView):
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request)
-        serializer = PlayerSerializer(page, many=True)
+        serializer = PlayerSerializer(page, many=True, context={"request": request})
         return paginator.get_paginated_response(serializer.data)
 
     @extend_schema(
@@ -116,7 +116,7 @@ class PlayerListCreateView(APIView):
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
-        serializer = PlayerSerializer(player)
+        serializer = PlayerSerializer(player, context={"request": request})
         return success_response(
             data=serializer.data,
             message="Player created successfully.",
@@ -159,7 +159,7 @@ class PlayerDetailUpdateView(APIView):
                     status_code=404,
                 )
 
-        serializer = PlayerDetailSerializer(player)
+        serializer = PlayerDetailSerializer(player, context={"request": request})
         return success_response(data=serializer.data, message="Player retrieved successfully.")
 
     @extend_schema(
@@ -195,7 +195,7 @@ class PlayerDetailUpdateView(APIView):
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
-        serializer = PlayerSerializer(player)
+        serializer = PlayerSerializer(player, context={"request": request})
         return success_response(data=serializer.data, message="Player updated successfully.")
 
 
@@ -224,7 +224,7 @@ class PlayerSearchView(APIView):
             )
 
         results = PlayerSelector.search(query, without_club=without_club)
-        serializer = PlayerSerializer(results, many=True)
+        serializer = PlayerSerializer(results, many=True, context={"request": request})
         return success_response(data=serializer.data, message="Search completed.")
 
 

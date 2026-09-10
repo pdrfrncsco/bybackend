@@ -9,7 +9,38 @@ from rest_framework import serializers
 from players.models import Player, PlayerRegistration
 
 
-class PlayerSerializer(serializers.ModelSerializer):
+class PlayerMediaMixin:
+    """Provides unified resolution for avatar and profile_photo_url."""
+
+    def _resolve_media_url(self, url: str | None) -> str | None:
+        if not url:
+            return None
+        request = getattr(self, "context", {}).get("request") if hasattr(self, "context") else None
+        if request and not url.startswith(("http://", "https://", "data:", "blob:")):
+            return request.build_absolute_uri(url)
+        return url
+
+    def get_avatar(self, obj: Player) -> str | None:
+        url = obj.profile_photo_url or obj.avatar
+        if not url:
+            try:
+                from media_assets.constants import AssetCategory, OwnerType
+                from media_assets.services import MediaAssetService
+
+                url = MediaAssetService.get_usage_url(
+                    owner_type=OwnerType.PLAYER,
+                    owner_id=obj.id,
+                    role=AssetCategory.AVATAR,
+                )
+            except Exception:
+                url = None
+        return self._resolve_media_url(url)
+
+    def get_profile_photo_url(self, obj: Player) -> str | None:
+        return self.get_avatar(obj)
+
+
+class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     """
     Public player profile serializer.
     
@@ -26,6 +57,8 @@ class PlayerSerializer(serializers.ModelSerializer):
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
     current_club = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    profile_photo_url = serializers.SerializerMethodField()
 
     # Prefer values from PlayerFootballProfile when present
     primary_position = serializers.SerializerMethodField()
@@ -142,7 +175,7 @@ class PlayerSerializer(serializers.ModelSerializer):
         return None
 
 
-class PlayerDetailSerializer(serializers.ModelSerializer):
+class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     """
     Extended player profile with career summary, videos, documents, and achievements.
     
@@ -163,6 +196,8 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
     videos = serializers.SerializerMethodField()
     documents = serializers.SerializerMethodField()
     achievements = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    profile_photo_url = serializers.SerializerMethodField()
 
     # Prefer football_profile values
     primary_position = serializers.SerializerMethodField()
@@ -297,9 +332,6 @@ class PlayerDetailSerializer(serializers.ModelSerializer):
             for registration in registrations
         ]
 
-    def get_profile_photo_url(self, obj: Player) -> str | None:
-        return obj.profile_photo_url
-    
     def get_videos(self, obj: Player) -> list:
         """Return player's published videos."""
         from players.models import PlayerVideo

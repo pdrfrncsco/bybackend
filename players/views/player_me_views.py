@@ -15,7 +15,7 @@ from players.serializers import PlayerDetailSerializer, PlayerSerializer
 from players.services import NoPlayerProfile, PlayerService
 
 
-def build_onboarding_status_data(player, status):
+def build_onboarding_status_data(player, status, request=None):
     has_basic_info = bool(
         player.first_name
         and player.last_name
@@ -45,6 +45,7 @@ def build_onboarding_status_data(player, status):
     next_step = status.get_next_step()
     onboarding_required = not status.is_complete
 
+    serializer_context = {"request": request} if request else {}
     return {
         "onboarding_required": onboarding_required,
         "has_player_profile": True,
@@ -61,7 +62,7 @@ def build_onboarding_status_data(player, status):
         "club_complete": status.club_complete,
         "review_complete": status.review_complete,
         "progress_percentage": status.progress_percentage,
-        "player": PlayerSerializer(player).data,
+        "player": PlayerSerializer(player, context=serializer_context).data,
     }
 
 
@@ -91,7 +92,7 @@ class PlayerOnboardingStatusView(APIView):
 
         from players.services.onboarding_service import PlayerOnboardingService
         status = PlayerOnboardingService.get_status(player)
-        data = build_onboarding_status_data(player, status)
+        data = build_onboarding_status_data(player, status, request=request)
 
         return success_response(
             data=data,
@@ -140,7 +141,7 @@ class PlayerMeView(APIView):
             return error_response(message=str(exc), status_code=400)
 
         return success_response(
-            data=PlayerSerializer(player).data,
+            data=PlayerSerializer(player, context={"request": request}).data,
             message="Player profile created successfully.",
             status_code=201,
         )
@@ -156,7 +157,7 @@ class PlayerMeView(APIView):
         except NoPlayerProfile:
             return error_response(message="No player profile linked to this account.", status_code=404)
 
-        serializer = PlayerDetailSerializer(player)
+        serializer = PlayerDetailSerializer(player, context={"request": request})
         return success_response(data=serializer.data, message="Player profile retrieved successfully.")
 
     @extend_schema(
@@ -212,7 +213,7 @@ class PlayerMeView(APIView):
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
-        serializer = PlayerSerializer(player)
+        serializer = PlayerSerializer(player, context={"request": request})
         return success_response(data=serializer.data, message="Player profile updated successfully.")
 
 
@@ -271,5 +272,5 @@ class PlayerAvatarView(APIView):
         except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
-        serializer = PlayerSerializer(player)
+        serializer = PlayerSerializer(player, context={"request": request})
         return success_response(data=serializer.data, message="Avatar uploaded successfully.")
