@@ -79,7 +79,7 @@ class ClubMeView(APIView):
     )
     def get(self, request):
         club = ClubService.get_club_for_user(user=request.user)
-        serializer = ClubSerializer(club)
+        serializer = ClubSerializer(club, context={"request": request})
         return success_response(
             data=serializer.data,
             message="Club retrieved successfully.",
@@ -104,14 +104,14 @@ class ClubMeView(APIView):
         )
 
         return success_response(
-            data=ClubSerializer(club).data,
+            data=ClubSerializer(club, context={"request": request}).data,
             message="Club updated successfully.",
         )
 
 
 class ClubLogoView(APIView):
     """
-    Upload a logo for the authenticated user's club.
+    Upload or remove a logo for the authenticated user's club.
     """
 
     permission_classes = [IsAuthenticated, IsActiveAccount, IsClubAdmin]
@@ -134,8 +134,21 @@ class ClubLogoView(APIView):
         club = ClubService.upload_logo(club=club, logo_file=file, uploaded_by=request.user)
 
         return success_response(
-            data=ClubSerializer(club).data,
+            data=ClubSerializer(club, context={"request": request}).data,
             message="Logo uploaded successfully.",
+        )
+
+    @extend_schema(
+        tags=["clubs"],
+        responses={200: ClubSerializer},
+    )
+    def delete(self, request):
+        club = ClubService.get_club_for_user(user=request.user)
+        club = ClubService.remove_logo(club=club)
+
+        return success_response(
+            data=ClubSerializer(club, context={"request": request}).data,
+            message="Logo removed successfully.",
         )
 
 
@@ -165,7 +178,7 @@ class ClubCreateView(APIView):
         )
 
         return created_response(
-            data=ClubSerializer(club).data,
+            data=ClubSerializer(club, context={"request": request}).data,
             message="Club created successfully.",
         )
 
@@ -185,7 +198,7 @@ class ClubActivateView(APIView):
         club = ClubService.activate(club=club)
 
         return success_response(
-            data=ClubSerializer(club).data,
+            data=ClubSerializer(club, context={"request": request}).data,
             message="Club activated successfully.",
         )
 
@@ -205,7 +218,7 @@ class ClubSuspendView(APIView):
         club = ClubService.suspend(club=club)
 
         return success_response(
-            data=ClubSerializer(club).data,
+            data=ClubSerializer(club, context={"request": request}).data,
             message="Club suspended successfully.",
         )
 
@@ -336,7 +349,7 @@ class ClubPublicListView(APIView):
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request)
-        serializer = PublicClubSerializer(page, many=True)
+        serializer = PublicClubSerializer(page, many=True, context={"request": request})
         return paginator.get_paginated_response(serializer.data)
 
 
@@ -372,7 +385,7 @@ class ClubPublicDetailView(APIView):
                 except Club.DoesNotExist:
                     raise ClubNotFound()
 
-        serializer = PublicClubSerializer(club)
+        serializer = PublicClubSerializer(club, context={"request": request})
         return success_response(
             data=serializer.data,
             message="Club retrieved successfully.",

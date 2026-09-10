@@ -70,3 +70,38 @@ class ClubLogoDamIsolationTest(TestCase):
 
         first_usage.refresh_from_db()
         self.assertFalse(first_usage.is_active)
+
+    def test_remove_logo_deactivates_usage_and_clears_serializer_url(self):
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.models import MediaUsage
+
+        ClubService.upload_logo(club=self.club_a, file=self._fake_image("logo.png"))
+        self.assertTrue(ClubSerializer(self.club_a).data["logo_url"])
+
+        ClubService.remove_logo(club=self.club_a)
+
+        usage = MediaUsage.objects.filter(
+            owner_type=OwnerType.CLUB,
+            owner_id=self.club_a.id,
+            role=AssetCategory.LOGO,
+            is_active=True,
+        ).first()
+        self.assertIsNone(usage)
+
+        self.assertEqual(ClubSerializer(self.club_a).data["logo_url"], "")
+        self.assertEqual(PublicClubSerializer(self.club_a).data["logo_url"], "")
+
+    def test_logo_url_with_request_context_is_absolute(self):
+        from rest_framework.test import APIRequestFactory
+
+        ClubService.upload_logo(club=self.club_a, file=self._fake_image("logo.png"))
+
+        factory = APIRequestFactory()
+        request = factory.get("/api/v1/clubs/me/")
+
+        data = ClubSerializer(self.club_a, context={"request": request}).data
+        self.assertTrue(data["logo_url"].startswith("http://") or data["logo_url"].startswith("https://"))
+
+        public_data = PublicClubSerializer(self.club_a, context={"request": request}).data
+        self.assertTrue(public_data["logo_url"].startswith("http://") or public_data["logo_url"].startswith("https://"))
+

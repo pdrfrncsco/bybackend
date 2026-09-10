@@ -219,7 +219,7 @@ class PublicClubSerializer(serializers.ModelSerializer):
             from media_assets.constants import AssetCategory, OwnerType
             from media_assets.services import MediaAssetService
 
-            return (
+            url = (
                 MediaAssetService.get_usage_url(
                     owner_type=OwnerType.CLUB,
                     owner_id=obj.id,
@@ -227,6 +227,11 @@ class PublicClubSerializer(serializers.ModelSerializer):
                 )
                 or ""
             )
+            if url:
+                request = self.context.get("request")
+                if request:
+                    return request.build_absolute_uri(url)
+            return url
         except Exception:
             return ""
 

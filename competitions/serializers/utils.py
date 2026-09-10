@@ -5,7 +5,7 @@ Shared presentation helpers for competitions and match center serializers.
 """
 
 
-def get_club_logo_url(club) -> str:
+def get_club_logo_url(club, request=None) -> str:
     """
     Resolve the club logo through the DAM.
 
@@ -20,7 +20,7 @@ def get_club_logo_url(club) -> str:
         from media_assets.constants import AssetCategory, OwnerType
         from media_assets.services import MediaAssetService
 
-        return (
+        url = (
             MediaAssetService.get_usage_url(
                 owner_type=OwnerType.CLUB,
                 owner_id=club.id,
@@ -28,5 +28,8 @@ def get_club_logo_url(club) -> str:
             )
             or ""
         )
+        if url and request:
+            return request.build_absolute_uri(url)
+        return url
     except Exception:
         return ""

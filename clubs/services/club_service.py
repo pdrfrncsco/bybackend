@@ -163,6 +163,25 @@ class ClubService:
 
     @staticmethod
     @transaction.atomic
+    def remove_logo(*, club: Club) -> Club:
+        """
+        Deactivate active logo usages for this club.
+        """
+        from media_assets.constants import AssetCategory, OwnerType
+        from media_assets.models import MediaUsage
+
+        MediaUsage.objects.filter(
+            owner_type=OwnerType.CLUB,
+            owner_id=club.id,
+            role=AssetCategory.LOGO,
+            is_active=True,
+        ).update(is_active=False)
+
+        logger.info("Logo removed for club: %s", club.name)
+        return club
+
+    @staticmethod
+    @transaction.atomic
     def activate(*, club: Club) -> Club:
         """Activate a club."""
         club.status = ClubStatus.ACTIVE
