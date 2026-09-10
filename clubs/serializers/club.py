@@ -277,6 +277,9 @@ class ClubMemberSerializer(serializers.ModelSerializer):
     display_name = serializers.SerializerMethodField()
     role_label = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    status_label = serializers.SerializerMethodField()
 
     class Meta:
         model = ClubMember
@@ -292,12 +295,15 @@ class ClubMemberSerializer(serializers.ModelSerializer):
             "position",
             "position_label",
             "is_active",
+            "status",
+            "status_label",
+            "avatar",
             "joined_at",
             "left_at",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "club", "display_name", "role_label", "position_label", "created_at", "updated_at"]
+        read_only_fields = ["id", "club", "display_name", "role_label", "position_label", "status", "status_label", "avatar", "created_at", "updated_at"]
 
     def get_display_name(self, obj: ClubMember) -> str:
         return obj.display_name
@@ -307,6 +313,22 @@ class ClubMemberSerializer(serializers.ModelSerializer):
 
     def get_position_label(self, obj: ClubMember) -> str:
         return obj.position_label
+
+    def get_status(self, obj: ClubMember) -> str:
+        return "active" if obj.is_active else "inactive"
+
+    def get_status_label(self, obj: ClubMember) -> str:
+        return "Ativo" if obj.is_active else "Inativo"
+
+    def get_avatar(self, obj: ClubMember) -> str | None:
+        if obj.user:
+            url = getattr(obj.user, "avatar", None)
+            if url:
+                request = self.context.get("request") if hasattr(self, "context") and self.context else None
+                if request and not url.startswith(("http://", "https://", "data:", "blob:")):
+                    return request.build_absolute_uri(url)
+                return url
+        return None
 
 
 class ClubSquadMemberSerializer(serializers.ModelSerializer):
@@ -322,17 +344,45 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
     jersey_number = serializers.IntegerField(source="shirt_number", read_only=True)
     joined_at = serializers.DateField(source="joined_date", read_only=True)
     player_id = serializers.SerializerMethodField()
+    player_slug = serializers.SerializerMethodField()
+    avatar = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+    status_label = serializers.SerializerMethodField()
+    nationality = serializers.SerializerMethodField()
+    date_of_birth = serializers.SerializerMethodField()
+    height_cm = serializers.SerializerMethodField()
+    weight_kg = serializers.SerializerMethodField()
+    foot = serializers.SerializerMethodField()
+    matches_played = serializers.SerializerMethodField()
+    goals = serializers.SerializerMethodField()
+    assists = serializers.SerializerMethodField()
+    yellow_cards = serializers.SerializerMethodField()
+    red_cards = serializers.SerializerMethodField()
 
     class Meta:
         model = ClubMember  # Keep for backward compatibility, but fields come from PlayerRegistration
         fields = [
             "id",
             "player_id",
+            "player_slug",
             "display_name",
             "jersey_number",
             "position",
             "position_label",
             "joined_at",
+            "avatar",
+            "status",
+            "status_label",
+            "nationality",
+            "date_of_birth",
+            "height_cm",
+            "weight_kg",
+            "foot",
+            "matches_played",
+            "goals",
+            "assists",
+            "yellow_cards",
+            "red_cards",
         ]
         read_only_fields = fields
 
@@ -342,12 +392,56 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
             return str(obj.player.id)
         return None
 
+    def get_player_slug(self, obj) -> str | None:
+        """Returns the Player slug."""
+        if hasattr(obj, "player") and obj.player:
+            return getattr(obj.player, "slug", None)
+        return None
+
     def get_display_name(self, obj) -> str:
         """Returns the player's full name from the PlayerRegistration."""
         if hasattr(obj, "player") and obj.player:
             return obj.player.full_name
         # Fallback for old ClubMember records
         return obj.display_name if hasattr(obj, "display_name") else str(obj)
+
+    def get_avatar(self, obj) -> str | None:
+        """Returns the player's avatar or profile photo URL."""
+        if hasattr(obj, "player") and obj.player:
+            player = obj.player
+            url = getattr(player, "profile_photo_url", None) or getattr(player, "avatar", None)
+            if not url:
+                try:
+                    from media_assets.constants import AssetCategory, OwnerType
+                    from media_assets.services import MediaAssetService
+
+                    url = MediaAssetService.get_usage_url(
+                        owner_type=OwnerType.PLAYER,
+                        owner_id=player.id,
+                        role=AssetCategory.AVATAR,
+                    )
+                except Exception:
+                    url = None
+            if url:
+                request = self.context.get("request") if hasattr(self, "context") and self.context else None
+                if request and not url.startswith(("http://", "https://", "data:", "blob:")):
+                    return request.build_absolute_uri(url)
+                return url
+        return None
+
+    def get_status(self, obj) -> str:
+        if hasattr(obj, "status") and obj.status:
+            return obj.status
+        if hasattr(obj, "is_active"):
+            return "registered" if obj.is_active else "inactive"
+        return "registered"
+
+    def get_status_label(self, obj) -> str:
+        if hasattr(obj, "get_status_display"):
+            return obj.get_status_display()
+        if hasattr(obj, "is_active"):
+            return "Ativo" if obj.is_active else "Inativo"
+        return "Registado"
 
     def get_position(self, obj) -> str:
         """Returns the player's position from the PlayerRegistration."""
@@ -366,6 +460,46 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
                 return obj.player.primary_position or ""
         # Fallback for old ClubMember records
         return getattr(obj, "position_label", "") or ""
+
+    def get_nationality(self, obj) -> str | None:
+        if hasattr(obj, "player") and obj.player:
+            return getattr(obj.player, "nationality", None)
+        return None
+
+    def get_date_of_birth(self, obj) -> str | None:
+        if hasattr(obj, "player") and obj.player and obj.player.date_of_birth:
+            return str(obj.player.date_of_birth)
+        return None
+
+    def get_height_cm(self, obj) -> int | None:
+        if hasattr(obj, "player") and obj.player:
+            return getattr(obj.player, "height_cm", None)
+        return None
+
+    def get_weight_kg(self, obj) -> int | None:
+        if hasattr(obj, "player") and obj.player:
+            return getattr(obj.player, "weight_kg", None)
+        return None
+
+    def get_foot(self, obj) -> str | None:
+        if hasattr(obj, "player") and obj.player:
+            return getattr(obj.player, "foot", None)
+        return None
+
+    def get_matches_played(self, obj) -> int:
+        return getattr(obj, "matches_played", 0) or 0
+
+    def get_goals(self, obj) -> int:
+        return getattr(obj, "goals", 0) or 0
+
+    def get_assists(self, obj) -> int:
+        return getattr(obj, "assists", 0) or 0
+
+    def get_yellow_cards(self, obj) -> int:
+        return getattr(obj, "yellow_cards", 0) or 0
+
+    def get_red_cards(self, obj) -> int:
+        return getattr(obj, "red_cards", 0) or 0
 
 
 class ClubStaffSerializer(serializers.ModelSerializer):

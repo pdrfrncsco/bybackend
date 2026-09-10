@@ -96,7 +96,7 @@ class ClubSelector:
         return (
             PlayerRegistration.objects
             .filter(club=club, status__in=["registered", "loaned"])
-            .select_related("player")
+            .select_related("player", "player__profile_photo")
             .order_by("shirt_number")
         )
 
