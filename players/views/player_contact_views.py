@@ -96,3 +96,29 @@ class PlayerEmergencyContactListCreateView(APIView):
         contact = serializer.save(player=player)
         result = EmergencyContactSerializer(contact)
         return success_response(data=result.data, message="Emergency contact added.", status_code=201)
+
+
+class PlayerEmergencyContactDetailView(APIView):
+    def get_permissions(self):
+        if self.request.method in ("GET", "HEAD", "OPTIONS"):
+            return player_read_permissions()
+        return player_write_permissions()
+
+    @extend_schema(tags=["players"], summary="Delete emergency contact")
+    def delete(self, request, slug: str, contact_id):
+        player = PlayerSelector.get_by_slug(slug)
+        if not player:
+            return error_response(message="Player not found.", status_code=404)
+
+        permission_error = player_write_permission(request, player)
+        if permission_error:
+            return permission_error
+
+        try:
+            contact = player.emergency_contacts.get(id=contact_id)
+        except Exception:
+            return error_response(message="Emergency contact not found.", status_code=404)
+
+        contact.delete()
+        return success_response(message="Emergency contact deleted.", status_code=200)
+

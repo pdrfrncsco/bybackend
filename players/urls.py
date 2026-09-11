@@ -2,35 +2,6 @@
 BOLAYETU — Players URL Configuration
 
 Public API for players (global domain).
-
-Endpoints:
-    GET    /api/v1/players/              — List players
-    POST   /api/v1/players/              — Create player (staff only)
-    GET    /api/v1/players/search/       — Search players
-    GET    /api/v1/players/{slug}/       — Get player detail
-    PATCH  /api/v1/players/{slug}/       — Update player (staff only)
-    POST   /api/v1/players/{slug}/register/ — Register player at a club
-    
-    GET    /api/v1/players/{slug}/documents/     — List player documents
-    POST   /api/v1/players/{slug}/documents/     — Upload document (staff only)
-    GET    /api/v1/players/{slug}/documents/{id}/ — Get document detail
-    PATCH  /api/v1/players/{slug}/documents/{id}/ — Update document (staff only)
-    DELETE /api/v1/players/{slug}/documents/{id}/ — Delete document (staff only)
-    POST   /api/v1/players/{slug}/documents/{id}/verify/ — Verify document (admin only)
-    
-    GET    /api/v1/players/{slug}/videos/        — List player videos
-    POST   /api/v1/players/{slug}/videos/        — Upload video (staff only)
-    GET    /api/v1/players/{slug}/videos/{id}/    — Get video detail
-    PATCH  /api/v1/players/{slug}/videos/{id}/    — Update video (staff only)
-    DELETE /api/v1/players/{slug}/videos/{id}/    — Delete video (staff only)
-    POST   /api/v1/players/{slug}/videos/{id}/publish/ — Publish video (staff only)
-    
-    GET    /api/v1/players/{slug}/achievements/      — List player achievements
-    POST   /api/v1/players/{slug}/achievements/      — Add achievement (staff only)
-    GET    /api/v1/players/{slug}/achievements/{id}/  — Get achievement detail
-    PATCH  /api/v1/players/{slug}/achievements/{id}/  — Update achievement (staff only)
-    DELETE /api/v1/players/{slug}/achievements/{id}/  — Delete achievement (staff only)
-    POST   /api/v1/players/{slug}/achievements/{id}/verify/ — Verify achievement (admin only)
 """
 
 from django.urls import path
@@ -71,12 +42,28 @@ from players.views.player_identity_views import (
 from players.views.player_contact_views import (
     PlayerContactView,
     PlayerEmergencyContactListCreateView,
+    PlayerEmergencyContactDetailView,
 )
-from players.views.player_privacy_views import PlayerPrivacySettingsView
-from players.views.player_career_views import PlayerCareerListView
-from players.views.player_statistics_views import PlayerStatisticsListView
-from players.views.player_football_profile_views import PlayerFootballProfileView
-from players.views.player_invite_views import InvitePlayerView, RedeemInviteView
+from players.views.player_guardian_views import (
+    PlayerLegalGuardianListCreateView,
+    PlayerLegalGuardianDetailView,
+)
+from players.views.player_privacy_views import (
+    PlayerPrivacySettingsView,
+)
+from players.views.player_invite_views import (
+    InvitePlayerView,
+    RedeemInviteView,
+)
+from players.views.player_career_views import (
+    PlayerCareerListView,
+)
+from players.views.player_football_profile_views import (
+    PlayerFootballProfileView,
+)
+from players.views.player_statistics_views import (
+    PlayerStatisticsListView,
+)
 from players.views.player_contract_views import (
     PlayerContractListCreateView,
     PlayerContractDetailView,
@@ -85,10 +72,10 @@ from players.views.player_contract_views import (
     PlayerContractTerminateView,
 )
 from players.views.player_agent_views import (
-    AgentListCreateView,
-    AgentDetailView,
     PlayerAgentRelationshipListCreateView,
     PlayerAgentRelationshipDetailView,
+    AgentListCreateView,
+    AgentDetailView,
 )
 from players.views.player_training_views import (
     PlayerTrainingHistoryListCreateView,
@@ -98,15 +85,14 @@ from players.views.player_training_views import (
 )
 from players.views.player_medical_views import (
     PlayerMedicalProfileView,
+    PlayerMedicalHistoryView,
     MedicalDocumentListCreateView,
     MedicalDocumentDetailView,
     MedicalDocumentVerifyView,
     MedicalDocumentRejectView,
-    PlayerMedicalHistoryView,
 )
 
 urlpatterns = [
-    # Player CRUD
     path("", PlayerListCreateView.as_view(), name="player-list-create"),
     path("search/", PlayerSearchView.as_view(), name="player-search"),
     path("me/", PlayerMeView.as_view(), name="player-me"),
@@ -119,7 +105,7 @@ urlpatterns = [
     path("<slug:slug>/", PlayerDetailUpdateView.as_view(), name="player-detail-update"),
     path("<slug:slug>/avatar/", PlayerAvatarView.as_view(), name="player-avatar"),
     path("<slug:slug>/register/", PlayerRegisterView.as_view(), name="player-register"),
-    
+
     # Player Documents
     path(
         "<slug:slug>/documents/",
@@ -136,7 +122,7 @@ urlpatterns = [
         PlayerDocumentVerifyView.as_view(),
         name="player-document-verify",
     ),
-    
+
     # Player Videos
     path(
         "<slug:slug>/videos/",
@@ -153,7 +139,7 @@ urlpatterns = [
         PlayerVideoPublishView.as_view(),
         name="player-video-publish",
     ),
-    
+
     # Player Achievements
     path(
         "<slug:slug>/achievements/",
@@ -203,6 +189,22 @@ urlpatterns = [
         PlayerEmergencyContactListCreateView.as_view(),
         name="player-emergency-contact-list-create",
     ),
+    path(
+        "<slug:slug>/emergency-contacts/<uuid:contact_id>/",
+        PlayerEmergencyContactDetailView.as_view(),
+        name="player-emergency-contact-detail",
+    ),
+    path(
+        "<slug:slug>/guardians/",
+        PlayerLegalGuardianListCreateView.as_view(),
+        name="player-guardian-list-create",
+    ),
+    path(
+        "<slug:slug>/guardians/<uuid:guardian_id>/",
+        PlayerLegalGuardianDetailView.as_view(),
+        name="player-guardian-detail",
+    ),
+
     # Invite endpoint (admin)
     path(
         "invite/",
@@ -214,18 +216,21 @@ urlpatterns = [
         RedeemInviteView.as_view(),
         name="player-invite-redeem",
     ),
+
     # Phase 2: Career timeline
     path(
         "<slug:slug>/career/",
         PlayerCareerListView.as_view(),
         name="player-career-list",
     ),
+
     # Football profile (Phase 2)
     path(
         "<slug:slug>/football-profile/",
         PlayerFootballProfileView.as_view(),
         name="player-football-profile",
     ),
+
     # Season statistics
     path(
         "<slug:slug>/statistics/",

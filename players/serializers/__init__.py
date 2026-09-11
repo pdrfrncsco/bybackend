@@ -53,6 +53,7 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     """
     
     age = serializers.SerializerMethodField()
+    is_minor = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
@@ -74,6 +75,7 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
         model = Player
         fields = [
             "id",
+            "global_id",
             "slug",
             "first_name",
             "last_name",
@@ -81,6 +83,7 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
             "email",
             "date_of_birth",
             "age",
+            "is_minor",
             "nationality",
             "height_cm",
             "weight_kg",
@@ -111,6 +114,9 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
 
     def get_age(self, obj: Player) -> int | None:
         return obj.age
+
+    def get_is_minor(self, obj: Player) -> bool:
+        return bool(obj.is_minor)
     
     def get_full_name(self, obj: Player) -> str:
         return obj.full_name
@@ -188,6 +194,7 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     """
     
     age = serializers.SerializerMethodField()
+    is_minor = serializers.SerializerMethodField()
     full_name = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
@@ -213,12 +220,14 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
         model = Player
         fields = [
             "id",
+            "global_id",
             "slug",
             "first_name",
             "last_name",
             "full_name",
             "date_of_birth",
             "age",
+            "is_minor",
             "nationality",
             "height_cm",
             "weight_kg",
@@ -253,6 +262,9 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
 
     def get_age(self, obj: Player) -> int | None:
         return obj.age
+
+    def get_is_minor(self, obj: Player) -> bool:
+        return bool(obj.is_minor)
     
     def get_full_name(self, obj: Player) -> str:
         return obj.full_name
