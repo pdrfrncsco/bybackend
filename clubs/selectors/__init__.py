@@ -38,16 +38,16 @@ class ClubSelector:
     def get_by_slug(*, slug: str) -> Optional[Club]:
         """Retrieve a public club by its slug."""
         try:
-            return Club.objects.select_related("tenant").get(slug=slug, is_public=True)
-        except Club.DoesNotExist:
+            return Club.objects.select_related("tenant").filter(slug=slug, is_public=True).first()
+        except Exception:
             return None
 
     @staticmethod
     def get_by_slug_any(*, slug: str) -> Optional[Club]:
         """Retrieve a club by slug regardless of public status (for admin access)."""
         try:
-            return Club.objects.select_related("tenant").get(slug=slug)
-        except Club.DoesNotExist:
+            return Club.objects.select_related("tenant").filter(slug=slug).first()
+        except Exception:
             return None
 
     @staticmethod

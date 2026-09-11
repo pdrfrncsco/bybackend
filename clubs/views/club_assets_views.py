@@ -28,13 +28,13 @@ from media_assets.models import MediaAsset
 
 def _get_club(*, slug: str, tenant=None, public_only: bool = False) -> Club:
     if tenant:
-        try:
-            filters = {"slug": slug, "tenant": tenant}
-            if public_only:
-                filters["is_public"] = True
-            return Club.objects.select_related("tenant").get(**filters)
-        except Club.DoesNotExist:
+        filters = {"slug": slug, "tenant": tenant}
+        if public_only:
+            filters["is_public"] = True
+        club = Club.objects.select_related("tenant").filter(**filters).first()
+        if not club:
             raise ClubNotFound()
+        return club
 
     club = ClubSelector.get_by_slug(slug=slug) if public_only else ClubSelector.get_by_slug_any(slug=slug)
     if club is None:

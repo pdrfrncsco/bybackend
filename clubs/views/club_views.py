@@ -353,6 +353,42 @@ class ClubPublicListView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+def _resolve_public_club(request, slug: str) -> Club:
+    """Safely resolve a public club by slug or UUID without throwing MultipleObjectsReturned or ValueError."""
+    tenant = getattr(request, "tenant", None)
+    if tenant:
+        try:
+            import uuid
+            uuid.UUID(slug)
+            club = Club.objects.select_related("tenant").filter(
+                Q(slug=slug) | Q(id=slug),
+                tenant=tenant,
+                is_public=True
+            ).first()
+        except (ValueError, TypeError):
+            club = Club.objects.select_related("tenant").filter(
+                slug=slug,
+                tenant=tenant,
+                is_public=True
+            ).first()
+        if not club:
+            raise ClubNotFound()
+        return club
+
+    # Unscoped public access
+    club = ClubSelector.get_by_slug(slug=slug)
+    if club is None:
+        try:
+            import uuid
+            uuid.UUID(slug)
+            club = Club.objects.select_related("tenant").filter(id=slug, is_public=True).first()
+        except (ValueError, TypeError):
+            pass
+        if club is None:
+            raise ClubNotFound()
+    return club
+
+
 class ClubPublicDetailView(APIView):
     """
     Retrieve details of a public club by slug or UUID.
@@ -365,26 +401,7 @@ class ClubPublicDetailView(APIView):
         responses={200: PublicClubSerializer},
     )
     def get(self, request, slug: str):
-        # Prefer tenant resolved by subdomain when available
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),  # Accept both slug and UUID
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            # Try by slug first, then by UUID
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         serializer = PublicClubSerializer(club, context={"request": request})
         return success_response(
             data=serializer.data,
@@ -399,24 +416,7 @@ class ClubKpisView(APIView):
 
     @extend_schema(tags=["clubs"], responses={200: ClubKpisSerializer})
     def get(self, request, slug: str):
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         kpis = ClubSelector.get_kpis(club=club)
         serializer = ClubKpisSerializer(kpis)
         return success_response(
@@ -432,24 +432,7 @@ class ClubSquadView(APIView):
 
     @extend_schema(tags=["clubs"], responses={200: ClubSquadMemberSerializer(many=True)})
     def get(self, request, slug: str):
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         squad = ClubSelector.get_squad(club=club)
         serializer = ClubSquadMemberSerializer(squad, many=True)
         return success_response(
@@ -465,24 +448,7 @@ class ClubStaffView(APIView):
 
     @extend_schema(tags=["clubs"], responses={200: ClubStaffSerializer(many=True)})
     def get(self, request, slug: str):
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         staff = ClubSelector.get_staff(club=club)
         serializer = ClubStaffSerializer(staff, many=True)
         return success_response(
@@ -503,24 +469,7 @@ class ClubPublicCompetitionsView(APIView):
 
     @extend_schema(tags=["clubs"])
     def get(self, request, slug: str):
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         from competitions.serializers import CompetitionSerializer
 
         competitions = ClubSelector.get_competitions(club=club)
@@ -538,24 +487,7 @@ class ClubPublicMatchesView(APIView):
 
     @extend_schema(tags=["clubs"])
     def get(self, request, slug: str):
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         from competitions.serializers import MatchSerializer
 
         status = request.query_params.get("status")
@@ -576,24 +508,7 @@ class ClubPublicStandingsView(APIView):
 
     @extend_schema(tags=["clubs"])
     def get(self, request, slug: str):
-        tenant = getattr(request, "tenant", None)
-        if tenant:
-            try:
-                club = Club.objects.select_related("tenant").get(
-                    Q(slug=slug) | Q(id=slug),
-                    tenant=tenant,
-                    is_public=True
-                )
-            except Club.DoesNotExist:
-                raise ClubNotFound()
-        else:
-            club = ClubSelector.get_by_slug(slug=slug)
-            if club is None:
-                try:
-                    club = Club.objects.select_related("tenant").get(id=slug, is_public=True)
-                except Club.DoesNotExist:
-                    raise ClubNotFound()
-
+        club = _resolve_public_club(request, slug)
         from competitions.serializers import StandingSerializer
 
         competition_id = request.query_params.get("competition_id")

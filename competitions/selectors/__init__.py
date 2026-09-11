@@ -43,10 +43,9 @@ class CompetitionSelector:
                 queryset = queryset.filter(tenant=tenant)
             
             # Try slug first (most common case)
-            try:
-                return queryset.get(slug=competition_id)
-            except Competition.DoesNotExist:
-                pass
+            match = queryset.filter(slug=competition_id).first()
+            if match is not None:
+                return match
             
             # If slug not found, try as UUID
             # Django's UUIDField handles UUID string conversion automatically
