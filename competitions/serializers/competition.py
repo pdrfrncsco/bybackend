@@ -19,6 +19,11 @@ class CompetitionSerializer(serializers.ModelSerializer):
             "season",
             "status",
             "status_label",
+            "start_date",
+            "end_date",
+            "registration_start_date",
+            "registration_end_date",
+            "description",
             "config",
             "tenant",
             "created_at",
@@ -41,12 +46,34 @@ class CompetitionSerializer(serializers.ModelSerializer):
         return CompetitionStatus.LABELS.get(obj.status, obj.status)
 
 
+def _validate_dates(start_date, end_date, reg_start_date, reg_end_date):
+    if start_date and end_date and start_date > end_date:
+        raise serializers.ValidationError({
+            "end_date": "A data de conclusão não pode ser anterior à data de início."
+        })
+    if reg_start_date and reg_end_date and reg_start_date > reg_end_date:
+        raise serializers.ValidationError({
+            "registration_end_date": "A data de fim de inscrições não pode ser anterior à data de início."
+        })
+
+
 class CompetitionCreateSerializer(serializers.ModelSerializer):
     config = serializers.JSONField(required=False, default=dict)
 
     class Meta:
         model = Competition
-        fields = ["name", "competition_type", "season", "status", "config"]
+        fields = [
+            "name",
+            "competition_type",
+            "season",
+            "status",
+            "start_date",
+            "end_date",
+            "registration_start_date",
+            "registration_end_date",
+            "description",
+            "config",
+        ]
 
     def validate_competition_type(self, value: str) -> str:
         valid = {choice[0] for choice in CompetitionType.CHOICES}
@@ -58,6 +85,15 @@ class CompetitionCreateSerializer(serializers.ModelSerializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError("Config must be a JSON object.")
         return value
+
+    def validate(self, attrs):
+        _validate_dates(
+            attrs.get("start_date"),
+            attrs.get("end_date"),
+            attrs.get("registration_start_date"),
+            attrs.get("registration_end_date"),
+        )
+        return attrs
 
 
 class CompetitionUpdateSerializer(serializers.ModelSerializer):
@@ -65,7 +101,18 @@ class CompetitionUpdateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Competition
-        fields = ["name", "competition_type", "season", "status", "config"]
+        fields = [
+            "name",
+            "competition_type",
+            "season",
+            "status",
+            "start_date",
+            "end_date",
+            "registration_start_date",
+            "registration_end_date",
+            "description",
+            "config",
+        ]
 
     def validate_competition_type(self, value: str) -> str:
         valid = {choice[0] for choice in CompetitionType.CHOICES}
@@ -77,6 +124,16 @@ class CompetitionUpdateSerializer(serializers.ModelSerializer):
         if not isinstance(value, dict):
             raise serializers.ValidationError("Config must be a JSON object.")
         return value
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        reg_start = attrs.get("registration_start_date", getattr(self.instance, "registration_start_date", None))
+        reg_end = attrs.get("registration_end_date", getattr(self.instance, "registration_end_date", None))
+
+        _validate_dates(start_date, end_date, reg_start, reg_end)
+        return attrs
+
 
 
 class CompetitionConfigSerializer(serializers.ModelSerializer):

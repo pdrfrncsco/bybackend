@@ -46,7 +46,37 @@ class Competition(BaseModel):
         default=CompetitionStatus.DRAFT,
         verbose_name="Status",
     )
+    start_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Start Date",
+        help_text="Expected starting date of the competition",
+    )
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="End Date",
+        help_text="Expected ending date of the competition",
+    )
+    registration_start_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Registration Start Date",
+        help_text="Opening date for club registrations",
+    )
+    registration_end_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Registration End Date",
+        help_text="Closing date for club registrations",
+    )
+    description = models.TextField(
+        blank=True,
+        verbose_name="Description",
+        help_text="Brief description, notes or regulations summary",
+    )
     config = models.JSONField(default=dict, blank=True, verbose_name="Configuration")
+
 
     class Meta:
         ordering = ["-created_at"]
