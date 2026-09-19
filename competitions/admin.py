@@ -55,6 +55,26 @@ class MatchAdmin(admin.ModelAdmin):
     ordering = ("-match_date", "round_number")
     readonly_fields = ("created_at", "updated_at")
 
+def _is_cascade_deletion(request, model_segment: str) -> bool:
+    """
+    Returns True if the deletion permission check is occurring as part of
+    a cascading deletion from a parent model (e.g. deleting a Match, Competition,
+    Club, or Tenant) rather than directly from this model's admin pages.
+    """
+    if not request:
+        return True
+    user = getattr(request, "user", None)
+    if user and getattr(user, "is_superuser", False):
+        return True
+    resolver = getattr(request, "resolver_match", None)
+    if resolver and getattr(resolver, "url_name", None):
+        return model_segment not in resolver.url_name
+    path = getattr(request, "path", "")
+    if path:
+        return f"/{model_segment}/" not in path
+    return True
+
+
 @admin.register(MatchEvent)
 class MatchEventAdmin(admin.ModelAdmin):
     list_display = ("__str__", "match", "event_type", "minute", "extra_time", "club", "player", "idempotency_key")
@@ -73,6 +93,10 @@ class MatchEventAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        if request and getattr(request.user, "is_superuser", False):
+            return True
+        if _is_cascade_deletion(request, "matchevent"):
+            return True
         return False
 
     def has_change_permission(self, request, obj=None):
@@ -94,6 +118,10 @@ class MatchClockActionAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
+        if request and getattr(request.user, "is_superuser", False):
+            return True
+        if _is_cascade_deletion(request, "matchclockaction"):
+            return True
         return False
 
     def has_change_permission(self, request, obj=None):
