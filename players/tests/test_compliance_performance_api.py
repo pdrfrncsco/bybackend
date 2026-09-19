@@ -117,3 +117,41 @@ class ComplianceAndPerformanceAPITestCase(TestCase):
 
         res = self.client.get(f"/api/v1/transfers/?player_id={self.player.id}")
         self.assertEqual(res.status_code, 200)
+
+    def test_contracts_list_and_create(self):
+        """Test that an athlete can create and list contracts with derived tenant."""
+        self.client.force_authenticate(user=self.player_user)
+
+        # 1. Create contract
+        payload = {
+            "club": str(self.club.id),
+            "contract_type": "professional",
+            "status": "draft",
+            "start_date": "2026-07-01",
+            "end_date": "2028-06-30",
+            "salary": "120000.00",
+            "currency": "USD",
+            "release_clause": "500000.00",
+            "has_image_rights": True,
+        }
+        res_create = self.client.post(
+            f"/api/v1/players/{self.player.id}/contracts/",
+            data=payload,
+            format="json",
+        )
+        self.assertEqual(res_create.status_code, 201)
+        created_data = res_create.json()
+        self.assertEqual(created_data["contract_type"], "professional")
+        self.assertEqual(str(created_data["club"]), str(self.club.id))
+
+        # 2. List contracts
+        res_list = self.client.get(f"/api/v1/players/{self.player.id}/contracts/")
+        self.assertEqual(res_list.status_code, 200)
+        data = res_list.json()
+        inner_data = data.get("data", data)
+        data_list = inner_data.get("results", inner_data) if isinstance(inner_data, dict) else inner_data
+        self.assertEqual(len(data_list), 1)
+        self.assertEqual(data_list[0]["club_name"], "Test Club")
+        self.assertEqual(str(data_list[0]["club"]), str(self.club.id))
+        self.assertEqual(data_list[0]["is_active"], False)  # draft
+

@@ -66,12 +66,15 @@ class PlayerContractListSerializer(serializers.ModelSerializer):
     player_name = serializers.CharField(source="player.full_name", read_only=True)
     club_name = serializers.CharField(source="club.name", read_only=True)
     is_active = serializers.SerializerMethodField()
+    is_fully_signed = serializers.SerializerMethodField()
 
     class Meta:
         model = PlayerContract
         fields = [
             "id",
+            "player",
             "player_name",
+            "club",
             "club_name",
             "contract_type",
             "status",
@@ -79,15 +82,29 @@ class PlayerContractListSerializer(serializers.ModelSerializer):
             "end_date",
             "salary",
             "currency",
+            "bonuses",
+            "release_clause",
+            "has_image_rights",
+            "option_year",
+            "termination_clause",
+            "signed_by_player",
+            "signed_by_club",
             "is_active",
+            "is_fully_signed",
         ]
 
     def get_is_active(self, obj):
         return obj.is_active
 
+    def get_is_fully_signed(self, obj):
+        return obj.is_fully_signed
+
 
 class PlayerContractCreateUpdateSerializer(serializers.ModelSerializer):
     """Serializer for creating and updating contracts."""
+
+    player = serializers.PrimaryKeyRelatedField(read_only=True)
+    tenant = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = PlayerContract
@@ -96,6 +113,7 @@ class PlayerContractCreateUpdateSerializer(serializers.ModelSerializer):
             "club",
             "tenant",
             "contract_type",
+            "status",
             "start_date",
             "end_date",
             "salary",

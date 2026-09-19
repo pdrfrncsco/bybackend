@@ -52,22 +52,31 @@ class PlayerContractListCreateView(generics.ListCreateAPIView):
         try:
             player_id = self.kwargs.get("player_id")
             player = Player.objects.get(id=player_id)
+            club = serializer.validated_data["club"]
+            tenant = getattr(club, "tenant", None)
+            if not tenant:
+                from core.models import Tenant
+                tenant = Tenant.objects.first()
             
             contract = PlayerContractService.create_contract(
                 player=player,
-                club=serializer.validated_data["club"],
+                club=club,
                 contract_type=serializer.validated_data.get(
                     "contract_type", PlayerContract.ContractType.PROFESSIONAL
                 ),
                 start_date=serializer.validated_data["start_date"],
                 end_date=serializer.validated_data["end_date"],
-                tenant=serializer.validated_data["tenant"],
+                tenant=tenant,
                 salary=serializer.validated_data.get("salary"),
                 currency=serializer.validated_data.get("currency", "USD"),
                 bonuses=serializer.validated_data.get("bonuses", {}),
                 release_clause=serializer.validated_data.get("release_clause"),
                 has_image_rights=serializer.validated_data.get("has_image_rights", False),
             )
+            target_status = serializer.validated_data.get("status")
+            if target_status and target_status != contract.status:
+                contract.status = target_status
+                contract.save(update_fields=["status"])
             serializer.instance = contract
         except Player.DoesNotExist:
             raise serializers.ValidationError({"player_id": "Player not found."})
