@@ -309,3 +309,178 @@ class MatchEventService:
             .order_by("-goals", "-appearances")
         )
         return list(players_qs)
+
+    @staticmethod
+    @transaction.atomic
+    def submit_manual_scoresheet(
+        *,
+        tenant: Tenant,
+        match: Match,
+        home_score: int,
+        away_score: int,
+        status: str = Match.MatchStatus.FINISHED,
+        home_penalty_score: int | None = None,
+        away_penalty_score: int | None = None,
+        goals: list[dict] | None = None,
+        cards: list[dict] | None = None,
+        substitutions: list[dict] | None = None,
+        notes: str = "",
+        replace_existing_events: bool = True,
+    ) -> Match:
+        """
+        Record a full manual scoresheet for non-live / paper-recorded matches.
+        Creates MatchEvents for goals, cards, and substitutions to feed player statistics,
+        sets scores and status, and recalculates competition standings.
+        """
+        from competitions.services.standing_service import StandingService
+
+        if replace_existing_events:
+            existing_events = list(
+                MatchEvent.objects.filter(
+                    match=match,
+                    tenant=tenant,
+                    event_type__in=[
+                        MatchEvent.EventType.GOAL,
+                        MatchEvent.EventType.PENALTY_SCORED,
+                        MatchEvent.EventType.OWN_GOAL,
+                        MatchEvent.EventType.YELLOW_CARD,
+                        MatchEvent.EventType.RED_CARD,
+                        MatchEvent.EventType.YELLOW_RED,
+                        MatchEvent.EventType.SUBSTITUTION_IN,
+                    ],
+                )
+            )
+            for ev in existing_events:
+                MatchEventService.remove_event(tenant=tenant, event_id=str(ev.id))
+
+        # Add goals
+        if goals:
+            for g in goals:
+                club_id = g.get("club_id") or g.get("club")
+                if not club_id:
+                    continue
+                try:
+                    club = Club.objects.get(id=club_id, tenant=tenant)
+                except Club.DoesNotExist:
+                    continue
+
+                player = None
+                player_id = g.get("player_id") or g.get("player")
+                if player_id:
+                    try:
+                        player = Player.objects.get(id=player_id)
+                    except Player.DoesNotExist:
+                        player = None
+
+                event_type = g.get("event_type") or MatchEvent.EventType.GOAL
+                minute = int(g.get("minute", 1))
+                g_notes = g.get("notes", "")
+
+                MatchEventService.add_event(
+                    tenant=tenant,
+                    match=match,
+                    club=club,
+                    event_type=event_type,
+                    minute=minute,
+                    player=player,
+                    notes=g_notes,
+                )
+
+        # Add cards
+        if cards:
+            for c in cards:
+                club_id = c.get("club_id") or c.get("club")
+                if not club_id:
+                    continue
+                try:
+                    club = Club.objects.get(id=club_id, tenant=tenant)
+                except Club.DoesNotExist:
+                    continue
+
+                player = None
+                player_id = c.get("player_id") or c.get("player")
+                if player_id:
+                    try:
+                        player = Player.objects.get(id=player_id)
+                    except Player.DoesNotExist:
+                        player = None
+
+                event_type = c.get("event_type") or MatchEvent.EventType.YELLOW_CARD
+                minute = int(c.get("minute", 1))
+                c_notes = c.get("notes", "")
+
+                MatchEventService.add_event(
+                    tenant=tenant,
+                    match=match,
+                    club=club,
+                    event_type=event_type,
+                    minute=minute,
+                    player=player,
+                    notes=c_notes,
+                )
+
+        # Add substitutions
+        if substitutions:
+            for s in substitutions:
+                club_id = s.get("club_id") or s.get("club")
+                if not club_id:
+                    continue
+                try:
+                    club = Club.objects.get(id=club_id, tenant=tenant)
+                except Club.DoesNotExist:
+                    continue
+
+                player = None
+                player_id = s.get("player_id") or s.get("player")
+                if player_id:
+                    try:
+                        player = Player.objects.get(id=player_id)
+                    except Player.DoesNotExist:
+                        player = None
+
+                player_off = None
+                player_off_id = s.get("player_off_id") or s.get("player_off")
+                if player_off_id:
+                    try:
+                        player_off = Player.objects.get(id=player_off_id)
+                    except Player.DoesNotExist:
+                        player_off = None
+
+                minute = int(s.get("minute", 46))
+                s_notes = s.get("notes", "")
+
+                MatchEventService.add_event(
+                    tenant=tenant,
+                    match=match,
+                    club=club,
+                    event_type=MatchEvent.EventType.SUBSTITUTION_IN,
+                    minute=minute,
+                    player=player,
+                    player_off=player_off,
+                    notes=s_notes,
+                )
+
+        # Ensure scores and status are exact
+        match.home_score = home_score
+        match.away_score = away_score
+        match.status = status
+        match.home_penalty_score = home_penalty_score
+        match.away_penalty_score = away_penalty_score
+        match.save(update_fields=[
+            "home_score",
+            "away_score",
+            "status",
+            "home_penalty_score",
+            "away_penalty_score",
+            "updated_at",
+        ])
+
+        # Recalculate standings for this competition context
+        StandingService.recalculate_standings(
+            tenant=tenant,
+            competition=match.competition,
+            group_id=match.group_id,
+            phase=match.phase,
+        )
+
+        return match

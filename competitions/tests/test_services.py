@@ -374,3 +374,109 @@ class CompetitionServicesTestCase(TestCase):
         self.assertEqual(updated_comp.allowed_genders, "female")
         self.assertEqual(updated_comp.start_date, date(2026, 2, 1))
         self.assertEqual(updated_comp.description, "Descrição atualizada")
+
+    def test_update_and_delete_match(self):
+        """Test updating match metadata and deleting match."""
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club1)
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club2)
+
+        match = MatchService.create_match(
+            tenant=self.tenant,
+            competition=self.competition,
+            home_club=self.club1,
+            away_club=self.club2,
+            match_date=datetime(2026, 3, 15, 16, 0, tzinfo=timezone.utc),
+            venue="Estádio 11 de Novembro",
+            round_number=1,
+        )
+        self.assertEqual(match.venue, "Estádio 11 de Novembro")
+
+        # Update match
+        new_date = datetime(2026, 3, 16, 17, 0, tzinfo=timezone.utc)
+        updated = MatchService.update_match(
+            tenant=self.tenant,
+            match_id=str(match.id),
+            venue="Estádio dos Coqueiros",
+            match_date=new_date,
+            round_number=2,
+            status=Match.MatchStatus.POSTPONED,
+        )
+        self.assertEqual(updated.venue, "Estádio dos Coqueiros")
+        self.assertEqual(updated.round_number, 2)
+        self.assertEqual(updated.status, Match.MatchStatus.POSTPONED)
+
+        # Delete match
+        match_id = str(updated.id)
+        MatchService.delete_match(tenant=self.tenant, match_id=match_id)
+        self.assertFalse(Match.objects.filter(id=match_id).exists())
+
+    def test_delete_competition(self):
+        """Test deleting a competition."""
+        comp = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Taça da Amizade",
+            competition_type="cup",
+            season="2025/26",
+        )
+        comp_id = str(comp.id)
+        CompetitionService.delete_competition(tenant=self.tenant, competition_id=comp_id)
+        self.assertFalse(Competition.objects.filter(id=comp_id).exists())
+
+    def test_submit_manual_scoresheet(self):
+        """Test submitting a full manual scoresheet with goals and cards."""
+        from competitions.services.match_event_service import MatchEventService
+        from competitions.models import MatchEvent
+        from competitions.serializers.v2_serializers import StandingSerializer
+
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club1)
+        CompetitionRegistrationService.register_club(tenant=self.tenant, competition=self.competition, club=self.club2)
+
+        match = MatchService.create_match(
+            tenant=self.tenant,
+            competition=self.competition,
+            home_club=self.club1,
+            away_club=self.club2,
+            match_date=datetime(2026, 4, 10, 15, 30, tzinfo=timezone.utc),
+            round_number=1,
+        )
+
+        goals_data = [
+            {"club_id": str(self.club1.id), "minute": 23, "event_type": "goal"},
+            {"club_id": str(self.club1.id), "minute": 67, "event_type": "penalty_scored"},
+            {"club_id": str(self.club2.id), "minute": 88, "event_type": "goal"},
+        ]
+        cards_data = [
+            {"club_id": str(self.club2.id), "minute": 34, "event_type": "yellow_card"},
+            {"club_id": str(self.club1.id), "minute": 75, "event_type": "yellow_card"},
+        ]
+
+        updated = MatchEventService.submit_manual_scoresheet(
+            tenant=self.tenant,
+            match=match,
+            home_score=2,
+            away_score=1,
+            status=Match.MatchStatus.FINISHED,
+            goals=goals_data,
+            cards=cards_data,
+        )
+
+        self.assertEqual(updated.status, Match.MatchStatus.FINISHED)
+        self.assertEqual(updated.home_score, 2)
+        self.assertEqual(updated.away_score, 1)
+
+        # Check events created
+        events = MatchEvent.objects.filter(match=match)
+        self.assertEqual(events.count(), 5)
+        self.assertEqual(events.filter(event_type__in=["goal", "penalty_scored"]).count(), 3)
+        self.assertEqual(events.filter(event_type="yellow_card").count(), 2)
+
+        # Check standings and form
+        st1 = Standing.objects.get(competition=self.competition, club=self.club1)
+        st2 = Standing.objects.get(competition=self.competition, club=self.club2)
+        self.assertEqual(st1.points, 3)
+        self.assertEqual(st2.points, 0)
+
+        serializer_data = StandingSerializer(st1).data
+        self.assertEqual(serializer_data["form"], ["W"])
+
+

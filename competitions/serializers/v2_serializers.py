@@ -4,6 +4,7 @@ BOLAYETU — v2 Serializers
 Serializers for CompetitionRegistrations, Matches, and Standings.
 """
 
+from django.db.models import Q
 from rest_framework import serializers
 
 from competitions.models import CompetitionRegistration, Match, Standing
@@ -157,9 +158,32 @@ class MatchCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class MatchUpdateSerializer(serializers.Serializer):
+    home_club = serializers.UUIDField(required=False)
+    away_club = serializers.UUIDField(required=False)
+    match_date = serializers.DateTimeField(required=False)
+    round_number = serializers.IntegerField(required=False, min_value=1)
+    round_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=100)
+    phase = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=50)
+    group_id = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=64)
+    venue = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    status = serializers.ChoiceField(
+        choices=Match.MatchStatus.choices,
+        required=False,
+    )
+
+    def validate(self, attrs):
+        home = attrs.get("home_club")
+        away = attrs.get("away_club")
+        if home and away and home == away:
+            raise serializers.ValidationError("Home and away clubs must be different.")
+        return attrs
+
+
 class StandingSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source="club.name", read_only=True)
     club_logo = serializers.SerializerMethodField()
+    form = serializers.SerializerMethodField()
 
     class Meta:
         model = Standing
@@ -180,6 +204,7 @@ class StandingSerializer(serializers.ModelSerializer):
             "goal_difference",
             "points",
             "position",
+            "form",
         ]
         read_only_fields = [
             "id",
@@ -196,7 +221,92 @@ class StandingSerializer(serializers.ModelSerializer):
             "goal_difference",
             "points",
             "position",
+            "form",
         ]
 
     def get_club_logo(self, obj: Standing) -> str | None:
         return get_club_logo_url(obj.club)
+
+    def get_form(self, obj: Standing) -> list[str]:
+        """Returns recent form for the last 5 completed matches: ['W', 'D', 'L', ...]"""
+        matches = Match.objects.filter(
+            competition=obj.competition,
+            tenant=obj.tenant,
+            status=Match.MatchStatus.FINISHED,
+        )
+        if obj.group_id:
+            matches = matches.filter(group_id=obj.group_id)
+        if obj.phase:
+            matches = matches.filter(phase=obj.phase)
+
+        club_matches = matches.filter(
+            Q(home_club=obj.club) | Q(away_club=obj.club)
+        ).order_by("-match_date")[:5]
+
+        form_list: list[str] = []
+        for m in reversed(list(club_matches)):
+            if m.home_score is None or m.away_score is None:
+                continue
+            if m.home_club_id == obj.club_id:
+                if m.home_score > m.away_score:
+                    form_list.append("W")
+                elif m.home_score == m.away_score:
+                    form_list.append("D")
+                else:
+                    form_list.append("L")
+            else:
+                if m.away_score > m.home_score:
+                    form_list.append("W")
+                elif m.away_score == m.home_score:
+                    form_list.append("D")
+                else:
+                    form_list.append("L")
+        return form_list
+
+
+class ManualScoresheetGoalSerializer(serializers.Serializer):
+    club_id = serializers.UUIDField()
+    player_id = serializers.UUIDField(required=False, allow_null=True)
+    minute = serializers.IntegerField(default=1, min_value=0, max_value=130)
+    event_type = serializers.ChoiceField(
+        choices=["goal", "penalty_scored", "own_goal"],
+        default="goal",
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ManualScoresheetCardSerializer(serializers.Serializer):
+    club_id = serializers.UUIDField()
+    player_id = serializers.UUIDField(required=False, allow_null=True)
+    minute = serializers.IntegerField(default=1, min_value=0, max_value=130)
+    event_type = serializers.ChoiceField(
+        choices=["yellow_card", "red_card", "yellow_red"],
+        default="yellow_card",
+    )
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ManualScoresheetSubstitutionSerializer(serializers.Serializer):
+    club_id = serializers.UUIDField()
+    player_id = serializers.UUIDField(required=False, allow_null=True)
+    player_off_id = serializers.UUIDField(required=False, allow_null=True)
+    minute = serializers.IntegerField(default=46, min_value=0, max_value=130)
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class ManualScoresheetSerializer(serializers.Serializer):
+    home_score = serializers.IntegerField(min_value=0)
+    away_score = serializers.IntegerField(min_value=0)
+    status = serializers.ChoiceField(
+        choices=Match.MatchStatus.choices,
+        default=Match.MatchStatus.FINISHED,
+    )
+    home_penalty_score = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    away_penalty_score = serializers.IntegerField(required=False, allow_null=True, min_value=0)
+    goals = ManualScoresheetGoalSerializer(many=True, required=False, default=list)
+    cards = ManualScoresheetCardSerializer(many=True, required=False, default=list)
+    substitutions = ManualScoresheetSubstitutionSerializer(many=True, required=False, default=list)
+    notes = serializers.CharField(required=False, allow_blank=True, default="")
+    replace_existing_events = serializers.BooleanField(default=True)
+
+

@@ -520,3 +520,114 @@ class MatchService:
             len(created_matches), competition.name, tenant.slug
         )
         return created_matches
+
+    @staticmethod
+    @transaction.atomic
+    def update_match(
+        *,
+        tenant: Tenant,
+        match_id: str,
+        match_date: datetime | None = None,
+        venue: str | None = None,
+        round_number: int | None = None,
+        round_name: str | None = None,
+        phase: str | None = None,
+        group_id: str | None = None,
+        status: str | None = None,
+        home_club: Club | None = None,
+        away_club: Club | None = None,
+    ) -> Match:
+        """Update match metadata and details."""
+        try:
+            match = Match.objects.select_for_update().get(id=match_id, tenant=tenant)
+        except Match.DoesNotExist:
+            raise MatchNotFound("Match not found.")
+
+        update_fields = ["updated_at"]
+
+        if home_club is not None:
+            if home_club.tenant_id != tenant.id:
+                raise PermissionError("Home club must belong to the same tenant.")
+            match.home_club = home_club
+            update_fields.append("home_club")
+
+        if away_club is not None:
+            if away_club.tenant_id != tenant.id:
+                raise PermissionError("Away club must belong to the same tenant.")
+            match.away_club = away_club
+            update_fields.append("away_club")
+
+        if match.home_club_id == match.away_club_id:
+            raise ValueError("Home and away clubs must be different.")
+
+        if match_date is not None:
+            if timezone.is_naive(match_date):
+                match_date = timezone.make_aware(match_date, timezone.get_current_timezone())
+            match.match_date = match_date
+            update_fields.append("match_date")
+
+        if venue is not None:
+            match.venue = venue
+            update_fields.append("venue")
+
+        if round_number is not None:
+            match.round_number = round_number
+            update_fields.append("round_number")
+
+        if round_name is not None:
+            match.round_name = round_name
+            update_fields.append("round_name")
+
+        if phase is not None:
+            match.phase = phase
+            update_fields.append("phase")
+
+        if group_id is not None:
+            match.group_id = group_id
+            update_fields.append("group_id")
+
+        if status is not None:
+            MatchService.validate_match_state(status=status)
+            match.status = status
+            update_fields.append("status")
+
+        match.save(update_fields=list(set(update_fields)))
+        logger.info("Match %s updated successfully.", match.id)
+        return match
+
+    @staticmethod
+    @transaction.atomic
+    def delete_match(
+        *,
+        tenant: Tenant,
+        match_id: str,
+        force: bool = False,
+    ) -> None:
+        """
+        Delete a match.
+        If match has events or has finished, prevent deletion unless force=True.
+        Recalculates standings if a finished match is deleted.
+        """
+        try:
+            match = Match.objects.get(id=match_id, tenant=tenant)
+        except Match.DoesNotExist:
+            raise MatchNotFound("Match not found.")
+
+        competition = match.competition
+        was_finished = match.status == Match.MatchStatus.FINISHED
+
+        has_events_or_lineups = (
+            match.events.exists() or match.lineups.exists()
+        )
+        if (was_finished or has_events_or_lineups) and not force:
+            raise ValueError(
+                "Não é possível eliminar uma partida que já possui eventos, alinhamentos ou foi concluída. "
+                "Cancele a partida ou use a opção de exclusão forçada."
+            )
+
+        match.delete()
+        logger.info("Match %s deleted.", match_id)
+
+        if was_finished:
+            StandingService.recalculate_standings(tenant=tenant, competition=competition)
+

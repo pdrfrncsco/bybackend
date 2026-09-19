@@ -4,7 +4,6 @@ BOLAYETU — Lineup Integration Tests
 Test lineup submission, validation, player eligibility, and lifecycle.
 """
 
-import pytest
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from django.utils import timezone
@@ -27,7 +26,6 @@ from competitions.permissions import CanManageClubLineup
 User = get_user_model()
 
 
-@pytest.mark.django_db
 class TestLineupSubmission(TestCase):
     """Test lineup submission and validation."""
 
@@ -310,7 +308,7 @@ class TestLineupSubmission(TestCase):
 
     def test_cannot_submit_empty_lineup(self):
         """Test that empty lineup is rejected."""
-        with pytest.raises(LineupValidationError):
+        with self.assertRaises(LineupValidationError):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -331,7 +329,7 @@ class TestLineupSubmission(TestCase):
             "shirt_number": 12,
         })
 
-        with pytest.raises(LineupValidationError):
+        with self.assertRaises(LineupValidationError):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -351,7 +349,7 @@ class TestLineupSubmission(TestCase):
             "shirt_number": 20,
         })
 
-        with pytest.raises(LineupValidationError):
+        with self.assertRaises(LineupValidationError):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -366,7 +364,7 @@ class TestLineupSubmission(TestCase):
         # Set duplicate shirt number
         players[1]["shirt_number"] = 1
 
-        with pytest.raises(LineupValidationError):
+        with self.assertRaises(LineupValidationError):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -381,7 +379,7 @@ class TestLineupSubmission(TestCase):
         # Remove goalkeeper
         players = [p for p in players if not p.get("is_goalkeeper", False)][:11]
 
-        with pytest.raises(LineupValidationError):
+        with self.assertRaises(LineupValidationError):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -396,7 +394,7 @@ class TestLineupSubmission(TestCase):
         # Add second captain
         players[2]["is_captain"] = True
 
-        with pytest.raises(LineupValidationError):
+        with self.assertRaises(LineupValidationError):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -548,7 +546,7 @@ class TestLineupSubmission(TestCase):
         )
 
         # Try to resubmit
-        with pytest.raises(LineupAlreadySubmitted):
+        with self.assertRaises(LineupAlreadySubmitted):
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -631,7 +629,7 @@ class TestLineupSubmission(TestCase):
             "formation_position": 3,
         }
 
-        with pytest.raises(LineupValidationError) as excinfo:
+        with self.assertRaises(LineupValidationError) as excinfo:
             LineupService.submit_lineup(
                 tenant=self.tenant,
                 match=self.match,
@@ -640,7 +638,7 @@ class TestLineupSubmission(TestCase):
                 formation="4-3-3",
                 submitted_by=self.user,
             )
-        assert "Apenas 1 guarda-redes é permitido" in str(excinfo.value)
+        self.assertIn("Apenas 1 guarda-redes é permitido", str(excinfo.exception))
 
     def test_submit_portuguese_position_abbreviations(self):
         """Test that Portuguese position codes like dc, le, ld, mdf, pl, gr are properly normalized."""
@@ -664,7 +662,6 @@ class TestLineupSubmission(TestCase):
         assert submission.status == LineupSubmission.SubmissionStatus.SUBMITTED
 
 
-@pytest.mark.django_db
 class TestMatchReport(TestCase):
     """Test match report and goal recording."""
 

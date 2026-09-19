@@ -108,6 +108,26 @@ class CompetitionService:
             tenant=tenant,
             competition_id=competition_id,
         )
-        if competition is None:
+        if not competition:
             raise CompetitionNotFound()
         return competition
+
+    @staticmethod
+    @transaction.atomic
+    def delete_competition(*, tenant: Tenant, competition_id, force: bool = False) -> None:
+        """
+        Delete a competition.
+        If it contains finished matches, prevent deletion unless force=True.
+        """
+        competition = CompetitionService.get_competition_for_tenant(
+            tenant=tenant,
+            competition_id=competition_id,
+        )
+        has_finished_matches = competition.matches.filter(status="finished").exists()
+        if has_finished_matches and not force:
+            raise ValueError(
+                "Não é possível eliminar uma competição com partidas já concluídas. "
+                "Altere o estado para inativo ou arquivado, ou utilize a exclusão forçada."
+            )
+        competition.delete()
+        logger.info("Competition %s deleted by tenant %s", competition_id, tenant.slug)

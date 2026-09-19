@@ -9,6 +9,7 @@ from competitions.views import (
     CompetitionMatchListView,
     MatchDetailView,
     MatchScoreUpdateView,
+    ManualScoresheetView,
     MatchTransitionView,
     MatchClockActionView,
     CompetitionStandingListView,
@@ -57,6 +58,8 @@ urlpatterns = [
     path("<str:competition_id>/regulations/", CompetitionRegulationListCreateView.as_view(), name="competition-regulation-list-create"),
     path("<str:competition_id>/regulations/<uuid:regulation_id>/", CompetitionRegulationDetailView.as_view(), name="competition-regulation-detail"),
     path("matches/<uuid:match_id>/", MatchScoreUpdateView.as_view(), name="match-score-update"),
+    path("matches/<uuid:match_id>/manual-scoresheet/", ManualScoresheetView.as_view(), name="match-manual-scoresheet-direct"),
+    path("<str:competition_id>/matches/<uuid:match_id>/manual-scoresheet/", ManualScoresheetView.as_view(), name="match-manual-scoresheet"),
     path("matches/<uuid:match_id>/transition/", MatchTransitionView.as_view(), name="match-transition"),
     path("matches/<uuid:match_id>/clock/action/", MatchClockActionView.as_view(), name="match-clock-action"),
 

@@ -24,13 +24,16 @@ from competitions.selectors import CompetitionSelector, CompetitionRegistrationS
 from competitions.services.competition_registration_service import CompetitionRegistrationService, ClubAlreadyRegistered
 from competitions.services.competition_format_service import CompetitionFormatService
 from competitions.services.match_service import MatchService, MatchNotFound, InvalidMatchTransition, InvalidClockAction
+from competitions.services.match_event_service import MatchEventService
 from competitions.permissions import IsMatchEventOperator
 from competitions.services.standing_service import StandingService
 from competitions.serializers.v2_serializers import (
     CompetitionRegistrationSerializer,
     MatchCreateSerializer,
+    MatchUpdateSerializer,
     MatchSerializer,
     StandingSerializer,
+    ManualScoresheetSerializer,
 )
 
 
@@ -285,8 +288,13 @@ class CompetitionMatchListView(APIView):
 class MatchDetailView(APIView):
     """
     GET: Retrieve a single match within a competition by ID.
+    PATCH: Update match metadata (date, venue, round, teams, status) - Org Admin.
+    DELETE: Delete or cancel match - Org Admin.
     """
-    permission_classes = [AllowAny]
+    def get_permissions(self):
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAuthenticated(), IsActiveAccount(), IsOrganizationAdmin()]
 
     @extend_schema(
         tags=["competitions"],
@@ -307,6 +315,84 @@ class MatchDetailView(APIView):
             data=serializer.data,
             message="Match retrieved successfully.",
         )
+
+    @extend_schema(
+        tags=["competitions"],
+        summary="Update match details",
+        request=MatchUpdateSerializer,
+        responses={200: MatchSerializer},
+    )
+    def patch(self, request, competition_id, match_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        competition = CompetitionSelector.get_by_id_public(competition_id=competition_id, tenant=tenant)
+        if competition is None:
+            return not_found_response(message="Competition not found.")
+
+        serializer = MatchUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        home_club = None
+        if "home_club" in serializer.validated_data:
+            try:
+                home_club = Club.objects.get(id=serializer.validated_data["home_club"], tenant=tenant)
+            except Club.DoesNotExist:
+                return not_found_response(message="Home club not found.")
+
+        away_club = None
+        if "away_club" in serializer.validated_data:
+            try:
+                away_club = Club.objects.get(id=serializer.validated_data["away_club"], tenant=tenant)
+            except Club.DoesNotExist:
+                return not_found_response(message="Away club not found.")
+
+        try:
+            match = MatchService.update_match(
+                tenant=tenant,
+                match_id=str(match_id),
+                match_date=serializer.validated_data.get("match_date"),
+                venue=serializer.validated_data.get("venue"),
+                round_number=serializer.validated_data.get("round_number"),
+                round_name=serializer.validated_data.get("round_name"),
+                phase=serializer.validated_data.get("phase"),
+                group_id=serializer.validated_data.get("group_id"),
+                status=serializer.validated_data.get("status"),
+                home_club=home_club,
+                away_club=away_club,
+            )
+        except MatchNotFound:
+            return not_found_response(message="Match not found.")
+        except Exception as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return success_response(
+            data=MatchSerializer(match).data,
+            message="Match updated successfully.",
+        )
+
+    @extend_schema(
+        tags=["competitions"],
+        summary="Delete a match",
+        responses={200: None},
+    )
+    def delete(self, request, competition_id, match_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        force = request.query_params.get("force", "").lower() in ("true", "1")
+        try:
+            MatchService.delete_match(
+                tenant=tenant,
+                match_id=str(match_id),
+                force=force,
+            )
+        except MatchNotFound:
+            return not_found_response(message="Match not found.")
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return success_response(message="Partida eliminada com sucesso.")
 
 
 class MatchScoreUpdateView(APIView):
@@ -365,6 +451,61 @@ class MatchScoreUpdateView(APIView):
             data=serializer.data,
             message="Match score updated and standings recalculated.",
         )
+
+
+class ManualScoresheetView(APIView):
+    """
+    POST: Submit a complete scoresheet (final score, goals, cards) for non-live matches.
+    Protected: org admin or match event operator.
+    """
+    permission_classes = [IsAuthenticated, IsActiveAccount, IsMatchEventOperator]
+
+    @extend_schema(
+        tags=["match-center"],
+        summary="Submit manual match scoresheet",
+        request=ManualScoresheetSerializer,
+        responses={200: MatchSerializer},
+    )
+    def post(self, request, match_id, competition_id=None):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        try:
+            match_kwargs = {"id": match_id, "tenant": tenant}
+            if competition_id:
+                # Resolve competition by ID or slug if given
+                comp = CompetitionSelector.get_by_id_public(competition_id=competition_id)
+                if comp:
+                    match_kwargs["competition_id"] = comp.id
+            match = Match.objects.select_related("competition", "home_club", "away_club").get(**match_kwargs)
+        except Match.DoesNotExist:
+            return not_found_response(message="Match not found.")
+
+        serializer = ManualScoresheetSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            updated_match = MatchEventService.submit_manual_scoresheet(
+                tenant=tenant,
+                match=match,
+                home_score=data["home_score"],
+                away_score=data["away_score"],
+                status=data.get("status", Match.MatchStatus.FINISHED),
+                home_penalty_score=data.get("home_penalty_score"),
+                away_penalty_score=data.get("away_penalty_score"),
+                goals=data.get("goals", []),
+                cards=data.get("cards", []),
+                substitutions=data.get("substitutions", []),
+                notes=data.get("notes", ""),
+                replace_existing_events=data.get("replace_existing_events", True),
+            )
+        except Exception as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return success_response(
+            data=MatchSerializer(updated_match).data,
+            message="Manual scoresheet submitted successfully and standings updated.",
+        )
+
 
 
 class MatchTransitionView(APIView):

@@ -179,6 +179,33 @@ class CompetitionDetailView(APIView):
             competition=competition,
             **serializer.validated_data,
         )
+        return success_response(
+            data=CompetitionSerializer(competition).data,
+            message="Competition updated successfully.",
+        )
+
+    @extend_schema(
+        tags=["competitions"],
+        summary="Delete a competition",
+        responses={200: None},
+    )
+    def delete(self, request, competition_id):
+        tenant = OrganizationService.get_organization_for_user(user=request.user)
+        OrganizationService.assert_is_organization_admin(user=request.user, tenant=tenant)
+
+        force = request.query_params.get("force", "").lower() in ("true", "1")
+        try:
+            CompetitionService.delete_competition(
+                tenant=tenant,
+                competition_id=competition_id,
+                force=force,
+            )
+        except CompetitionNotFound:
+            return not_found_response(message="Competition not found.")
+        except ValueError as exc:
+            return error_response(message=str(exc), status_code=400)
+
+        return success_response(message="Competição eliminada com sucesso.")
 
 
 class ClubCompetitionListView(APIView):

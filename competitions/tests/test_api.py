@@ -7,6 +7,7 @@ from rest_framework.test import APIClient
 
 from accounts.models import TenantMembership
 from clubs.models import Club
+from competitions.constants import CompetitionStatus
 from competitions.models import Competition, CompetitionRegistration, Match, Standing
 from competitions.services import CompetitionService
 from competitions.services.competition_registration_service import CompetitionRegistrationService
@@ -453,17 +454,28 @@ class CompetitionAPITestCase(TestCase):
     @override_settings(ALLOWED_HOSTS=["testserver", ".bolayetu.com"])
     def test_list_competitions_filters_by_subdomain_tenant(self):
         """Public competition list should use request.tenant when subdomain is present."""
+        self.tenant.is_public = True
+        self.tenant.status = Tenant.TenantStatus.ACTIVE
+        self.tenant.save()
+
+        self.competition.status = CompetitionStatus.ACTIVE
+        self.competition.save()
+
         other_tenant = Tenant.objects.create(
             name="Luanda League",
             slug="luanda",
             subdomain="luanda",
+            is_public=True,
+            status=Tenant.TenantStatus.ACTIVE,
         )
-        CompetitionService.create_competition(
+        other_competition = CompetitionService.create_competition(
             tenant=other_tenant,
             name="Liga Luanda",
             competition_type="league",
             season="2025/26",
         )
+        other_competition.status = CompetitionStatus.ACTIVE
+        other_competition.save()
 
         self.client.force_authenticate(user=None)
 

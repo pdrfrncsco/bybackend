@@ -41,6 +41,8 @@ class MatchEventSerializer(serializers.ModelSerializer):
     def get_player_name(self, obj: MatchEvent) -> str | None:
         if obj.player:
             return obj.player.full_name
+        if obj.notes:
+            return obj.notes
         return None
 
     def get_player_off_name(self, obj: MatchEvent) -> str | None:
