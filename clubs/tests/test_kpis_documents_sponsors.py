@@ -19,7 +19,7 @@ User = get_user_model()
 class ClubKpisTestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.tenant = Tenant.objects.create(name="Test Org", slug="test-org")
+        self.tenant = Tenant.objects.create(name="Test Org", slug="test-org", is_public=True, status="active")
         self.club = Club.objects.create(tenant=self.tenant, name="Test Club", slug="test-club", is_public=True)
         self.opponent = Club.objects.create(tenant=self.tenant, name="Opponents", slug="opponents", is_public=True)
         self.competition = Competition.objects.create(
@@ -105,7 +105,7 @@ class ClubKpisTestCase(TestCase):
 class ClubDocumentsAndSponsorsAPITestCase(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.tenant = Tenant.objects.create(name="Test Org", slug="test-org")
+        self.tenant = Tenant.objects.create(name="Test Org", slug="test-org", is_public=True, status="active")
         self.club = Club.objects.create(tenant=self.tenant, name="Test Club", slug="test-club", is_public=True)
         self.user = User.objects.create_user(email="admin@test.com", password="SecurePass123!", status="active")
         TenantMembership.objects.create(user=self.user, tenant=self.tenant, role="owner", is_active=True)

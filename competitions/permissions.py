@@ -89,6 +89,15 @@ class CanManageClubLineup(BasePermission):
             if tenant_id:
                 from core.models import Tenant
                 tenant = Tenant.objects.filter(id=tenant_id).first()
+        if tenant is None and request.user and request.user.is_authenticated:
+            from clubs.models import ClubMember
+            cm = ClubMember.objects.filter(user=request.user, is_active=True).select_related("club__tenant").first()
+            if cm and cm.club and cm.club.tenant:
+                tenant = cm.club.tenant
+        if tenant is None and match_id:
+            match = Match.objects.filter(id=match_id).select_related("tenant").first()
+            if match and match.tenant:
+                tenant = match.tenant
         if tenant is None:
             return False
 

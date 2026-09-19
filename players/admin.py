@@ -192,15 +192,24 @@ class PlayerAdmin(admin.ModelAdmin):
         "primary_position",
         "status",
         "nationality",
-        "user",
+        "user_account_link",
         "active_contract_display",
     )
     list_filter = ("status", "primary_position", "nationality", "foot", "created_at")
-    search_fields = ("first_name", "last_name", "slug", "global_id")
+    search_fields = (
+        "first_name",
+        "last_name",
+        "slug",
+        "global_id",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+    )
     readonly_fields = (
         "id",
         "slug",
         "global_id",
+        "user_link",
         "created_at",
         "updated_at",
         "total_matches",
@@ -208,7 +217,8 @@ class PlayerAdmin(admin.ModelAdmin):
         "total_assists",
         "profile_photo_url",
     )
-    raw_id_fields = ("user", "profile_photo")
+    autocomplete_fields = ("user",)
+    raw_id_fields = ("profile_photo",)
     inlines = (
         # Phase 1-2
         PlayerRegistrationInline,
@@ -298,6 +308,7 @@ class PlayerAdmin(admin.ModelAdmin):
                     "status",
                     "is_public",
                     "user",
+                    "user_link",
                 )
             },
         ),
@@ -312,6 +323,27 @@ class PlayerAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    def user_account_link(self, obj):
+        if obj.user:
+            return format_html(
+                '<a href="/admin/accounts/user/{}/change/">👤 {}</a>',
+                obj.user.pk,
+                obj.user.full_name or obj.user.email,
+            )
+        return mark_safe('<span style="color:gray;">—</span>')
+    user_account_link.short_description = "Conta de Usuário"
+
+    def user_link(self, obj):
+        if obj.user:
+            return format_html(
+                '<a href="/admin/accounts/user/{}/change/">🔗 Abrir Conta de Usuário: {} ({})</a>',
+                obj.user.pk,
+                obj.user.full_name or obj.user.username,
+                obj.user.email,
+            )
+        return mark_safe('<span style="color:gray;">Nenhum usuário vinculado. Use o campo "Associated User" acima para buscar e associar.</span>')
+    user_link.short_description = "Acesso Rápido ao Usuário"
 
     def global_id_display(self, obj):
         if obj.global_id:

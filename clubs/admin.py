@@ -14,22 +14,33 @@ from clubs.models import (
 )
 
 
+class ClubMemberInline(admin.TabularInline):
+    model = ClubMember
+    extra = 0
+    autocomplete_fields = ["user"]
+    fields = ("user", "full_name", "role", "jersey_number", "position", "is_active", "joined_at")
+    show_change_link = True
+    verbose_name = "Membro / Staff do Clube"
+    verbose_name_plural = "Membros / Staff do Clube"
+
+
 @admin.register(Club)
 class ClubAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "tenant", "status", "is_public", "city", "country")
     list_filter = ("status", "is_public", "is_verified", "tenant")
     search_fields = ("name", "slug", "short_name", "city")
     readonly_fields = ("id", "slug", "created_at", "updated_at")
-    raw_id_fields = ("tenant",)
+    autocomplete_fields = ("tenant",)
+    inlines = [ClubMemberInline]
 
 
 @admin.register(ClubMember)
 class ClubMemberAdmin(admin.ModelAdmin):
     list_display = ("display_name", "club", "role", "jersey_number", "position", "is_active")
     list_filter = ("role", "is_active", "position", "club__tenant")
-    search_fields = ("full_name", "user__email", "club__name")
+    search_fields = ("full_name", "user__email", "user__first_name", "user__last_name", "club__name")
     readonly_fields = ("id", "created_at", "updated_at")
-    raw_id_fields = ("user", "club")
+    autocomplete_fields = ("user", "club")
 
 
 @admin.register(ClubAffiliationRequest)

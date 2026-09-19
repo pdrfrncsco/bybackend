@@ -39,7 +39,10 @@ def get_request_tenant(request):
     Estratégia (por prioridade):
       1. request.tenant  — injetado pelo TenantMiddleware (subdomain)
       2. Header X-Tenant-ID — útil para clientes API que passam o UUID do tenant
-      3. TenantMembership  — primeira membership ativa do utilizador autenticado
+      3. TenantMembership  — primeira membership ativa do utilizador autenticado em organização
+      4. ClubMember  — clube associado ao utilizador autenticado (gestor, treinador, staff de clube)
+      5. match_id na rota ou query params — tenant da partida em questão
+      6. club_id na rota ou query params — tenant do clube em questão
 
     Retorna None se nenhuma estratégia tiver sucesso.
     """
@@ -57,7 +60,7 @@ def get_request_tenant(request):
         except (Tenant.DoesNotExist, Exception):
             pass
 
-    # 3. Primeira membership ativa do utilizador
+    # 3. Primeira membership ativa do utilizador em organização
     if request.user and request.user.is_authenticated:
         from accounts.models import TenantMembership
         membership = (
@@ -68,6 +71,28 @@ def get_request_tenant(request):
         )
         if membership:
             return membership.tenant
+
+        # 4. Associação ativa a um Clube (gestor de clube, treinador, staff)
+        from clubs.models import ClubMember
+        club_membership = (
+            ClubMember.objects
+            .filter(user=request.user, is_active=True)
+            .select_related("club__tenant")
+            .first()
+        )
+        if club_membership and club_membership.club and club_membership.club.tenant:
+            return club_membership.club.tenant
+
+    # 5. Resolver através do match_id no contexto do pedido
+    match_id = None
+    if hasattr(request, "parser_context") and request.parser_context:
+        match_id = request.parser_context.get("kwargs", {}).get("match_id")
+    if not match_id and hasattr(request, "query_params"):
+        match_id = request.query_params.get("match_id")
+    if match_id:
+        match_obj = Match.objects.filter(id=match_id).select_related("tenant").first()
+        if match_obj and match_obj.tenant:
+            return match_obj.tenant
 
     return None
 
@@ -146,6 +171,13 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         }
         """
         tenant = get_request_tenant(request)
+        match_id = self.kwargs.get('match_id')
+
+        if tenant is None and match_id:
+            match_obj = Match.objects.filter(id=match_id).select_related("tenant").first()
+            if match_obj and match_obj.tenant:
+                tenant = match_obj.tenant
+
         if tenant is None:
             return Response(
                 {
@@ -154,8 +186,6 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-        match_id = self.kwargs.get('match_id')
 
         # Get match
         match = get_object_or_404(Match, id=match_id, tenant=tenant)
@@ -225,6 +255,11 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         match_id = self.kwargs.get('match_id')
         club_id = self.kwargs.get('pk')  # club_id in URL
 
+        if tenant is None and match_id:
+            match_obj = Match.objects.filter(id=match_id).select_related("tenant").first()
+            if match_obj and match_obj.tenant:
+                tenant = match_obj.tenant
+
         qs = LineupSubmission.objects.filter(match_id=match_id, club_id=club_id)
         if tenant:
             qs = qs.filter(tenant=tenant)
@@ -244,6 +279,11 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         """Get all lineups for a match."""
         tenant = get_request_tenant(request)
         match_id = self.kwargs.get('match_id')
+
+        if tenant is None and match_id:
+            match_obj = Match.objects.filter(id=match_id).select_related("tenant").first()
+            if match_obj and match_obj.tenant:
+                tenant = match_obj.tenant
 
         match_qs = Match.objects.filter(id=match_id)
         if tenant:
@@ -277,13 +317,19 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         Permissions: only organization admins, club managers/coaches/assistant_coaches, or superusers may confirm.
         """
         tenant = get_request_tenant(request)
+        match_id = self.kwargs.get('match_id')
+
+        if tenant is None and match_id:
+            match_obj = Match.objects.filter(id=match_id).select_related("tenant").first()
+            if match_obj and match_obj.tenant:
+                tenant = match_obj.tenant
+
         if tenant is None:
             return Response(
                 {"error": "Tenant não identificado."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        match_id = self.kwargs.get('match_id')
         club_id = request.data.get('club_id')
 
         if not club_id:
@@ -342,13 +388,19 @@ class LineupSubmissionViewSet(viewsets.ModelViewSet):
         If no 'club_id' is provided, lock all lineups for the match (requires org-admin or superuser).
         """
         tenant = get_request_tenant(request)
+        match_id = self.kwargs.get('match_id')
+
+        if tenant is None and match_id:
+            match_obj = Match.objects.filter(id=match_id).select_related("tenant").first()
+            if match_obj and match_obj.tenant:
+                tenant = match_obj.tenant
+
         if tenant is None:
             return Response(
                 {"error": "Tenant não identificado."},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
-        match_id = self.kwargs.get('match_id')
         club_id = request.data.get('club_id')
 
         try:

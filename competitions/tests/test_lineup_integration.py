@@ -266,6 +266,42 @@ class TestLineupSubmission(TestCase):
             club=self.home_club,
         ) is True
 
+    def test_club_manager_without_tenant_membership_can_submit_via_api(self):
+        """A user assigned only as club manager (no TenantMembership) can submit and retrieve lineups via API."""
+        from rest_framework.test import APIClient
+        manager_user = User.objects.create_user(
+            email="manager@club.test",
+            password="SecurePass123!",
+            status="active",
+        )
+        ClubMember.objects.create(
+            club=self.home_club,
+            user=manager_user,
+            role="manager",
+            is_active=True,
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=manager_user)
+
+        players = self._create_valid_lineup()
+        url = f"/api/v1/competitions/matches/{self.match.id}/lineups/"
+        res = client.post(
+            url,
+            {
+                "club_id": str(self.home_club.id),
+                "formation": "4-3-3",
+                "players": players,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201)
+
+        # Retrieve via API
+        detail_url = f"/api/v1/competitions/matches/{self.match.id}/lineups/{self.home_club.id}/"
+        res_get = client.get(detail_url)
+        self.assertEqual(res_get.status_code, 200)
+
     def test_submit_valid_lineup(self):
         """Test submitting a valid lineup."""
         players = self._create_valid_lineup()
