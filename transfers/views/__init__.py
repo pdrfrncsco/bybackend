@@ -66,14 +66,16 @@ class TransferListCreateView(APIView):
     )
     def get(self, request):
         status = request.query_params.get("status")
-        player_id = request.query_params.get("player_id")
+        player_id = request.query_params.get("player_id") or request.query_params.get("player")
         from_club_id = request.query_params.get("from_club_id")
         to_club_id = request.query_params.get("to_club_id")
 
-        if status:
-            queryset = TransferSelector.list_by_status(status)
-        elif player_id:
+        if player_id:
             queryset = TransferSelector.list_by_player(player_id)
+            if status:
+                queryset = queryset.filter(status=status)
+        elif status:
+            queryset = TransferSelector.list_by_status(status)
         elif from_club_id:
             queryset = TransferSelector.list_outgoing_transfers(from_club_id)
         elif to_club_id:
@@ -301,9 +303,25 @@ class TransferCancelView(APIView):
         if not transfer:
             return error_response(message="Transfer not found.", status_code=404)
 
+        from accounts.models import TenantMembership
+
+        player_user_id = getattr(getattr(transfer, "player", None), "user_id", None)
+        is_player = player_user_id and player_user_id == request.user.id
+        is_staff = request.user.is_staff or getattr(request.user, "is_superuser", False)
+        is_tenant_member = (
+            transfer.to_tenant and TenantMembership.objects.filter(user=request.user, tenant=transfer.to_tenant).exists()
+        ) or (
+            transfer.from_tenant and TenantMembership.objects.filter(user=request.user, tenant=transfer.from_tenant).exists()
+        )
+
+        if not (is_player or is_staff or is_tenant_member):
+            return error_response(message="You do not have permission to cancel this transfer.", status_code=403)
+
         try:
             transfer = TransferService.cancel_transfer(transfer)
         except TransferAlreadyProcessed as exc:
+            return error_response(message=str(exc), status_code=400)
+        except Exception as exc:
             return error_response(message=str(exc), status_code=400)
 
         serializer = TransferDetailSerializer(transfer)

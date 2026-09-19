@@ -68,7 +68,9 @@ class CanViewTransfer(BasePermission):
     """
     Permission to view a transfer.
 
-    User must be a member of either the origin or destination tenant.
+    User must be a member of either the origin or destination tenant,
+    OR be the player involved in the transfer,
+    OR be platform staff.
     """
 
     message = "You do not have permission to view this transfer."
@@ -76,6 +78,16 @@ class CanViewTransfer(BasePermission):
     def has_object_permission(self, request, view, obj):
         if not request.user or not request.user.is_authenticated:
             return False
+
+        if request.user.is_staff or getattr(request.user, "is_superuser", False):
+            return True
+
+        # Check if user is the player involved in the transfer
+        player_user_id = getattr(getattr(obj, "player", None), "user_id", None)
+        if player_user_id and player_user_id == request.user.id:
+            return True
+        if getattr(getattr(obj, "player", None), "user", None) == request.user:
+            return True
 
         # Check if user belongs to origin tenant
         if obj.from_tenant:
@@ -96,13 +108,23 @@ class CanManageTransfers(BasePermission):
     """
     General permission for transfer management.
 
-    User must be a member of a tenant to access transfer operations.
+    - Authenticated users can perform read operations (GET, HEAD, OPTIONS)
+      e.g. players querying transfers by player_id.
+    - Write operations require tenant membership, staff privileges, or player ownership.
     """
 
-    message = "You must be a member of an organization to manage transfers."
+    message = "You do not have permission to manage transfers."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
 
+        # Allow read operations for all authenticated users
+        if request.method in ["GET", "HEAD", "OPTIONS"]:
+            return True
+
+        if request.user.is_staff or getattr(request.user, "is_superuser", False):
+            return True
+
         return TenantMembership.objects.filter(user=request.user).exists()
+

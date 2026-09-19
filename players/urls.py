@@ -91,6 +91,15 @@ from players.views.player_medical_views import (
     MedicalDocumentVerifyView,
     MedicalDocumentRejectView,
 )
+from players.views.player_compliance_views import (
+    PlayerComplianceRecordListView,
+    PlayerComplianceSummaryView,
+)
+from players.views.player_performance_views import (
+    PlayerPerformanceMetricListView,
+    PlayerPerformanceSummaryView,
+    PlayerPerformanceTrendsView,
+)
 
 urlpatterns = [
     path("", PlayerListCreateView.as_view(), name="player-list-create"),
@@ -346,5 +355,59 @@ urlpatterns = [
         "<uuid:player_id>/medical/documents/<uuid:id>/reject/",
         MedicalDocumentRejectView.as_view(),
         name="player-medical-document-reject",
+    ),
+
+    # Phase 4: Compliance (FIFA RSTP)
+    path(
+        "<uuid:player_id>/compliance/",
+        PlayerComplianceRecordListView.as_view(),
+        name="player-compliance-list",
+    ),
+    path(
+        "<uuid:player_id>/compliance/status/",
+        PlayerComplianceSummaryView.as_view(),
+        name="player-compliance-status",
+    ),
+    path(
+        "<slug:slug>/compliance/",
+        PlayerComplianceRecordListView.as_view(),
+        name="player-slug-compliance-list",
+    ),
+    path(
+        "<slug:slug>/compliance/status/",
+        PlayerComplianceSummaryView.as_view(),
+        name="player-slug-compliance-status",
+    ),
+
+    # Phase 4: Performance & Biometrics
+    path(
+        "<uuid:player_id>/performance-metrics/",
+        PlayerPerformanceMetricListView.as_view(),
+        name="player-performance-metrics",
+    ),
+    path(
+        "<uuid:player_id>/performance/summary/",
+        PlayerPerformanceSummaryView.as_view(),
+        name="player-performance-summary",
+    ),
+    path(
+        "<uuid:player_id>/performance/trends/",
+        PlayerPerformanceTrendsView.as_view(),
+        name="player-performance-trends",
+    ),
+    path(
+        "<slug:slug>/performance-metrics/",
+        PlayerPerformanceMetricListView.as_view(),
+        name="player-slug-performance-metrics",
+    ),
+    path(
+        "<slug:slug>/performance/summary/",
+        PlayerPerformanceSummaryView.as_view(),
+        name="player-slug-performance-summary",
+    ),
+    path(
+        "<slug:slug>/performance/trends/",
+        PlayerPerformanceTrendsView.as_view(),
+        name="player-slug-performance-trends",
     ),
 ]
