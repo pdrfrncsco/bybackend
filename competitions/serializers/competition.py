@@ -96,6 +96,29 @@ class CompetitionCreateSerializer(serializers.ModelSerializer):
             "config",
         ]
 
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        elif isinstance(data, dict):
+            data = dict(data)
+
+        raw = data.get("allowed_genders")
+        if isinstance(raw, list):
+            if len(raw) == 1:
+                data["allowed_genders"] = raw[0]
+            elif len(raw) > 1:
+                data["allowed_genders"] = "mixed"
+            else:
+                data["allowed_genders"] = "male"
+        elif isinstance(raw, str):
+            cleaned = raw.strip("[]'\" ")
+            if cleaned in ("male", "female", "mixed"):
+                data["allowed_genders"] = cleaned
+            elif "," in cleaned:
+                data["allowed_genders"] = "mixed"
+
+        return super().to_internal_value(data)
+
     def validate_competition_type(self, value: str) -> str:
         valid = {choice[0] for choice in CompetitionType.CHOICES}
         if value not in valid:
@@ -143,6 +166,29 @@ class CompetitionUpdateSerializer(serializers.ModelSerializer):
             "description",
             "config",
         ]
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        elif isinstance(data, dict):
+            data = dict(data)
+
+        raw = data.get("allowed_genders")
+        if isinstance(raw, list):
+            if len(raw) == 1:
+                data["allowed_genders"] = raw[0]
+            elif len(raw) > 1:
+                data["allowed_genders"] = "mixed"
+            else:
+                data["allowed_genders"] = "male"
+        elif isinstance(raw, str):
+            cleaned = raw.strip("[]'\" ")
+            if cleaned in ("male", "female", "mixed"):
+                data["allowed_genders"] = cleaned
+            elif "," in cleaned:
+                data["allowed_genders"] = "mixed"
+
+        return super().to_internal_value(data)
 
     def validate_competition_type(self, value: str) -> str:
         valid = {choice[0] for choice in CompetitionType.CHOICES}

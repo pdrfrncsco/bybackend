@@ -23,6 +23,14 @@ class CompetitionService:
         season: str,
         status: str = CompetitionStatus.DRAFT,
         config: dict | None = None,
+        category=None,
+        allowed_genders: str = "male",
+        start_date=None,
+        end_date=None,
+        registration_start_date=None,
+        registration_end_date=None,
+        description: str = "",
+        **kwargs,
     ) -> Competition:
         slug = slugify(name) or "competition"
         if Competition.objects.filter(
@@ -32,6 +40,8 @@ class CompetitionService:
         ).exists():
             raise DuplicateCompetition()
 
+        extra_fields = {k: v for k, v in kwargs.items() if hasattr(Competition, k)}
+
         competition = Competition.objects.create(
             tenant=tenant,
             name=name,
@@ -40,6 +50,14 @@ class CompetitionService:
             season=season,
             status=status,
             config=config or {},
+            category=category,
+            allowed_genders=allowed_genders or "male",
+            start_date=start_date,
+            end_date=end_date,
+            registration_start_date=registration_start_date,
+            registration_end_date=registration_end_date,
+            description=description or "",
+            **extra_fields,
         )
         logger.info("Competition created: %s (%s)", competition.name, competition.id)
         return competition
@@ -47,11 +65,24 @@ class CompetitionService:
     @staticmethod
     @transaction.atomic
     def update_competition(*, competition: Competition, **kwargs) -> Competition:
-        updatable_fields = ["name", "competition_type", "season", "status", "config"]
+        updatable_fields = [
+            "name",
+            "competition_type",
+            "season",
+            "status",
+            "config",
+            "category",
+            "allowed_genders",
+            "start_date",
+            "end_date",
+            "registration_start_date",
+            "registration_end_date",
+            "description",
+        ]
         updated_fields = ["updated_at"]
 
         for field in updatable_fields:
-            if field in kwargs and kwargs[field] is not None:
+            if field in kwargs:
                 setattr(competition, field, kwargs[field])
                 updated_fields.append(field)
 

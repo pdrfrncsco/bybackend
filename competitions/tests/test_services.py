@@ -326,3 +326,51 @@ class CompetitionServicesTestCase(TestCase):
         self.assertEqual(final_matches.count(), 1)
         final_match = final_matches.first()
         self.assertEqual(final_match.round_name, "Final")
+
+    def test_create_and_update_competition_with_all_metadata_fields(self):
+        """Competition creation and update should persist start_date, category, allowed_genders and other metadata."""
+        from datetime import date
+        from players.models import PlayerCategory
+
+        category = PlayerCategory.objects.create(
+            tenant=self.tenant,
+            name="Sub-20",
+            slug="sub-20",
+            min_age=18,
+            max_age=20,
+            gender="male",
+        )
+
+        comp = CompetitionService.create_competition(
+            tenant=self.tenant,
+            name="Torneio Nacional Sub-20",
+            competition_type="tournament",
+            season="2025/26",
+            category=category,
+            allowed_genders="male",
+            start_date=date(2026, 1, 10),
+            end_date=date(2026, 6, 20),
+            registration_start_date=date(2025, 11, 1),
+            registration_end_date=date(2025, 12, 15),
+            description="Competição oficial de escalão Sub-20",
+        )
+
+        self.assertEqual(comp.category, category)
+        self.assertEqual(comp.allowed_genders, "male")
+        self.assertEqual(comp.start_date, date(2026, 1, 10))
+        self.assertEqual(comp.end_date, date(2026, 6, 20))
+        self.assertEqual(comp.registration_start_date, date(2025, 11, 1))
+        self.assertEqual(comp.registration_end_date, date(2025, 12, 15))
+        self.assertEqual(comp.description, "Competição oficial de escalão Sub-20")
+
+        # Test updating fields
+        updated_comp = CompetitionService.update_competition(
+            competition=comp,
+            allowed_genders="female",
+            start_date=date(2026, 2, 1),
+            description="Descrição atualizada",
+        )
+
+        self.assertEqual(updated_comp.allowed_genders, "female")
+        self.assertEqual(updated_comp.start_date, date(2026, 2, 1))
+        self.assertEqual(updated_comp.description, "Descrição atualizada")
