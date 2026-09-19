@@ -2,11 +2,15 @@ from rest_framework import serializers
 
 from competitions.constants import CompetitionType, CompetitionStatus
 from competitions.models import Competition
+from players.models import PlayerCategory
 
 
 class CompetitionSerializer(serializers.ModelSerializer):
     type_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source="category.name", read_only=True, allow_null=True)
+    category_slug = serializers.CharField(source="category.slug", read_only=True, allow_null=True)
+    allowed_genders_label = serializers.CharField(source="get_allowed_genders_display", read_only=True)
 
     class Meta:
         model = Competition
@@ -19,6 +23,11 @@ class CompetitionSerializer(serializers.ModelSerializer):
             "season",
             "status",
             "status_label",
+            "category",
+            "category_name",
+            "category_slug",
+            "allowed_genders",
+            "allowed_genders_label",
             "start_date",
             "end_date",
             "registration_start_date",
@@ -34,6 +43,9 @@ class CompetitionSerializer(serializers.ModelSerializer):
             "slug",
             "type_label",
             "status_label",
+            "category_name",
+            "category_slug",
+            "allowed_genders_label",
             "tenant",
             "created_at",
             "updated_at",
@@ -59,6 +71,12 @@ def _validate_dates(start_date, end_date, reg_start_date, reg_end_date):
 
 class CompetitionCreateSerializer(serializers.ModelSerializer):
     config = serializers.JSONField(required=False, default=dict)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=PlayerCategory.objects.all(),
+        source="category",
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Competition
@@ -71,6 +89,9 @@ class CompetitionCreateSerializer(serializers.ModelSerializer):
             "end_date",
             "registration_start_date",
             "registration_end_date",
+            "category",
+            "category_id",
+            "allowed_genders",
             "description",
             "config",
         ]
@@ -98,6 +119,12 @@ class CompetitionCreateSerializer(serializers.ModelSerializer):
 
 class CompetitionUpdateSerializer(serializers.ModelSerializer):
     config = serializers.JSONField(required=False)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=PlayerCategory.objects.all(),
+        source="category",
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Competition
@@ -106,6 +133,9 @@ class CompetitionUpdateSerializer(serializers.ModelSerializer):
             "competition_type",
             "season",
             "status",
+            "category",
+            "category_id",
+            "allowed_genders",
             "start_date",
             "end_date",
             "registration_start_date",

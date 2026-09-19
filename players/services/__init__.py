@@ -290,6 +290,7 @@ class PlayerRegistrationService:
         joined_date: date,
         shirt_number: Optional[int] = None,
         competition=None,
+        category=None,
     ) -> PlayerRegistration:
         """
         Register a player with a club for an optional competition.
@@ -323,19 +324,26 @@ class PlayerRegistrationService:
                     "Player is a minor and requires a legal guardian with consent before registration."
                 )
 
+        if category is None and tenant:
+            try:
+                category = player.get_eligible_category(tenant=tenant)
+            except Exception:
+                category = None
+
         registration = PlayerRegistration.objects.create(
             player=player,
             club=club,
             tenant=tenant,
             competition=competition,
+            category=category,
             joined_date=joined_date,
             shirt_number=shirt_number,
             status=PlayerRegistration.RegistrationStatus.REGISTERED,
         )
 
         logger.info(
-            "Player registered: %s → %s (id=%s)",
-            player.full_name, club.name, registration.id
+            "Player registered: %s → %s (id=%s, category=%s)",
+            player.full_name, club.name, registration.id, getattr(category, "name", None)
         )
 
         # Publish domain event (best-effort) so other subsystems can react

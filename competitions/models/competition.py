@@ -46,6 +46,26 @@ class Competition(BaseModel):
         default=CompetitionStatus.DRAFT,
         verbose_name="Status",
     )
+    category = models.ForeignKey(
+        "players.PlayerCategory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="competitions",
+        verbose_name="Categoria / Escalão",
+        help_text="Escalão etário da competição (ex: Sénior, Júnior, Sub-17).",
+    )
+    allowed_genders = models.CharField(
+        max_length=10,
+        choices=[
+            ("male", "Masculino"),
+            ("female", "Feminino"),
+            ("mixed", "Misto"),
+        ],
+        default="male",
+        verbose_name="Géneros Permitidos",
+        help_text="Género dos atletas/equipas autorizados a competir.",
+    )
     start_date = models.DateField(
         null=True,
         blank=True,

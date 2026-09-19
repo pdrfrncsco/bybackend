@@ -433,8 +433,10 @@ class ClubSquadView(APIView):
     @extend_schema(tags=["clubs"], responses={200: ClubSquadMemberSerializer(many=True)})
     def get(self, request, slug: str):
         club = _resolve_public_club(request, slug)
-        squad = ClubSelector.get_squad(club=club)
-        serializer = ClubSquadMemberSerializer(squad, many=True)
+        category_id = request.query_params.get("category_id") or request.query_params.get("category")
+        gender = request.query_params.get("gender")
+        squad = ClubSelector.get_squad(club=club, category_id=category_id, gender=gender)
+        serializer = ClubSquadMemberSerializer(squad, many=True, context={"request": request})
         return success_response(
             data=serializer.data,
             message="Club squad retrieved successfully.",

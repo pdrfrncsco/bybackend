@@ -84,21 +84,26 @@ class ClubSelector:
         return Club.objects.filter(tenant_id=tenant_id).select_related("tenant").order_by("name")
 
     @staticmethod
-    def get_squad(*, club: Club) -> QuerySet:
+    def get_squad(*, club: Club, category_id: Optional[str] = None, gender: Optional[str] = None) -> QuerySet:
         """
         Return all active players for a club, ordered by shirt number.
+        Can optionally be filtered by category_id or player gender.
         
-        NOTE: This method now uses PlayerRegistration instead of ClubMember.
-        ClubMember with role="player" is deprecated - use PlayerRegistration instead.
+        NOTE: This method uses PlayerRegistration instead of ClubMember.
         """
         from players.models import PlayerRegistration
         
-        return (
+        qs = (
             PlayerRegistration.objects
             .filter(club=club, status__in=["registered", "loaned"])
-            .select_related("player", "player__profile_photo")
+            .select_related("player", "player__profile_photo", "category")
             .order_by("shirt_number")
         )
+        if category_id:
+            qs = qs.filter(category_id=category_id)
+        if gender and gender != "all":
+            qs = qs.filter(player__gender=gender)
+        return qs
 
     @staticmethod
     def get_staff(*, club: Club) -> QuerySet:

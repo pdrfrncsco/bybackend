@@ -57,6 +57,7 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    gender_label = serializers.CharField(source="get_gender_display", read_only=True)
     current_club = serializers.SerializerMethodField()
     avatar = serializers.SerializerMethodField()
     profile_photo_url = serializers.SerializerMethodField()
@@ -82,6 +83,8 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
             "full_name",
             "email",
             "date_of_birth",
+            "gender",
+            "gender_label",
             "age",
             "is_minor",
             "nationality",
@@ -198,6 +201,7 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    gender_label = serializers.CharField(source="get_gender_display", read_only=True)
     current_club = serializers.SerializerMethodField()
     career_history = serializers.SerializerMethodField()
     videos = serializers.SerializerMethodField()
@@ -226,6 +230,8 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
             "last_name",
             "full_name",
             "date_of_birth",
+            "gender",
+            "gender_label",
             "age",
             "is_minor",
             "nationality",
@@ -416,9 +422,14 @@ class PlayerRegistrationSerializer(serializers.ModelSerializer):
     
     player_name = serializers.CharField(source="player.full_name", read_only=True)
     player_slug = serializers.CharField(source="player.slug", read_only=True)
+    gender = serializers.CharField(source="player.gender", read_only=True)
+    gender_label = serializers.CharField(source="player.get_gender_display", read_only=True)
     position = serializers.CharField(source="player.primary_position", read_only=True)
     position_label = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    category_id = serializers.UUIDField(source="category.id", read_only=True, allow_null=True)
+    category_name = serializers.CharField(source="category.name", read_only=True, allow_null=True)
+    category = serializers.SerializerMethodField()
     
     class Meta:
         model = PlayerRegistration
@@ -427,6 +438,11 @@ class PlayerRegistrationSerializer(serializers.ModelSerializer):
             "player",
             "player_name",
             "player_slug",
+            "gender",
+            "gender_label",
+            "category",
+            "category_id",
+            "category_name",
             "shirt_number",
             "position",
             "position_label",
@@ -441,6 +457,19 @@ class PlayerRegistrationSerializer(serializers.ModelSerializer):
             "red_cards",
         ]
         read_only_fields = fields
+
+    def get_category(self, obj: PlayerRegistration) -> dict | None:
+        if obj.category:
+            return {
+                "id": str(obj.category.id),
+                "name": obj.category.name,
+                "slug": obj.category.slug,
+                "min_age": obj.category.min_age,
+                "max_age": obj.category.max_age,
+                "gender": obj.category.gender,
+                "is_custom": obj.category.is_custom,
+            }
+        return None
     
     def get_position_label(self, obj: PlayerRegistration) -> str:
         try:

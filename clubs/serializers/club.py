@@ -20,6 +20,7 @@ class ClubSerializer(serializers.ModelSerializer):
     logo_url = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    gender_label = serializers.CharField(source="get_gender_display", read_only=True)
     tenant_name = serializers.SerializerMethodField()
     tenant_slug = serializers.SerializerMethodField()
     # Expose affiliation request summary (if any) so frontend can show banners/CTA
@@ -51,6 +52,8 @@ class ClubSerializer(serializers.ModelSerializer):
             "description",
             "is_public",
             "is_verified",
+            "gender",
+            "gender_label",
             "status",
             "status_label",
             "affiliation_request_status",
@@ -143,6 +146,7 @@ class ClubCreateSerializer(serializers.ModelSerializer):
             "description",
             "primary_color",
             "secondary_color",
+            "gender",
             "is_public",
         ]
 
@@ -168,6 +172,7 @@ class ClubUpdateSerializer(serializers.ModelSerializer):
             "description",
             "primary_color",
             "secondary_color",
+            "gender",
             "is_public",
         ]
 
@@ -180,6 +185,7 @@ class PublicClubSerializer(serializers.ModelSerializer):
     logo_url = serializers.SerializerMethodField()
     location = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
+    gender_label = serializers.CharField(source="get_gender_display", read_only=True)
     tenant_name = serializers.SerializerMethodField()
     tenant_slug = serializers.SerializerMethodField()
 
@@ -205,6 +211,8 @@ class PublicClubSerializer(serializers.ModelSerializer):
             "description",
             "is_public",
             "is_verified",
+            "gender",
+            "gender_label",
             "status",
             "status_label",
             "tenant_name",
@@ -349,6 +357,12 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     status_label = serializers.SerializerMethodField()
     nationality = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    gender_label = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    category_id = serializers.SerializerMethodField()
+    category_name = serializers.SerializerMethodField()
+    category_slug = serializers.SerializerMethodField()
     date_of_birth = serializers.SerializerMethodField()
     height_cm = serializers.SerializerMethodField()
     weight_kg = serializers.SerializerMethodField()
@@ -374,6 +388,12 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
             "status",
             "status_label",
             "nationality",
+            "gender",
+            "gender_label",
+            "category",
+            "category_id",
+            "category_name",
+            "category_slug",
             "date_of_birth",
             "height_cm",
             "weight_kg",
@@ -465,6 +485,42 @@ class ClubSquadMemberSerializer(serializers.ModelSerializer):
         if hasattr(obj, "player") and obj.player:
             return getattr(obj.player, "nationality", None)
         return None
+
+    def get_gender(self, obj) -> str:
+        if hasattr(obj, "player") and obj.player:
+            return getattr(obj.player, "gender", "male")
+        return "male"
+
+    def get_gender_label(self, obj) -> str:
+        if hasattr(obj, "player") and obj.player:
+            return obj.player.get_gender_display()
+        return "Masculino"
+
+    def get_category(self, obj) -> dict | None:
+        cat = getattr(obj, "category", None)
+        if cat:
+            return {
+                "id": str(cat.id),
+                "name": cat.name,
+                "slug": cat.slug,
+                "min_age": cat.min_age,
+                "max_age": cat.max_age,
+                "gender": cat.gender,
+                "is_custom": cat.is_custom,
+            }
+        return None
+
+    def get_category_id(self, obj) -> str | None:
+        cat = getattr(obj, "category", None)
+        return str(cat.id) if cat else None
+
+    def get_category_name(self, obj) -> str | None:
+        cat = getattr(obj, "category", None)
+        return cat.name if cat else None
+
+    def get_category_slug(self, obj) -> str | None:
+        cat = getattr(obj, "category", None)
+        return cat.slug if cat else None
 
     def get_date_of_birth(self, obj) -> str | None:
         if hasattr(obj, "player") and obj.player and obj.player.date_of_birth:

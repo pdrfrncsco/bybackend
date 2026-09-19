@@ -106,6 +106,19 @@ class Club(BaseModel):
         verbose_name="Status",
     )
 
+    # Gender scope
+    gender = models.CharField(
+        max_length=10,
+        choices=[
+            ("male", "Masculino"),
+            ("female", "Feminino"),
+            ("mixed", "Misto"),
+        ],
+        default="mixed",
+        verbose_name="Género do Clube",
+        help_text="Indica se o clube tem secções masculinas, femininas ou mistas.",
+    )
+
     class Meta:
         ordering = ["name"]
         verbose_name = "Club"

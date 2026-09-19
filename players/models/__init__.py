@@ -1,6 +1,7 @@
 """Players domain models."""
 
 from players.models.player import Player
+from players.models.category import PlayerCategory
 from players.models.registration import PlayerRegistration
 from players.models.player_registration_request import PlayerRegistrationRequest
 from players.models.player_video import PlayerVideo
@@ -32,6 +33,7 @@ from players.models.compliance import PlayerComplianceRecord
 
 __all__ = [
     "Player",
+    "PlayerCategory",
     "PlayerRegistration",
     "PlayerRegistrationRequest",
     "PlayerVideo",

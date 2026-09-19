@@ -30,10 +30,15 @@ from organizations.views import (
     OrganizationPendingLineupsView,
     OrganizationPendingLineupReviewView,
 )
+from players.views.category_views import OrganizationCategoriesView
 
 urlpatterns = [
     # Authenticated — Organization Management
     path("me/", OrganizationMeView.as_view(), name="organization-me"),
+    path("me/categories/", OrganizationCategoriesView.as_view(), name="organization-me-categories"),
+    path("categories/", OrganizationCategoriesView.as_view(), name="organization-categories-list"),
+    path("<uuid:org_id>/categories/", OrganizationCategoriesView.as_view(), name="organization-categories"),
+    path("<slug:slug>/categories/", OrganizationCategoriesView.as_view(), name="organization-categories-slug"),
     path("me/logo/", OrganizationLogoView.as_view(), name="organization-logo"),
     path("me/banner/", OrganizationBannerView.as_view(), name="organization-banner"),
     path("me/launch/", OrganizationLaunchView.as_view(), name="organization-launch"),
@@ -51,6 +56,7 @@ urlpatterns = [
     path("public/<slug:slug>/tournaments/", OrganizationTournamentsView.as_view(), name="organization-tournaments"),
     path("public/<slug:slug>/clubs/", OrganizationClubsView.as_view(), name="organization-clubs"),
     path("public/<slug:slug>/players/", OrganizationPlayersView.as_view(), name="organization-players"),
+    path("public/<slug:slug>/categories/", OrganizationCategoriesView.as_view(), name="organization-public-categories"),
     path("public/<slug:slug>/club-requests/", OrganizationClubRequestCreateView.as_view(), name="organization-club-request-create"),
     path("public/<slug:slug>/club-requests/<uuid:request_id>/submit/", OrganizationClubRequestSubmitView.as_view(), name="organization-club-request-submit"),
 

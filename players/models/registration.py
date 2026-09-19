@@ -59,6 +59,16 @@ class PlayerRegistration(BaseModel):
         related_name="player_registrations",
         verbose_name="Competition",
     )
+
+    # Category / Escalão
+    category = models.ForeignKey(
+        "players.PlayerCategory",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="registrations",
+        verbose_name="Categoria / Escalão",
+    )
     
     # Tenant (denormalized for query efficiency)
     tenant = models.ForeignKey(

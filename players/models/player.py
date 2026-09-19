@@ -35,6 +35,10 @@ class Player(BaseModel):
     Identity is based on personal info + optional User link.
     """
 
+    class Gender(models.TextChoices):
+        MALE = "male", "Masculino"
+        FEMALE = "female", "Feminino"
+
     class PlayerStatus(models.TextChoices):
         ACTIVE = "active", "Activo"
         RETIRED = "retired", "Retiredo"
@@ -85,6 +89,12 @@ class Player(BaseModel):
     
     # Physical
     date_of_birth = models.DateField(null=True, blank=True, verbose_name="Data de Nascimento")
+    gender = models.CharField(
+        max_length=10,
+        choices=Gender.choices,
+        default=Gender.MALE,
+        verbose_name="Género",
+    )
     nationality = models.CharField(max_length=100, null=True, blank=True, verbose_name="País")
     height_cm = models.IntegerField(null=True, blank=True, verbose_name="Altura (cm)")
     weight_kg = models.IntegerField(null=True, blank=True, verbose_name="Peso (kg)")
@@ -234,6 +244,30 @@ class Player(BaseModel):
         """Return True if player is a minor (<18 years)."""
         age = self.age
         return age is not None and age < 18
+
+    def get_eligible_category(self, categories=None):
+        """
+        Return the recommended PlayerCategory for this player based on age and gender.
+        Youth/specific categories take precedence over general senior categories.
+        """
+        age = self.age
+        if age is None:
+            return None
+        if categories is None:
+            from players.models.category import PlayerCategory
+            categories = PlayerCategory.objects.filter(is_active=True).order_by("display_order", "min_age")
+        else:
+            categories = sorted(categories, key=lambda c: (getattr(c, "display_order", 99), 0 if getattr(c, "max_age", None) else 1))
+
+        for cat in categories:
+            if cat.gender != "mixed" and cat.gender != self.gender:
+                continue
+            if cat.min_age and age < cat.min_age:
+                continue
+            if cat.max_age and age > cat.max_age:
+                continue
+            return cat
+        return None
 
     def save(self, *args, **kwargs) -> None:
         # Ensure a stable, unique global_id exists (immutable after creation)
