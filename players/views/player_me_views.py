@@ -35,6 +35,10 @@ def build_onboarding_status_data(player, status, request=None):
     if has_identity_info and not status.identity_complete:
         status.identity_complete = True
         dirty = True
+    has_club_info = player.registrations.filter(status="registered").exists() or player.registration_requests.exists()
+    if has_club_info and not status.club_complete:
+        status.club_complete = True
+        dirty = True
     if not status.account_complete:
         status.account_complete = True
         dirty = True
