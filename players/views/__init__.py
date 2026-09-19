@@ -146,7 +146,12 @@ class PlayerDetailUpdateView(APIView):
                 status_code=404,
             )
 
-        if not player.is_public:
+        is_private = (
+            not player.is_public
+            or player.status != Player.PlayerStatus.ACTIVE
+            or (hasattr(player, "privacy_settings") and player.privacy_settings.profile_visibility != "public")
+        )
+        if is_private:
             if not request.user or not request.user.is_authenticated:
                 return error_response(
                     message="Player not found.",

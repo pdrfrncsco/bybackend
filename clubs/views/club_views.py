@@ -355,21 +355,26 @@ class ClubPublicListView(APIView):
 
 def _resolve_public_club(request, slug: str) -> Club:
     """Safely resolve a public club by slug or UUID without throwing MultipleObjectsReturned or ValueError."""
+    from core.models import Tenant
     tenant = getattr(request, "tenant", None)
     if tenant:
+        if not tenant.is_public or tenant.status != Tenant.TenantStatus.ACTIVE:
+            raise ClubNotFound()
         try:
             import uuid
             uuid.UUID(slug)
             club = Club.objects.select_related("tenant").filter(
                 Q(slug=slug) | Q(id=slug),
                 tenant=tenant,
-                is_public=True
+                is_public=True,
+                status=ClubStatus.ACTIVE,
             ).first()
         except (ValueError, TypeError):
             club = Club.objects.select_related("tenant").filter(
                 slug=slug,
                 tenant=tenant,
-                is_public=True
+                is_public=True,
+                status=ClubStatus.ACTIVE,
             ).first()
         if not club:
             raise ClubNotFound()
@@ -381,7 +386,13 @@ def _resolve_public_club(request, slug: str) -> Club:
         try:
             import uuid
             uuid.UUID(slug)
-            club = Club.objects.select_related("tenant").filter(id=slug, is_public=True).first()
+            club = Club.objects.select_related("tenant").filter(
+                id=slug,
+                is_public=True,
+                status=ClubStatus.ACTIVE,
+                tenant__is_public=True,
+                tenant__status=Tenant.TenantStatus.ACTIVE,
+            ).first()
         except (ValueError, TypeError):
             pass
         if club is None:
@@ -435,7 +446,7 @@ class ClubSquadView(APIView):
         club = _resolve_public_club(request, slug)
         category_id = request.query_params.get("category_id") or request.query_params.get("category")
         gender = request.query_params.get("gender")
-        squad = ClubSelector.get_squad(club=club, category_id=category_id, gender=gender)
+        squad = ClubSelector.get_squad(club=club, category_id=category_id, gender=gender, public_only=True)
         serializer = ClubSquadMemberSerializer(squad, many=True, context={"request": request})
         return success_response(
             data=serializer.data,

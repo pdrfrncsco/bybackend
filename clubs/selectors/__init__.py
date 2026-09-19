@@ -36,9 +36,16 @@ class ClubSelector:
 
     @staticmethod
     def get_by_slug(*, slug: str) -> Optional[Club]:
-        """Retrieve a public club by its slug."""
+        """Retrieve an active, public club by its slug."""
+        from core.models import Tenant
         try:
-            return Club.objects.select_related("tenant").filter(slug=slug, is_public=True).first()
+            return Club.objects.select_related("tenant").filter(
+                slug=slug,
+                is_public=True,
+                status=ClubStatus.ACTIVE,
+                tenant__is_public=True,
+                tenant__status=Tenant.TenantStatus.ACTIVE,
+            ).first()
         except Exception:
             return None
 
@@ -57,15 +64,18 @@ class ClubSelector:
         tenant_slug: str | None = None,
     ) -> QuerySet:
         """
-        Return all public, active clubs.
+        Return all public, active clubs belonging to public, active tenants.
 
         Args:
             search: Optional search term for name or city.
             tenant_slug: Optional filter by organization slug.
         """
+        from core.models import Tenant
         queryset = Club.objects.filter(
             is_public=True,
             status=ClubStatus.ACTIVE,
+            tenant__is_public=True,
+            tenant__status=Tenant.TenantStatus.ACTIVE,
         ).select_related("tenant")
 
         if search:
@@ -84,14 +94,21 @@ class ClubSelector:
         return Club.objects.filter(tenant_id=tenant_id).select_related("tenant").order_by("name")
 
     @staticmethod
-    def get_squad(*, club: Club, category_id: Optional[str] = None, gender: Optional[str] = None) -> QuerySet:
+    def get_squad(
+        *,
+        club: Club,
+        category_id: Optional[str] = None,
+        gender: Optional[str] = None,
+        public_only: bool = False,
+    ) -> QuerySet:
         """
         Return all active players for a club, ordered by shirt number.
         Can optionally be filtered by category_id or player gender.
+        If public_only is True, excludes private and non-active players.
         
         NOTE: This method uses PlayerRegistration instead of ClubMember.
         """
-        from players.models import PlayerRegistration
+        from players.models import PlayerRegistration, Player
         
         qs = (
             PlayerRegistration.objects
@@ -99,6 +116,13 @@ class ClubSelector:
             .select_related("player", "player__profile_photo", "category")
             .order_by("shirt_number")
         )
+        if public_only:
+            qs = qs.filter(
+                player__is_public=True,
+                player__status=Player.PlayerStatus.ACTIVE,
+            ).exclude(
+                player__privacy_settings__profile_visibility__in=["private", "club", "organization", "agent"]
+            )
         if category_id:
             qs = qs.filter(category_id=category_id)
         if gender and gender != "all":
@@ -248,22 +272,29 @@ class ClubSelector:
         return ClubSponsor.objects.filter(club=club, is_active=True).select_related("logo_asset")
 
     @staticmethod
-    def get_competitions(*, club: Club) -> QuerySet:
+    def get_competitions(*, club: Club, public_only: bool = True) -> QuerySet:
         """
-        Return all competitions where the club is registered or has matches/standings.
+        Return competitions where the club is registered or has matches/standings.
         """
         from competitions.models import Competition
+        from competitions.constants import CompetitionStatus
+        from core.models import Tenant
 
-        return (
+        qs = (
             Competition.objects.filter(
                 Q(registrations__club=club)
                 | Q(matches__home_club=club)
                 | Q(matches__away_club=club)
                 | Q(standings__club=club)
             )
-            .distinct()
-            .order_by("-created_at")
         )
+        if public_only:
+            qs = qs.filter(
+                status__in=[CompetitionStatus.ACTIVE, CompetitionStatus.COMPLETED],
+                tenant__is_public=True,
+                tenant__status=Tenant.TenantStatus.ACTIVE,
+            )
+        return qs.distinct().order_by("-created_at")
 
     @staticmethod
     def get_matches(

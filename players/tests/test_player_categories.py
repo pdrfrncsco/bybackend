@@ -11,10 +11,13 @@ from clubs.models import Club
 from players.models import Player, PlayerRegistration, PlayerCategory
 from players.selectors import PlayerSelector
 
-
 class PlayerCategoryTests(TestCase):
     def setUp(self):
-        self.tenant = Tenant.objects.create(name="Federação Angolana de Futebol", slug="faf")
+        self.tenant = Tenant.objects.create(
+            name="Federação Angolana de Futebol",
+            slug="faf",
+            status=Tenant.TenantStatus.ACTIVE,
+        )
         self.club = Club.objects.create(
             tenant=self.tenant,
             name="Petro Atlético de Luanda",

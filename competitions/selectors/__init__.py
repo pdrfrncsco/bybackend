@@ -1,5 +1,6 @@
 from django.db.models import QuerySet, Q
 from core.models import Tenant
+from competitions.constants import CompetitionStatus
 from competitions.models import Competition, CompetitionRegistration, Match, Standing
 
 
@@ -11,9 +12,41 @@ class CompetitionSelector:
         )
 
     @staticmethod
-    def list_all_active(*, tenant: Tenant | None = None) -> list[Competition]:
-        """Public selector: competitions ordered by most recent."""
-        queryset = Competition.objects.select_related("tenant")
+    def list_for_public_organization(*, tenant: Tenant) -> list[Competition]:
+        """Competitions visible on an organization's public page."""
+        return list(
+            Competition.objects.filter(
+                tenant=tenant,
+                status__in=[CompetitionStatus.ACTIVE, CompetitionStatus.COMPLETED],
+            ).order_by("-created_at")
+        )
+
+    @staticmethod
+    def list_all_active(
+        *,
+        tenant: Tenant | None = None,
+        status: str | None = None,
+        search: str | None = None,
+        competition_type: str | None = None,
+    ) -> list[Competition]:
+        """Public selector: active/completed competitions belonging to active, public tenants."""
+        queryset = Competition.objects.select_related("tenant").filter(
+            tenant__is_public=True,
+            tenant__status=Tenant.TenantStatus.ACTIVE,
+        )
+        if status and status in [CompetitionStatus.ACTIVE, CompetitionStatus.COMPLETED]:
+            queryset = queryset.filter(status=status)
+        else:
+            queryset = queryset.filter(status__in=[CompetitionStatus.ACTIVE, CompetitionStatus.COMPLETED])
+
+        if competition_type:
+            queryset = queryset.filter(competition_type=competition_type)
+
+        if search:
+            queryset = queryset.filter(
+                Q(name__icontains=search) | Q(season__icontains=search) | Q(slug__icontains=search)
+            )
+
         if tenant is not None:
             queryset = queryset.filter(tenant=tenant)
         return list(queryset.order_by("-created_at"))

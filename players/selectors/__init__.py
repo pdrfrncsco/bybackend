@@ -41,8 +41,13 @@ class PlayerSelector:
     @staticmethod
     def get_public_by_slug(slug: str) -> Optional[Player]:
         try:
-            return Player.objects.get(slug=slug, status=Player.PlayerStatus.ACTIVE, is_public=True)
-        except Player.DoesNotExist:
+            return (
+                Player.objects
+                .filter(slug=slug, status=Player.PlayerStatus.ACTIVE, is_public=True)
+                .exclude(privacy_settings__profile_visibility__in=["private", "club", "organization", "agent"])
+                .first()
+            )
+        except Exception:
             return None
 
     @staticmethod
@@ -58,7 +63,11 @@ class PlayerSelector:
 
     @staticmethod
     def list_active(limit: int = 100) -> QuerySet:
-        return Player.objects.filter(status=Player.PlayerStatus.ACTIVE, is_public=True).order_by("-updated_at")[:limit]
+        return (
+            Player.objects.filter(status=Player.PlayerStatus.ACTIVE, is_public=True)
+            .exclude(privacy_settings__profile_visibility__in=["private", "club", "organization", "agent"])
+            .order_by("-updated_at")[:limit]
+        )
 
     @staticmethod
     def list_players(
@@ -69,7 +78,10 @@ class PlayerSelector:
         without_club: bool = False,
         include_football_profile: bool = False,
     ) -> QuerySet:
-        qs = Player.objects.filter(status=Player.PlayerStatus.ACTIVE, is_public=True)
+        qs = (
+            Player.objects.filter(status=Player.PlayerStatus.ACTIVE, is_public=True)
+            .exclude(privacy_settings__profile_visibility__in=["private", "club", "organization", "agent"])
+        )
         if search:
             qs = qs.filter(
                 Q(first_name__icontains=search)
@@ -88,9 +100,13 @@ class PlayerSelector:
 
     @staticmethod
     def search(query: str, without_club: bool = False) -> QuerySet:
-        qs = Player.objects.filter(
-            Q(first_name__icontains=query) | Q(last_name__icontains=query) | Q(slug__icontains=query)
-        ).filter(status=Player.PlayerStatus.ACTIVE, is_public=True)
+        qs = (
+            Player.objects.filter(
+                Q(first_name__icontains=query) | Q(last_name__icontains=query) | Q(slug__icontains=query)
+            )
+            .filter(status=Player.PlayerStatus.ACTIVE, is_public=True)
+            .exclude(privacy_settings__profile_visibility__in=["private", "club", "organization", "agent"])
+        )
         if without_club:
             qs = qs.exclude(registrations__status__in=[PlayerRegistration.RegistrationStatus.REGISTERED, PlayerRegistration.RegistrationStatus.LOANED])
         return qs

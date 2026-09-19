@@ -222,38 +222,43 @@ class OrganizationSelector:
     @staticmethod
     def get_tournaments(*, tenant: Tenant) -> list:
         """
-        Retrieve competitions for an organization.
+        Retrieve public competitions for an organization.
         """
         from competitions.selectors import CompetitionSelector
         from competitions.serializers import CompetitionSerializer
 
-        competitions = CompetitionSelector.list_for_tenant(tenant=tenant)
+        competitions = CompetitionSelector.list_for_public_organization(tenant=tenant)
         return CompetitionSerializer(competitions, many=True).data
 
     @staticmethod
     def get_clubs(*, tenant: Tenant) -> list:
         """
-        Retrieve public clubs affiliated with an organization.
+        Retrieve public, active clubs affiliated with an organization.
         """
+        from clubs.constants import ClubStatus
         from clubs.selectors import ClubSelector
         from clubs.serializers import PublicClubSerializer
 
-        clubs = ClubSelector.list_by_tenant(tenant_id=tenant.id).filter(is_public=True)
+        clubs = ClubSelector.list_by_tenant(tenant_id=tenant.id).filter(
+            is_public=True,
+            status=ClubStatus.ACTIVE,
+        )
         return PublicClubSerializer(clubs, many=True).data
 
     @staticmethod
     def get_players(*, tenant: Tenant) -> list:
         """
-        Retrieve players registered in clubs affiliated with an organization.
-
-        Fetches all active player registrations across all clubs belonging to
-        the tenant and returns deduplicated, serialized player data.
+        Retrieve public, active players registered in active clubs affiliated with an organization.
         """
+        from clubs.constants import ClubStatus
         from clubs.selectors import ClubSelector
-        from players.models import PlayerRegistration
+        from players.models import PlayerRegistration, Player
         from players.serializers import PlayerSerializer
 
-        club_ids = ClubSelector.list_by_tenant(tenant_id=tenant.id).values_list("id", flat=True)
+        club_ids = ClubSelector.list_by_tenant(tenant_id=tenant.id).filter(
+            is_public=True,
+            status=ClubStatus.ACTIVE,
+        ).values_list("id", flat=True)
 
         player_ids = (
             PlayerRegistration.objects.filter(
@@ -264,10 +269,15 @@ class OrganizationSelector:
             .distinct()
         )
 
-        from players.models import Player
-
         players = (
-            Player.objects.filter(id__in=player_ids, status="active")
+            Player.objects.filter(
+                id__in=player_ids,
+                status=Player.PlayerStatus.ACTIVE,
+                is_public=True,
+            )
+            .exclude(
+                privacy_settings__profile_visibility__in=["private", "club", "organization", "agent"]
+            )
             .prefetch_related("registrations__club")
             .order_by("last_name", "first_name")
         )

@@ -290,3 +290,16 @@ class Player(BaseModel):
                 counter += 1
             self.slug = slug
         super().save(*args, **kwargs)
+
+        # Sincronizar privacy_settings se existir
+        try:
+            privacy = getattr(self, "privacy_settings", None)
+            if privacy:
+                target_vis = "public" if self.is_public else "private"
+                if (self.is_public and privacy.profile_visibility != "public") or (
+                    not self.is_public and privacy.profile_visibility == "public"
+                ):
+                    privacy.profile_visibility = target_vis
+                    privacy.save(update_fields=["profile_visibility"])
+        except Exception:
+            pass

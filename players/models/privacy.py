@@ -26,3 +26,11 @@ class PlayerPrivacySettings(BaseModel):
     class Meta:
         verbose_name = "Player Privacy Settings"
         verbose_name_plural = "Player Privacy Settings"
+
+    def save(self, *args, **kwargs) -> None:
+        super().save(*args, **kwargs)
+        if self.player_id:
+            is_public_target = (self.profile_visibility == "public")
+            if self.player.is_public != is_public_target:
+                self.player.is_public = is_public_target
+                self.player.save(update_fields=["is_public"])

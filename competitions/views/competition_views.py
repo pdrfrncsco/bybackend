@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 from accounts.permissions import IsActiveAccount
 from common.pagination import StandardPagination
 from common.responses import created_response, error_response, not_found_response, success_response
+from core.models import Tenant
+from competitions.constants import CompetitionStatus
 from competitions.exceptions import CompetitionNotFound, DuplicateCompetition
 from competitions.selectors import CompetitionSelector
 from competitions.serializers import (
@@ -36,9 +38,43 @@ class CompetitionListCreateView(APIView):
 
     @extend_schema(tags=["competitions"], responses={200: CompetitionSerializer(many=True)})
     def get(self, request):
-        competitions = CompetitionSelector.list_all_active(
-            tenant=getattr(request, "tenant", None),
-        )
+        status = request.query_params.get("status")
+        search = request.query_params.get("search")
+        competition_type = request.query_params.get("competition_type")
+        is_admin_param = request.query_params.get("admin") == "true"
+
+        user = request.user
+        tenant = getattr(request, "tenant", None)
+        if not tenant and user and user.is_authenticated:
+            try:
+                tenant = OrganizationService.get_organization_for_user(user=user)
+            except Exception:
+                tenant = None
+
+        is_admin = False
+        if user and user.is_authenticated and tenant:
+            try:
+                OrganizationService.assert_is_organization_admin(user=user, tenant=tenant)
+                is_admin = True
+            except Exception:
+                is_admin = False
+
+        if is_admin and is_admin_param and tenant:
+            competitions = CompetitionSelector.list_for_tenant(tenant=tenant)
+            if status:
+                competitions = [c for c in competitions if c.status == status]
+            if competition_type:
+                competitions = [c for c in competitions if c.competition_type == competition_type]
+            if search:
+                s = search.lower()
+                competitions = [c for c in competitions if s in c.name.lower() or s in c.season.lower() or s in c.slug.lower()]
+        else:
+            competitions = CompetitionSelector.list_all_active(
+                tenant=getattr(request, "tenant", None),
+                status=status,
+                search=search,
+                competition_type=competition_type,
+            )
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(competitions, request)
@@ -95,6 +131,25 @@ class CompetitionDetailView(APIView):
         )
         if competition is None:
             return not_found_response(message="Competition not found.")
+
+        # Check access permission:
+        # If competition is draft or inactive, OR tenant is not active/public,
+        # ONLY organization admins of that tenant are allowed to view it.
+        is_admin = False
+        user = request.user
+        if user and user.is_authenticated:
+            try:
+                OrganizationService.assert_is_organization_admin(user=user, tenant=competition.tenant)
+                is_admin = True
+            except Exception:
+                is_admin = False
+
+        if not is_admin:
+            if competition.status in [CompetitionStatus.DRAFT, CompetitionStatus.INACTIVE]:
+                return not_found_response(message="Competition not found.")
+            if not competition.tenant.is_public or competition.tenant.status != Tenant.TenantStatus.ACTIVE:
+                return not_found_response(message="Competition not found.")
+
         return success_response(
             data=CompetitionSerializer(competition).data,
             message="Competition retrieved successfully.",
