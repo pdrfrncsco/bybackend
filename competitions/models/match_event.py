@@ -74,6 +74,16 @@ class MatchEvent(BaseModel):
         verbose_name="Player (Off)",
         help_text="Only used for SUBSTITUTION_IN — the player being replaced.",
     )
+    # For goals: the player who assisted
+    assist_player = models.ForeignKey(
+        "players.Player",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="assist_events",
+        verbose_name="Assist Player",
+        help_text="Only used for GOAL / PENALTY_SCORED — the player who provided the assist.",
+    )
 
     event_type = models.CharField(
         max_length=30,

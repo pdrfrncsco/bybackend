@@ -79,6 +79,7 @@ class MatchEventService:
         minute: int,
         player: Player | None = None,
         player_off: Player | None = None,
+        assist_player: Player | None = None,
         extra_time: bool = False,
         notes: str = "",
         idempotency_key: str | None = None,
@@ -126,6 +127,7 @@ class MatchEventService:
             minute=minute,
             player=player,
             player_off=player_off,
+            assist_player=assist_player,
             extra_time=extra_time,
             notes=notes,
             idempotency_key=idempotency_key or None,
@@ -372,6 +374,14 @@ class MatchEventService:
                     except Player.DoesNotExist:
                         player = None
 
+                assist_player = None
+                assist_player_id = g.get("assist_player_id") or g.get("assist_player")
+                if assist_player_id:
+                    try:
+                        assist_player = Player.objects.get(id=assist_player_id)
+                    except Player.DoesNotExist:
+                        assist_player = None
+
                 event_type = g.get("event_type") or MatchEvent.EventType.GOAL
                 minute = int(g.get("minute", 1))
                 g_notes = g.get("notes", "")
@@ -383,6 +393,7 @@ class MatchEventService:
                     event_type=event_type,
                     minute=minute,
                     player=player,
+                    assist_player=assist_player,
                     notes=g_notes,
                 )
 

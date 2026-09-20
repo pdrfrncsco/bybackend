@@ -14,6 +14,7 @@ class MatchEventSerializer(serializers.ModelSerializer):
     )
     player_name = serializers.SerializerMethodField()
     player_off_name = serializers.SerializerMethodField()
+    assist_player_name = serializers.SerializerMethodField()
     club_name = serializers.CharField(source="club.name", read_only=True)
     club_logo = serializers.SerializerMethodField()
 
@@ -29,6 +30,8 @@ class MatchEventSerializer(serializers.ModelSerializer):
             "player_name",
             "player_off",
             "player_off_name",
+            "assist_player",
+            "assist_player_name",
             "club",
             "club_name",
             "club_logo",
@@ -50,6 +53,11 @@ class MatchEventSerializer(serializers.ModelSerializer):
             return obj.player_off.full_name
         return None
 
+    def get_assist_player_name(self, obj: MatchEvent) -> str | None:
+        if obj.assist_player:
+            return obj.assist_player.full_name
+        return None
+
     def get_club_logo(self, obj: MatchEvent) -> str | None:
         return get_club_logo_url(obj.club)
 
@@ -62,6 +70,7 @@ class MatchEventCreateSerializer(serializers.Serializer):
     club = serializers.UUIDField()
     player = serializers.UUIDField(required=False, allow_null=True)
     player_off = serializers.UUIDField(required=False, allow_null=True)
+    assist_player = serializers.UUIDField(required=False, allow_null=True)
     notes = serializers.CharField(max_length=255, required=False, default="")
     idempotency_key = serializers.CharField(max_length=128, required=False, allow_blank=True)
 

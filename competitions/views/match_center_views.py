@@ -120,6 +120,13 @@ class MatchEventListCreateView(APIView):
             except Player.DoesNotExist:
                 return not_found_response(message="Player (off) not found.")
 
+        assist_player = None
+        if data.get("assist_player"):
+            try:
+                assist_player = Player.objects.get(id=data["assist_player"])
+            except Player.DoesNotExist:
+                return not_found_response(message="Assist player not found.")
+
         try:
             event = MatchEventService.add_event(
                 tenant=tenant,
@@ -129,6 +136,7 @@ class MatchEventListCreateView(APIView):
                 minute=data["minute"],
                 player=player,
                 player_off=player_off,
+                assist_player=assist_player,
                 extra_time=data.get("extra_time", False),
                 notes=data.get("notes", ""),
                 idempotency_key=data.get("idempotency_key"),

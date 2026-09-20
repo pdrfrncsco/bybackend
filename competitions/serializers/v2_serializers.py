@@ -267,6 +267,7 @@ class StandingSerializer(serializers.ModelSerializer):
 class ManualScoresheetGoalSerializer(serializers.Serializer):
     club_id = serializers.UUIDField()
     player_id = serializers.UUIDField(required=False, allow_null=True)
+    assist_player_id = serializers.UUIDField(required=False, allow_null=True)
     minute = serializers.IntegerField(default=1, min_value=0, max_value=130)
     event_type = serializers.ChoiceField(
         choices=["goal", "penalty_scored", "own_goal"],
