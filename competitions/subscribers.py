@@ -17,6 +17,8 @@ def handle_match_finished(event: Event) -> None:
         match = Match.objects.select_related("competition", "tenant").get(
             id=payload["match_id"], tenant_id=event.tenant_id,
         )
+        from competitions.services.lineup_service import LineupService
+        LineupService.calculate_and_save_minutes_for_match(match)
         StandingService.recalculate_standings(tenant=match.tenant, competition=match.competition)
         if match.competition.competition_type in {"cup", "tournament"}:
             from competitions.services.competition_format_service import CompetitionFormatService

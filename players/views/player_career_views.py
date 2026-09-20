@@ -1,4 +1,5 @@
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from common.responses import error_response, success_response
@@ -10,6 +11,8 @@ from players.serializers.player_career import PlayerCareerSerializer
 
 class PlayerCareerListView(APIView):
     """GET /api/v1/players/{slug}/career/ — Return player's career timeline."""
+
+    permission_classes = [AllowAny]
 
     @extend_schema(tags=["players"], summary="Get player career timeline", responses={200: PlayerCareerSerializer(many=True)})
     def get(self, request, slug: str):

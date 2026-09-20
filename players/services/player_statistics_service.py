@@ -62,13 +62,54 @@ class PlayerStatisticsService:
 
             key = (getattr(reg.club, "id", None), season, getattr(reg.competition, "id", None))
 
-            # Use registration's per-registration stats as a source
-            buckets[key]["appearances"] += reg.matches_played or 0
-            buckets[key]["goals"] += reg.goals or 0
-            buckets[key]["assists"] += reg.assists or 0
-            buckets[key]["yellow_cards"] += reg.yellow_cards or 0
-            buckets[key]["red_cards"] += reg.red_cards or 0
-            # starts/minutes/shots not present on registration — left as 0 for now
+            appearances = reg.matches_played or 0
+            goals = reg.goals or 0
+            assists = reg.assists or 0
+            yellow_cards = reg.yellow_cards or 0
+            red_cards = reg.red_cards or 0
+
+            # Calculate minutes and starts from MatchLineup
+            from competitions.models import Match, MatchLineup
+            lineup_qs = MatchLineup.objects.filter(
+                player=player,
+                club=reg.club,
+            )
+            if reg.competition:
+                lineup_qs = lineup_qs.filter(match__competition=reg.competition)
+            lineup_qs = lineup_qs.filter(
+                match__status__in=[
+                    Match.MatchStatus.FINISHED,
+                    Match.MatchStatus.ARCHIVED,
+                    Match.MatchStatus.LIVE,
+                    Match.MatchStatus.HALFTIME,
+                ]
+            )
+
+            lineup_minutes = sum(l.minutes_played or 0 for l in lineup_qs)
+            lineup_starts = sum(1 for l in lineup_qs if l.status == MatchLineup.LineupStatus.STARTER)
+            lineup_matches = sum(
+                1 for l in lineup_qs
+                if l.status == MatchLineup.LineupStatus.STARTER or l.substituted_in_minute is not None or (l.minutes_played or 0) > 0
+            )
+
+            # If there are historical or imported matches in registration not represented in MatchLineup
+            if appearances > lineup_matches:
+                unaccounted = appearances - lineup_matches
+                est_minutes = unaccounted * 80
+                est_starts = round(unaccounted * 0.85)
+                minutes = lineup_minutes + est_minutes
+                starts = lineup_starts + est_starts
+            else:
+                minutes = lineup_minutes
+                starts = lineup_starts
+
+            buckets[key]["appearances"] += appearances
+            buckets[key]["starts"] += starts
+            buckets[key]["minutes"] += minutes
+            buckets[key]["goals"] += goals
+            buckets[key]["assists"] += assists
+            buckets[key]["yellow_cards"] += yellow_cards
+            buckets[key]["red_cards"] += red_cards
 
         # Persist aggregated rows
         for (club_id, season, competition_id), agg in buckets.items():

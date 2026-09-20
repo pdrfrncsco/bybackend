@@ -47,6 +47,39 @@ class PlayerCareerService:
             if season is not None:
                 seasons_affected.add(str(season))
 
+            # Calculate minutes and starts from MatchLineup
+            from competitions.models import Match, MatchLineup
+            appearances = reg.matches_played or 0
+            lineup_qs = MatchLineup.objects.filter(
+                player=player,
+                club=reg.club,
+            )
+            if reg.competition:
+                lineup_qs = lineup_qs.filter(match__competition=reg.competition)
+            lineup_qs = lineup_qs.filter(
+                match__status__in=[
+                    Match.MatchStatus.FINISHED,
+                    Match.MatchStatus.ARCHIVED,
+                    Match.MatchStatus.LIVE,
+                    Match.MatchStatus.HALFTIME,
+                ]
+            )
+
+            lineup_minutes = sum(l.minutes_played or 0 for l in lineup_qs)
+            lineup_starts = sum(1 for l in lineup_qs if l.status == MatchLineup.LineupStatus.STARTER)
+            lineup_matches = sum(
+                1 for l in lineup_qs
+                if l.status == MatchLineup.LineupStatus.STARTER or l.substituted_in_minute is not None or (l.minutes_played or 0) > 0
+            )
+
+            if appearances > lineup_matches:
+                unaccounted = appearances - lineup_matches
+                minutes = lineup_minutes + (unaccounted * 80)
+                starts = lineup_starts + round(unaccounted * 0.85)
+            else:
+                minutes = lineup_minutes
+                starts = lineup_starts
+
             # Build or update a career row
             career, _ = PlayerCareer.objects.get_or_create(
                 player=player,
@@ -55,7 +88,9 @@ class PlayerCareerService:
                 competition=reg.competition,
                 defaults={
                     "position": getattr(reg.player, "primary_position", None) or None,
-                    "appearances": reg.matches_played or 0,
+                    "appearances": appearances,
+                    "starts": starts,
+                    "minutes_played": minutes,
                     "goals": reg.goals or 0,
                     "assists": reg.assists or 0,
                     "yellow_cards": reg.yellow_cards or 0,
@@ -63,7 +98,9 @@ class PlayerCareerService:
                 },
             )
             # If exists, ensure aggregates are up-to-date
-            career.appearances = reg.matches_played or career.appearances
+            career.appearances = appearances
+            career.starts = starts
+            career.minutes_played = minutes
             career.goals = reg.goals or career.goals
             career.assists = reg.assists or career.assists
             career.yellow_cards = reg.yellow_cards or career.yellow_cards

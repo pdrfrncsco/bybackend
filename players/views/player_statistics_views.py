@@ -1,4 +1,5 @@
 from drf_spectacular.utils import extend_schema
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from common.responses import error_response, success_response
@@ -10,6 +11,8 @@ from players.serializers.player_statistics import PlayerSeasonStatisticsSerializ
 
 class PlayerStatisticsListView(APIView):
     """GET /api/v1/players/{slug}/statistics/ — list season stats; GET /{slug}/statistics/{season}/ for single season."""
+
+    permission_classes = [AllowAny]
 
     @extend_schema(tags=["players"], summary="Get player season statistics", responses={200: PlayerSeasonStatisticsSerializer(many=True)})
     def get(self, request, slug: str, season: str | None = None):

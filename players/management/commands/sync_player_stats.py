@@ -10,6 +10,8 @@ Updates:
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from competitions.models import Match
+from competitions.services.lineup_service import LineupService
 from players.models import Player, PlayerRegistration
 from players.services.stats_sync_service import StatsSyncService
 from players.services.player_career_service import PlayerCareerService
@@ -27,6 +29,19 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        # 0. Recalculate lineup minutes for all played matches
+        matches = Match.objects.filter(
+            status__in=[
+                Match.MatchStatus.FINISHED,
+                Match.MatchStatus.ARCHIVED,
+                Match.MatchStatus.LIVE,
+                Match.MatchStatus.HALFTIME,
+            ]
+        )
+        self.stdout.write(f"Calculating lineup minutes for {matches.count()} matches...")
+        for m in matches:
+            LineupService.calculate_and_save_minutes_for_match(m)
+
         player_arg = options.get("player")
         if player_arg:
             players = Player.objects.filter(slug=player_arg) or Player.objects.filter(id=player_arg)

@@ -145,6 +145,7 @@ class MatchEventService:
         # Update substitution minutes on MatchLineup if applicable
         if event_type == MatchEvent.EventType.SUBSTITUTION_IN:
             from competitions.models import MatchLineup
+            from competitions.services.lineup_service import LineupService
             if player:
                 MatchLineup.objects.filter(
                     tenant=tenant, match=match, club=club, player=player
@@ -153,6 +154,7 @@ class MatchEventService:
                 MatchLineup.objects.filter(
                     tenant=tenant, match=match, club=club, player=player_off
                 ).update(substituted_out_minute=minute)
+            LineupService.calculate_and_save_minutes_for_match(match)
 
         # Auto-check Fair Play suspensions for cards
         card_types = {
@@ -161,6 +163,9 @@ class MatchEventService:
             MatchEvent.EventType.YELLOW_RED,
         }
         if event_type in card_types:
+            if event_type in {MatchEvent.EventType.RED_CARD, MatchEvent.EventType.YELLOW_RED}:
+                from competitions.services.lineup_service import LineupService
+                LineupService.calculate_and_save_minutes_for_match(match)
             try:
                 from competitions.services.fair_play_service import FairPlayService, SuspensionAlreadyExists
                 FairPlayService.check_and_create_suspension_for_event(
@@ -485,6 +490,10 @@ class MatchEventService:
             "away_penalty_score",
             "updated_at",
         ])
+
+        # Calculate and persist lineup minutes played
+        from competitions.services.lineup_service import LineupService
+        LineupService.calculate_and_save_minutes_for_match(match)
 
         # Recalculate standings for this competition context
         StandingService.recalculate_standings(

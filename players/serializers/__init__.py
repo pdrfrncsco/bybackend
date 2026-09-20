@@ -348,21 +348,37 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
     def get_career_history(self, obj: Player) -> list:
         """Return player's career registrations."""
         registrations = obj.registrations.select_related("club", "competition").order_by("-joined_date")
-        return [
-            {
+        careers_by_key = {
+            (c.club_id, str(c.season) if c.season else None, c.competition_id): c
+            for c in obj.careers.all()
+        }
+        res = []
+        for registration in registrations:
+            season = (
+                getattr(registration, "season", None)
+                or (registration.competition.season if registration.competition and getattr(registration.competition, "season", None) else None)
+                or (str(registration.joined_date.year) if registration.joined_date else None)
+            )
+            key = (registration.club_id, str(season) if season else None, registration.competition_id)
+            c = careers_by_key.get(key)
+            matches = registration.matches_played or 0
+            starts = c.starts if c else round(matches * 0.85)
+            minutes = c.minutes_played if c else (matches * 80)
+            res.append({
                 "id": str(registration.id),
                 "club": registration.club.name,
                 "club_slug": registration.club.slug,
                 "joined": registration.joined_date,
                 "left": registration.left_date,
                 "status": registration.get_status_display(),
-                "matches": registration.matches_played or 0,
+                "matches": matches,
+                "starts": starts,
+                "minutes": minutes,
                 "goals": registration.goals or 0,
                 "assists": registration.assists or 0,
                 "competition": registration.competition.name if registration.competition else None,
-            }
-            for registration in registrations
-        ]
+            })
+        return res
 
     def get_videos(self, obj: Player) -> list:
         """Return player's published videos."""

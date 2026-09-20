@@ -634,3 +634,98 @@ class LineupService:
         ])
         
         return lineup_entry
+
+    @staticmethod
+    def calculate_and_save_minutes_for_match(match: Match) -> List[MatchLineup]:
+        """
+        Calculate and persist minutes_played for all players in a match lineup.
+        
+        Calculates minutes based on:
+        - Starter status: starts at 0, ends at substituted_out_minute or match duration
+        - Substitute status: starts at substituted_in_minute, ends at substituted_out_minute or match duration
+        - Red cards: ends early if player was sent off
+        - Match duration: 90 min (120 if extra time), or current_minute for in-progress matches
+        """
+        is_finished = match.status in {
+            Match.MatchStatus.FINISHED,
+            Match.MatchStatus.ARCHIVED,
+        }
+        is_active = match.status in {
+            Match.MatchStatus.LIVE,
+            Match.MatchStatus.HALFTIME,
+        }
+
+        if not (is_finished or is_active):
+            return []
+
+        if is_finished:
+            duration = 120 if getattr(match, "has_extra_time", False) or getattr(match, "period", "") == Match.MatchPeriod.EXTRA_TIME else 90
+        else:
+            if match.status == Match.MatchStatus.HALFTIME:
+                duration = 45
+            elif match.current_minute:
+                duration = match.current_minute
+            else:
+                duration = 90
+
+        # Map player red card minutes
+        red_card_events = match.events.filter(
+            event_type__in=["red_card", "yellow_red"]
+        ).values("player_id", "minute")
+        red_cards = {}
+        for rc in red_card_events:
+            pid = str(rc["player_id"])
+            if pid not in red_cards or rc["minute"] < red_cards[pid]:
+                red_cards[pid] = rc["minute"]
+
+        # Map substitution events if missing on lineup entries
+        sub_in_events = match.events.filter(
+            event_type="substitution_in"
+        ).values("player_id", "player_off_id", "minute")
+        sub_ins = {}
+        sub_outs = {}
+        for sub in sub_in_events:
+            if sub["player_id"]:
+                sub_ins[str(sub["player_id"])] = sub["minute"]
+            if sub["player_off_id"]:
+                sub_outs[str(sub["player_off_id"])] = sub["minute"]
+
+        updated_lineups = []
+        for lineup in match.lineups.select_related("player"):
+            pid = str(lineup.player_id)
+
+            if lineup.substituted_in_minute is None and pid in sub_ins:
+                lineup.substituted_in_minute = sub_ins[pid]
+            if lineup.substituted_out_minute is None and pid in sub_outs:
+                lineup.substituted_out_minute = sub_outs[pid]
+
+            rc_minute = red_cards.get(pid)
+
+            if lineup.status == MatchLineup.LineupStatus.STARTER:
+                exit_minute = lineup.substituted_out_minute if lineup.substituted_out_minute is not None else duration
+                if rc_minute is not None:
+                    exit_minute = min(exit_minute, rc_minute)
+                minutes = max(0, min(exit_minute, duration))
+                lineup.minutes_played = minutes
+            elif lineup.status == MatchLineup.LineupStatus.SUBSTITUTE:
+                if lineup.substituted_in_minute is not None:
+                    start_min = lineup.substituted_in_minute
+                    exit_minute = lineup.substituted_out_minute if lineup.substituted_out_minute is not None else duration
+                    if rc_minute is not None:
+                        exit_minute = min(exit_minute, rc_minute)
+                    minutes = max(0, min(exit_minute, duration) - start_min)
+                    lineup.minutes_played = minutes
+                else:
+                    lineup.minutes_played = 0
+            else:
+                lineup.minutes_played = 0
+
+            lineup.save(update_fields=[
+                "minutes_played",
+                "substituted_in_minute",
+                "substituted_out_minute",
+                "updated_at",
+            ])
+            updated_lineups.append(lineup)
+
+        return updated_lineups
