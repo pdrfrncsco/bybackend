@@ -297,15 +297,27 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
 
     def get_total_matches(self, obj: Player) -> int:
         fp = self._fp(obj)
-        return fp.total_matches if fp is not None else obj.total_matches
+        if fp is not None and fp.total_matches:
+            return fp.total_matches
+        if obj.total_matches:
+            return obj.total_matches
+        return sum(r.matches_played or 0 for r in obj.registrations.all())
 
     def get_total_goals(self, obj: Player) -> int:
         fp = self._fp(obj)
-        return fp.total_goals if fp is not None else obj.total_goals
+        if fp is not None and fp.total_goals:
+            return fp.total_goals
+        if obj.total_goals:
+            return obj.total_goals
+        return sum(r.goals or 0 for r in obj.registrations.all())
 
     def get_total_assists(self, obj: Player) -> int:
         fp = self._fp(obj)
-        return fp.total_assists if fp is not None else obj.total_assists
+        if fp is not None and fp.total_assists:
+            return fp.total_assists
+        if obj.total_assists:
+            return obj.total_assists
+        return sum(r.assists or 0 for r in obj.registrations.all())
 
     def get_position_label(self, obj: Player) -> str:
         try:
@@ -335,17 +347,19 @@ class PlayerDetailSerializer(PlayerMediaMixin, serializers.ModelSerializer):
 
     def get_career_history(self, obj: Player) -> list:
         """Return player's career registrations."""
-        registrations = obj.registrations.select_related("club").order_by("-joined_date")
+        registrations = obj.registrations.select_related("club", "competition").order_by("-joined_date")
         return [
             {
+                "id": str(registration.id),
                 "club": registration.club.name,
                 "club_slug": registration.club.slug,
                 "joined": registration.joined_date,
                 "left": registration.left_date,
                 "status": registration.get_status_display(),
-                "matches": registration.matches_played,
-                "goals": registration.goals,
-                "assists": registration.assists,
+                "matches": registration.matches_played or 0,
+                "goals": registration.goals or 0,
+                "assists": registration.assists or 0,
+                "competition": registration.competition.name if registration.competition else None,
             }
             for registration in registrations
         ]

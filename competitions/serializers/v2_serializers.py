@@ -181,6 +181,7 @@ class MatchUpdateSerializer(serializers.Serializer):
 
 
 class StandingSerializer(serializers.ModelSerializer):
+    competition_name = serializers.CharField(source="competition.name", read_only=True)
     club_name = serializers.CharField(source="club.name", read_only=True)
     club_logo = serializers.SerializerMethodField()
     form = serializers.SerializerMethodField()
@@ -190,6 +191,7 @@ class StandingSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "competition",
+            "competition_name",
             "club",
             "phase",
             "group_id",
@@ -208,6 +210,8 @@ class StandingSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "competition",
+            "competition_name",
             "phase",
             "group_id",
             "club_name",

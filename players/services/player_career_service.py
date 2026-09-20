@@ -32,11 +32,17 @@ class PlayerCareerService:
         regs = PlayerRegistration.objects.filter(player=player).select_related("club", "competition")
         for reg in regs:
             season = None
-            # If competition/season info is available on registration, prefer it
             try:
-                season = getattr(reg, "season", None) or (getattr(reg.competition, "season", None) if reg.competition else None)
+                from datetime import date
+                season = (
+                    getattr(reg, "season", None)
+                    or (reg.competition.season if reg.competition and getattr(reg.competition, "season", None) else None)
+                    or (str(reg.joined_date.year) if reg.joined_date else None)
+                    or str(date.today().year)
+                )
             except Exception:
-                season = None
+                from datetime import date
+                season = str(date.today().year)
 
             if season is not None:
                 seasons_affected.add(str(season))
@@ -52,12 +58,16 @@ class PlayerCareerService:
                     "appearances": reg.matches_played or 0,
                     "goals": reg.goals or 0,
                     "assists": reg.assists or 0,
+                    "yellow_cards": reg.yellow_cards or 0,
+                    "red_cards": reg.red_cards or 0,
                 },
             )
             # If exists, ensure aggregates are up-to-date
             career.appearances = reg.matches_played or career.appearances
             career.goals = reg.goals or career.goals
             career.assists = reg.assists or career.assists
+            career.yellow_cards = reg.yellow_cards or career.yellow_cards
+            career.red_cards = reg.red_cards or career.red_cards
             career.save()
 
         # Publish domain event to signal career rebuild
@@ -72,4 +82,8 @@ class PlayerCareerService:
     @staticmethod
     def get_career_timeline(player):
         """Return player's career entries ordered by most recent season."""
-        return PlayerCareer.objects.filter(player=player).select_related("club", "competition").order_by("-season", "-appearances")
+        qs = PlayerCareer.objects.filter(player=player).select_related("club", "competition").order_by("-season", "-appearances")
+        if not qs.exists() and PlayerRegistration.objects.filter(player=player).exists():
+            PlayerCareerService.rebuild_career_for_player(player)
+            qs = PlayerCareer.objects.filter(player=player).select_related("club", "competition").order_by("-season", "-appearances")
+        return qs

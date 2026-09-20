@@ -119,16 +119,21 @@ class StatsSyncService:
         competition = registration.competition
         
         # Build queryset for relevant matches
-        matches_qs = Match.objects.filter(
-            competition=competition,
-        ).filter(
-            Q(home_club=club) | Q(away_club=club)
-        )
+        if competition:
+            matches_qs = Match.objects.filter(
+                competition=competition,
+            ).filter(
+                Q(home_club=club) | Q(away_club=club)
+            )
+        else:
+            matches_qs = Match.objects.filter(
+                Q(home_club=club) | Q(away_club=club)
+            )
         
         match_ids = list(matches_qs.values_list("id", flat=True))
         
         # Count goals (including penalties)
-        goals = MatchEvent.objects.filter(
+        event_goals = MatchEvent.objects.filter(
             player=player,
             club=club,
             match_id__in=match_ids,
@@ -137,25 +142,19 @@ class StatsSyncService:
                 MatchEvent.EventType.PENALTY_SCORED,
             ],
         ).count()
-        
-        # Count own goals (tracked separately but not in basic stats)
-        # own_goals = MatchEvent.objects.filter(
-        #     player=player,
-        #     club=club,
-        #     match_id__in=match_ids,
-        #     event_type=MatchEvent.EventType.OWN_GOAL,
-        # ).count()
+        goals = max(event_goals, registration.goals or 0)
         
         # Count yellow cards
-        yellow_cards = MatchEvent.objects.filter(
+        event_yc = MatchEvent.objects.filter(
             player=player,
             club=club,
             match_id__in=match_ids,
             event_type=MatchEvent.EventType.YELLOW_CARD,
         ).count()
+        yellow_cards = max(event_yc, registration.yellow_cards or 0)
         
         # Count red cards (direct + second yellow)
-        red_cards = MatchEvent.objects.filter(
+        event_rc = MatchEvent.objects.filter(
             player=player,
             club=club,
             match_id__in=match_ids,
@@ -164,22 +163,38 @@ class StatsSyncService:
                 MatchEvent.EventType.YELLOW_RED,
             ],
         ).count()
+        red_cards = max(event_rc, registration.red_cards or 0)
         
-        # Count assists (not directly tracked in events yet, keep existing)
-        # For now, assists remain as manually set values
-        # assists = registration.assists
-        
-        # Count matches played (distinct matches where player has events)
-        matches_with_events = MatchEvent.objects.filter(
-            player=player,
+        # Count assists (from assist_player on goal events or pre-existing count)
+        event_assists = MatchEvent.objects.filter(
+            assist_player=player,
             club=club,
             match_id__in=match_ids,
-        ).values_list("match_id", flat=True).distinct()
+        ).count()
+        assists = max(event_assists, registration.assists or 0)
         
-        matches_played = len(matches_with_events)
+        # Count matches played (distinct matches where player was starter, entered, or generated events)
+        from competitions.models import MatchLineup
+        lineup_match_ids = set(
+            MatchLineup.objects.filter(
+                player=player,
+                club=club,
+                match_id__in=match_ids,
+            ).filter(
+                Q(status=MatchLineup.LineupStatus.STARTER) | Q(substituted_in_minute__isnull=False)
+            ).values_list("match_id", flat=True)
+        )
+        event_match_ids = set(
+            MatchEvent.objects.filter(
+                Q(player=player) | Q(assist_player=player),
+                club=club,
+                match_id__in=match_ids,
+            ).values_list("match_id", flat=True)
+        )
+        calculated_matches = len(lineup_match_ids | event_match_ids)
+        matches_played = max(calculated_matches, registration.matches_played or 0)
         
         # Aggregate minutes_played and starts from MatchLineup
-        from competitions.models import MatchLineup
         lineups = MatchLineup.objects.filter(
             player=player,
             club=club,
@@ -196,11 +211,12 @@ class StatsSyncService:
         
         # Update registration
         registration.goals = goals
+        registration.assists = assists
         registration.yellow_cards = yellow_cards
         registration.red_cards = red_cards
         registration.matches_played = matches_played
         registration.save(update_fields=[
-            "goals", "yellow_cards", "red_cards", "matches_played"
+            "goals", "assists", "yellow_cards", "red_cards", "matches_played"
         ])
         
         logger.debug(

@@ -48,9 +48,14 @@ class PlayerStatisticsService:
             # Determine season key
             season = None
             try:
-                season = getattr(reg, "season", None) or (reg.joined_date.year if reg.joined_date else None)
+                season = (
+                    getattr(reg, "season", None)
+                    or (reg.competition.season if reg.competition and getattr(reg.competition, "season", None) else None)
+                    or (reg.joined_date.year if reg.joined_date else None)
+                    or date.today().year
+                )
             except Exception:
-                season = None
+                season = date.today().year
 
             if season is not None:
                 seasons_affected.add(str(season))
@@ -94,8 +99,16 @@ class PlayerStatisticsService:
 
     @staticmethod
     def get_statistics_for_player(player):
-        return PlayerSeasonStatistics.objects.filter(player=player).select_related("club", "competition").order_by("-season")
+        qs = PlayerSeasonStatistics.objects.filter(player=player).select_related("club", "competition").order_by("-season")
+        if not qs.exists() and PlayerRegistration.objects.filter(player=player).exists():
+            PlayerStatisticsService.rebuild_for_player(player)
+            qs = PlayerSeasonStatistics.objects.filter(player=player).select_related("club", "competition").order_by("-season")
+        return qs
 
     @staticmethod
     def get_statistics_for_player_and_season(player, season):
-        return PlayerSeasonStatistics.objects.filter(player=player, season=str(season)).select_related("club", "competition")
+        qs = PlayerSeasonStatistics.objects.filter(player=player, season=str(season)).select_related("club", "competition")
+        if not qs.exists() and PlayerRegistration.objects.filter(player=player).exists():
+            PlayerStatisticsService.rebuild_for_player(player)
+            qs = PlayerSeasonStatistics.objects.filter(player=player, season=str(season)).select_related("club", "competition")
+        return qs

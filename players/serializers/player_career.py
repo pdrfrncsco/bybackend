@@ -5,6 +5,7 @@ from players.models import PlayerCareer
 
 class PlayerCareerSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source="club.name", read_only=True)
+    club_slug = serializers.CharField(source="club.slug", read_only=True)
     competition_name = serializers.CharField(source="competition.name", read_only=True)
 
     class Meta:
@@ -14,6 +15,7 @@ class PlayerCareerSerializer(serializers.ModelSerializer):
             "player",
             "club",
             "club_name",
+            "club_slug",
             "season",
             "competition",
             "competition_name",
