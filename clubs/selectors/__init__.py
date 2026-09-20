@@ -80,7 +80,10 @@ class ClubSelector:
 
         if search:
             queryset = queryset.filter(
-                Q(name__icontains=search) | Q(city__icontains=search)
+                Q(name__icontains=search)
+                | Q(short_name__icontains=search)
+                | Q(acronym__icontains=search)
+                | Q(city__icontains=search)
             )
 
         if tenant_slug:

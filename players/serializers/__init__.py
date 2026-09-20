@@ -177,6 +177,9 @@ class PlayerSerializer(PlayerMediaMixin, serializers.ModelSerializer):
             return {
                 "id": current.club.id,
                 "name": current.club.name,
+                "short_name": current.club.short_name,
+                "acronym": current.club.acronym,
+                "display_name": current.club.display_name,
                 "slug": current.club.slug,
                 "registered_since": current.joined_date,
                 "shirt_number": current.shirt_number,
