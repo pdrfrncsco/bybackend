@@ -31,8 +31,9 @@ class ClubAffiliationRequest(BaseModel):
         related_name="club_affiliation_requests_submitted",
         verbose_name="Submitted By",
     )
-    name = models.CharField(max_length=255, verbose_name="Club Name")
-    short_name = models.CharField(max_length=50, blank=True, default="", verbose_name="Short Name")
+    name = models.CharField(max_length=255, verbose_name="Club Official Name")
+    short_name = models.CharField(max_length=80, blank=True, default="", verbose_name="Short Name")
+    acronym = models.CharField(max_length=10, blank=True, default="", verbose_name="Acronym")
     founded_year = models.PositiveIntegerField(null=True, blank=True, verbose_name="Founded Year")
     city = models.CharField(max_length=255, null=True, blank=True, verbose_name="City")
     country = models.CharField(max_length=100, default="Angola", verbose_name="Country")

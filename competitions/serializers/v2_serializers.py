@@ -13,6 +13,8 @@ from competitions.serializers.utils import get_club_logo_url
 
 class CompetitionRegistrationSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source="club.name", read_only=True)
+    club_short_name = serializers.CharField(source="club.short_name", read_only=True, allow_null=True)
+    club_acronym = serializers.CharField(source="club.acronym", read_only=True, allow_null=True)
     club_logo = serializers.SerializerMethodField()
 
     class Meta:
@@ -22,10 +24,12 @@ class CompetitionRegistrationSerializer(serializers.ModelSerializer):
             "competition",
             "club",
             "club_name",
+            "club_short_name",
+            "club_acronym",
             "club_logo",
             "registered_at",
         ]
-    read_only_fields = ["id", "club_name", "club_logo", "registered_at"]
+    read_only_fields = ["id", "club_name", "club_short_name", "club_acronym", "club_logo", "registered_at"]
 
     def get_club_logo(self, obj: CompetitionRegistration) -> str | None:
         return get_club_logo_url(obj.club)
@@ -42,7 +46,11 @@ class MatchSerializer(serializers.ModelSerializer):
     away_team_logo = serializers.SerializerMethodField()
     scheduled_at = serializers.DateTimeField(source="match_date", read_only=True)
     home_club_name = serializers.CharField(source="home_club.name", read_only=True)
+    home_club_short_name = serializers.CharField(source="home_club.short_name", read_only=True, allow_null=True)
+    home_club_acronym = serializers.CharField(source="home_club.acronym", read_only=True, allow_null=True)
     away_club_name = serializers.CharField(source="away_club.name", read_only=True)
+    away_club_short_name = serializers.CharField(source="away_club.short_name", read_only=True, allow_null=True)
+    away_club_acronym = serializers.CharField(source="away_club.acronym", read_only=True, allow_null=True)
     home_club_logo = serializers.SerializerMethodField()
     away_club_logo = serializers.SerializerMethodField()
     status_label = serializers.CharField(source="get_status_display", read_only=True)
@@ -62,12 +70,16 @@ class MatchSerializer(serializers.ModelSerializer):
             "home_club",
             "home_team_id",
             "home_club_name",
+            "home_club_short_name",
+            "home_club_acronym",
             "home_team_name",
             "home_club_logo",
             "home_team_logo",
             "away_club",
             "away_team_id",
             "away_club_name",
+            "away_club_short_name",
+            "away_club_acronym",
             "away_team_name",
             "away_club_logo",
             "away_team_logo",
@@ -93,10 +105,14 @@ class MatchSerializer(serializers.ModelSerializer):
             "id",
             "competition_id",
             "home_club_name",
+            "home_club_short_name",
+            "home_club_acronym",
             "home_team_name",
             "home_club_logo",
             "home_team_logo",
             "away_club_name",
+            "away_club_short_name",
+            "away_club_acronym",
             "away_team_name",
             "away_club_logo",
             "away_team_logo",
@@ -183,6 +199,8 @@ class MatchUpdateSerializer(serializers.Serializer):
 class StandingSerializer(serializers.ModelSerializer):
     competition_name = serializers.CharField(source="competition.name", read_only=True)
     club_name = serializers.CharField(source="club.name", read_only=True)
+    club_short_name = serializers.CharField(source="club.short_name", read_only=True, allow_null=True)
+    club_acronym = serializers.CharField(source="club.acronym", read_only=True, allow_null=True)
     club_logo = serializers.SerializerMethodField()
     form = serializers.SerializerMethodField()
 
@@ -196,6 +214,8 @@ class StandingSerializer(serializers.ModelSerializer):
             "phase",
             "group_id",
             "club_name",
+            "club_short_name",
+            "club_acronym",
             "club_logo",
             "played",
             "won",
@@ -215,6 +235,8 @@ class StandingSerializer(serializers.ModelSerializer):
             "phase",
             "group_id",
             "club_name",
+            "club_short_name",
+            "club_acronym",
             "club_logo",
             "played",
             "won",

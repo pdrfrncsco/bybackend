@@ -95,6 +95,7 @@ class ClubService:
         updatable_fields = [
             "name",
             "short_name",
+            "acronym",
             "primary_color",
             "secondary_color",
             "founded_year",

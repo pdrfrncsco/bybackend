@@ -34,6 +34,8 @@ class ClubSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "short_name",
+            "acronym",
+            "display_name",
             "tenant",
             "tenant_name",
             "tenant_slug",
@@ -64,6 +66,7 @@ class ClubSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "slug",
+            "display_name",
             "logo_url",
             "location",
             "status_label",
@@ -135,6 +138,7 @@ class ClubCreateSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "short_name",
+            "acronym",
             "founded_year",
             "stadium_name",
             "stadium_capacity",
@@ -161,6 +165,7 @@ class ClubUpdateSerializer(serializers.ModelSerializer):
         fields = [
             "name",
             "short_name",
+            "acronym",
             "founded_year",
             "stadium_name",
             "stadium_capacity",
@@ -196,6 +201,8 @@ class PublicClubSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "short_name",
+            "acronym",
+            "display_name",
             "logo_url",
             "primary_color",
             "secondary_color",

@@ -32,14 +32,21 @@ class Club(BaseModel):
     """
 
     # Identity
-    name = models.CharField(max_length=255, verbose_name="Name")
+    name = models.CharField(max_length=255, verbose_name="Official Name", help_text="Nome oficial completo do clube para documentos oficiais (ex. 'Atlético Clube Petróleos de Luanda').")
     slug = models.SlugField(max_length=255, blank=True, verbose_name="Slug")
     short_name = models.CharField(
-        max_length=50,
-        null=True,
+        max_length=80,
         blank=True,
+        default="",
         verbose_name="Short Name",
-        help_text="Abbreviated name for tables and fixtures (e.g. 'PLU', '1º AGO').",
+        help_text="Nome usual/comum para placares e tabelas (ex. 'Petro de Luanda').",
+    )
+    acronym = models.CharField(
+        max_length=3,
+        blank=True,
+        default="",
+        verbose_name="Acronym",
+        help_text="Sigla de 2 a 5 letras para placares curtos e tickers (ex. 'APL').",
     )
 
     # Tenant ownership
@@ -152,6 +159,16 @@ class Club(BaseModel):
     def is_active(self) -> bool:
         """Returns True if the club is currently active."""
         return self.status == "active"
+
+    @property
+    def display_name(self) -> str:
+        """Returns short_name if defined, otherwise falls back to official name."""
+        return self.short_name or self.name
+
+    @property
+    def compact_name(self) -> str:
+        """Returns acronym if defined, otherwise short_name, otherwise official name."""
+        return self.acronym or self.short_name or self.name
 
     @property
     def location(self) -> str:

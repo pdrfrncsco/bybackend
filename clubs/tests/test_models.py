@@ -53,9 +53,24 @@ class ClubModelTest(TestCase):
 
     def test_club_display_name(self):
         """Club display_name should prefer short_name over name."""
-        # This test checks the property if it exists on the model
-        # Since we don't see display_name property in the model, skip
-        pass
+        self.assertEqual(self.club.display_name, "TFC")
+        club_no_short = Club.objects.create(
+            tenant=self.tenant,
+            name="Official Full Name Only",
+        )
+        self.assertEqual(club_no_short.display_name, "Official Full Name Only")
+
+    def test_club_compact_name(self):
+        """Club compact_name should prefer acronym over short_name and name."""
+        club = Club.objects.create(
+            tenant=self.tenant,
+            name="Atlético Petróleos de Luanda",
+            short_name="Petro de Luanda",
+            acronym="APL",
+        )
+        self.assertEqual(club.compact_name, "APL")
+        self.assertEqual(club.display_name, "Petro de Luanda")
+        self.assertEqual(club.name, "Atlético Petróleos de Luanda")
 
     def test_club_timestamps(self):
         """Club should have created_at and updated_at timestamps."""

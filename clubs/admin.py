@@ -26,9 +26,9 @@ class ClubMemberInline(admin.TabularInline):
 
 @admin.register(Club)
 class ClubAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "tenant", "status", "is_public", "city", "country")
+    list_display = ("name", "short_name", "acronym", "slug", "tenant", "status", "is_public", "city", "country")
     list_filter = ("status", "is_public", "is_verified", "tenant")
-    search_fields = ("name", "slug", "short_name", "city")
+    search_fields = ("name", "slug", "short_name", "acronym", "city")
     readonly_fields = ("id", "slug", "created_at", "updated_at")
     autocomplete_fields = ("tenant",)
     inlines = [ClubMemberInline]
@@ -45,9 +45,9 @@ class ClubMemberAdmin(admin.ModelAdmin):
 
 @admin.register(ClubAffiliationRequest)
 class ClubAffiliationRequestAdmin(admin.ModelAdmin):
-    list_display = ("club","status")
-    list_filter = ("status", "club__tenant")
-    search_fields = ("club__name", "email")
+    list_display = ("name", "short_name", "acronym", "club", "status", "tenant", "created_at")
+    list_filter = ("status", "tenant")
+    search_fields = ("name", "short_name", "acronym", "email")
     raw_id_fields = ("club",)
 
 

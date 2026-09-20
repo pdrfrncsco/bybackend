@@ -17,6 +17,7 @@ class ClubAffiliationRequestSerializer(serializers.ModelSerializer):
             "submitted_by_email",
             "name",
             "short_name",
+            "acronym",
             "founded_year",
             "city",
             "country",
@@ -57,7 +58,8 @@ class ClubAffiliationRequestSerializer(serializers.ModelSerializer):
 
 class ClubAffiliationRequestCreateSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=255)
-    short_name = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    short_name = serializers.CharField(max_length=80, required=False, allow_blank=True, default="")
+    acronym = serializers.CharField(max_length=10, required=False, allow_blank=True, default="")
     founded_year = serializers.IntegerField(required=False, allow_null=True)
     city = serializers.CharField(max_length=255, required=False, allow_null=True, allow_blank=True)
     country = serializers.CharField(max_length=100, required=False, default="Angola")

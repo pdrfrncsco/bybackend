@@ -47,6 +47,7 @@ class ClubAffiliationService:
                 tenant=request_obj.tenant,
                 name=request_obj.name,
                 short_name=request_obj.short_name,
+                acronym=request_obj.acronym,
                 founded_year=request_obj.founded_year,
                 city=request_obj.city,
                 country=request_obj.country,

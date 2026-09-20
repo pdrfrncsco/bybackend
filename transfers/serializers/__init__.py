@@ -20,7 +20,11 @@ class TransferSerializer(serializers.ModelSerializer):
     player_name = serializers.CharField(source="player.full_name", read_only=True)
     player_slug = serializers.CharField(source="player.slug", read_only=True)
     from_club_name = serializers.SerializerMethodField()
+    from_club_short_name = serializers.SerializerMethodField()
+    from_club_acronym = serializers.SerializerMethodField()
     to_club_name = serializers.CharField(source="to_club.name", read_only=True)
+    to_club_short_name = serializers.CharField(source="to_club.short_name", read_only=True, allow_null=True)
+    to_club_acronym = serializers.CharField(source="to_club.acronym", read_only=True, allow_null=True)
 
     class Meta:
         model = Transfer
@@ -31,8 +35,12 @@ class TransferSerializer(serializers.ModelSerializer):
             "player_slug",
             "from_club",
             "from_club_name",
+            "from_club_short_name",
+            "from_club_acronym",
             "to_club",
             "to_club_name",
+            "to_club_short_name",
+            "to_club_acronym",
             "competition",
             "joined_date",
             "shirt_number",
@@ -50,6 +58,12 @@ class TransferSerializer(serializers.ModelSerializer):
 
     def get_from_club_name(self, obj: Transfer) -> str | None:
         return obj.from_club.name if obj.from_club else "Free Agent"
+
+    def get_from_club_short_name(self, obj: Transfer) -> str | None:
+        return obj.from_club.short_name if obj.from_club else None
+
+    def get_from_club_acronym(self, obj: Transfer) -> str | None:
+        return obj.from_club.acronym if obj.from_club else None
 
 
 class TransferDetailSerializer(serializers.ModelSerializer):
