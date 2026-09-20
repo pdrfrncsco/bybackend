@@ -158,18 +158,79 @@ class RankingService:
             qs = qs.filter(competition=competition)
         
         qs = qs.order_by("position")[:limit]
-        
-        return [
-            {
-                "position": r.position,
-                "player_id": str(r.player.id),
-                "player_name": r.player.full_name,
-                "goals": int(r.value),
-                "club_name": r.stats.get("club_name"),
-                "season": r.season,
-            }
-            for r in qs
-        ]
+
+        if qs.exists():
+            return [
+                {
+                    "position": r.position,
+                    "player_id": str(r.player.id),
+                    "player_name": r.player.full_name,
+                    "goals": int(r.value),
+                    "club_name": r.stats.get("club_name") if r.stats else (r.club.name if r.club else None),
+                    "season": r.season,
+                }
+                for r in qs
+            ]
+
+        # Real-time fallback: dynamically compute directly from MatchEvent
+        from django.db.models import Count
+
+        event_qs = MatchEvent.objects.filter(
+            tenant=tenant,
+            event_type__in=[
+                MatchEvent.EventType.GOAL,
+                MatchEvent.EventType.PENALTY_SCORED,
+            ],
+            player__isnull=False,
+        )
+        if competition:
+            event_qs = event_qs.filter(match__competition=competition)
+        elif season:
+            event_qs = event_qs.filter(match__competition__season=season)
+
+        players_stats = (
+            event_qs.values(
+                "player_id",
+                "player__first_name",
+                "player__last_name",
+            )
+            .annotate(goals=Count("id"))
+            .order_by("-goals")[:limit]
+        )
+
+        if not players_stats.exists():
+            return []
+
+        player_ids = [s["player_id"] for s in players_stats]
+        recent_clubs = {}
+        for ev in (
+            event_qs.filter(player_id__in=player_ids)
+            .select_related("club")
+            .order_by("created_at")
+        ):
+            if ev.club:
+                recent_clubs[ev.player_id] = ev.club.name
+
+        realtime_rankings = []
+        position = 0
+        prev_goals = None
+        for i, stat in enumerate(players_stats, 1):
+            if stat["goals"] != prev_goals:
+                position = i
+                prev_goals = stat["goals"]
+            first_name = stat.get("player__first_name") or ""
+            last_name = stat.get("player__last_name") or ""
+            full_name = f"{first_name} {last_name}".strip()
+            realtime_rankings.append({
+                "position": position,
+                "player_id": str(stat["player_id"]),
+                "player_name": full_name,
+                "goals": stat["goals"],
+                "club_name": recent_clubs.get(stat["player_id"]),
+                "season": (competition.season if competition else (season or "")),
+            })
+
+        return realtime_rankings
 
     # ─── Fair Play Rankings ────────────────────────────────────────────────────
 
