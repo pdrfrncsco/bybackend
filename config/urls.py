@@ -26,6 +26,8 @@ urlpatterns = [
     path("api/v1/players/", include("players.urls")),
     # Phase 7 — Transfers
     path("api/v1/transfers/", include("transfers.urls")),
+    # Fan Portal & Community Engagement
+    path("api/v1/fans/", include("fans.urls")),
     # API Documentation
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),

@@ -1,0 +1,3 @@
+"""
+Fans app tests
+"""

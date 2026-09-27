@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     "transfers",
     "media_assets",
     "notifications",
+    "fans",
 ]
 
 # ─────────────────────────────────────────────────────────────────────
