@@ -7,9 +7,11 @@ from uuid import UUID
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, PermissionDenied
 
-from clubs.models import Club
+from core.models import Tenant
+from accounts.models import TenantMembership
+from clubs.models import Club, ClubMember
 from players.models import Player
 from competitions.models import Match, Competition
 from .models import (
@@ -19,6 +21,11 @@ from .models import (
     FanMVPVote,
     FollowTargetType,
     PredictionStatus,
+    FeedPost,
+    FeedPostLike,
+    FeedPostComment,
+    PostAuthorType,
+    PostCategory,
 )
 
 User = get_user_model()
@@ -202,3 +209,155 @@ class FanMVPVoteService:
             defaults={"player": player},
         )
         return vote
+
+
+# ─────────────────────────────────────────────────────────────────────
+# CONTENT PUBLISHING SERVICE ("PUBLICAR NO FEED")
+# ─────────────────────────────────────────────────────────────────────
+
+class FeedPostService:
+    """Handles creation, interaction (likes/comments), and moderation of Feed posts."""
+
+    @staticmethod
+    @transaction.atomic
+    def create_post(
+        user,
+        author_type: str,
+        content: str,
+        title: str = "",
+        category: str = PostCategory.GENERAL,
+        media_url: str | None = None,
+        is_pinned: bool = False,
+        club_id: UUID | None = None,
+        player_id: UUID | None = None,
+        organization_id: UUID | None = None,
+    ) -> FeedPost:
+        """
+        Creates a feed post validating user identity permissions against chosen author_type.
+        """
+        if not user or not user.is_authenticated:
+            raise PermissionDenied("Autenticação obrigatória para publicar no feed.")
+
+        target_org = None
+        target_club = None
+        target_player = None
+        is_official = True
+
+        if author_type == PostAuthorType.ORGANIZATION:
+            if not organization_id:
+                # Try finding first active tenant membership for user
+                membership = TenantMembership.objects.filter(user=user, is_active=True).first()
+                if membership:
+                    target_org = membership.tenant
+                elif user.is_staff or user.is_superuser:
+                    target_org = Tenant.objects.first()
+                else:
+                    raise ValidationError("Nenhuma Organização/Federação vinculada ao utilizador.")
+            else:
+                target_org = Tenant.objects.filter(id=organization_id).first()
+                if not target_org:
+                    raise ValidationError("Organização não encontrada.")
+                if not (user.is_staff or user.is_superuser):
+                    is_member = TenantMembership.objects.filter(
+                        tenant=target_org, user=user, is_active=True
+                    ).exists()
+                    if not is_member:
+                        raise PermissionDenied("Não tem permissão para publicar em nome desta Organização.")
+
+        elif author_type == PostAuthorType.CLUB:
+            if not club_id:
+                # Try finding club membership
+                club_member = ClubMember.objects.filter(user=user, is_active=True).first()
+                if club_member:
+                    target_club = club_member.club
+                elif user.is_staff or user.is_superuser:
+                    target_club = Club.objects.first()
+                else:
+                    raise ValidationError("Nenhum Clube vinculado ao utilizador.")
+            else:
+                target_club = Club.objects.filter(id=club_id).first()
+                if not target_club:
+                    raise ValidationError("Clube não encontrado.")
+                if not (user.is_staff or user.is_superuser):
+                    is_member = ClubMember.objects.filter(
+                        club=target_club, user=user, is_active=True
+                    ).exists()
+                    if not is_member:
+                        raise PermissionDenied("Não tem permissão para publicar em nome deste Clube.")
+
+        elif author_type == PostAuthorType.PLAYER:
+            if not player_id:
+                target_player = Player.objects.filter(user=user).first()
+                if not target_player and not (user.is_staff or user.is_superuser):
+                    raise ValidationError("Nenhum Perfil de Atleta vinculado ao utilizador.")
+                elif not target_player and (user.is_staff or user.is_superuser):
+                    target_player = Player.objects.first()
+            else:
+                target_player = Player.objects.filter(id=player_id).first()
+                if not target_player:
+                    raise ValidationError("Jogador não encontrado.")
+                if target_player.user != user and not (user.is_staff or user.is_superuser):
+                    raise PermissionDenied("Não tem permissão para publicar em nome deste Jogador.")
+
+        else:
+            raise ValidationError(f"Tipo de autor inválido: {author_type}")
+
+        post = FeedPost.objects.create(
+            author_user=user,
+            author_type=author_type,
+            organization=target_org,
+            club=target_club,
+            player=target_player,
+            category=category,
+            title=title.strip() if title else "",
+            content=content.strip(),
+            media_url=media_url.strip() if media_url else None,
+            is_official=is_official,
+            is_pinned=is_pinned if (user.is_staff or user.is_superuser) else False,
+        )
+        return post
+
+    @staticmethod
+    @transaction.atomic
+    def toggle_like(user, post_id: UUID) -> Tuple[FeedPost, bool]:
+        """
+        Toggles like on a FeedPost and updates the post like count.
+        Returns (post, is_liked_now).
+        """
+        post = FeedPost.objects.filter(id=post_id).first()
+        if not post:
+            raise ValidationError("Publicação não encontrada.")
+
+        existing_like = FeedPostLike.objects.filter(user=user, post=post).first()
+        if existing_like:
+            existing_like.delete()
+            post.likes_count = max(0, post.likes_count - 1)
+            post.save(update_fields=["likes_count"])
+            return post, False
+
+        FeedPostLike.objects.create(user=user, post=post)
+        post.likes_count += 1
+        post.save(update_fields=["likes_count"])
+        return post, True
+
+    @staticmethod
+    @transaction.atomic
+    def add_comment(user, post_id: UUID, content: str) -> FeedPostComment:
+        """
+        Adds a comment to a feed post and updates the post comments count.
+        """
+        if not content or not content.strip():
+            raise ValidationError("O comentário não pode ser vazio.")
+
+        post = FeedPost.objects.filter(id=post_id).first()
+        if not post:
+            raise ValidationError("Publicação não encontrada.")
+
+        comment = FeedPostComment.objects.create(
+            user=user,
+            post=post,
+            content=content.strip(),
+        )
+        post.comments_count += 1
+        post.save(update_fields=["comments_count"])
+        return comment

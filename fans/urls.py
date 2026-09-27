@@ -10,6 +10,10 @@ from .views import (
     FanPredictionsView,
     FanLeaderboardView,
     FanMVPVoteView,
+    FeedPostsView,
+    FeedPostDetailView,
+    FeedPostToggleLikeView,
+    FeedPostCommentsView,
 )
 
 app_name = "fans"
@@ -21,4 +25,9 @@ urlpatterns = [
     path("predictions/", FanPredictionsView.as_view(), name="fan-predictions"),
     path("leaderboard/", FanLeaderboardView.as_view(), name="fan-leaderboard"),
     path("mvp-vote/", FanMVPVoteView.as_view(), name="fan-mvp-vote"),
+    # Feed & Social Posts
+    path("posts/", FeedPostsView.as_view(), name="feed-posts"),
+    path("posts/<uuid:post_id>/", FeedPostDetailView.as_view(), name="feed-post-detail"),
+    path("posts/<uuid:post_id>/like/", FeedPostToggleLikeView.as_view(), name="feed-post-like"),
+    path("posts/<uuid:post_id>/comments/", FeedPostCommentsView.as_view(), name="feed-post-comments"),
 ]

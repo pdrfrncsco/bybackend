@@ -3,7 +3,18 @@ BOLAYETU — Fans App Serializers
 """
 
 from rest_framework import serializers
-from .models import FanProfile, FanFollow, MatchPrediction, FanMVPVote, FollowTargetType
+from .models import (
+    FanProfile,
+    FanFollow,
+    MatchPrediction,
+    FanMVPVote,
+    FollowTargetType,
+    FeedPost,
+    FeedPostLike,
+    FeedPostComment,
+    PostAuthorType,
+    PostCategory,
+)
 
 
 class FanProfileSerializer(serializers.ModelSerializer):
@@ -218,3 +229,126 @@ class FanMVPVoteInputSerializer(serializers.Serializer):
 
     match_id = serializers.UUIDField()
     player_id = serializers.UUIDField()
+
+
+# ─────────────────────────────────────────────────────────────────────
+# CONTENT PUBLISHING SERIALIZERS
+# ─────────────────────────────────────────────────────────────────────
+
+class FeedPostSerializer(serializers.ModelSerializer):
+    """Complete feed post representation with author identity."""
+
+    author_name = serializers.SerializerMethodField()
+    author_avatar = serializers.SerializerMethodField()
+    author_id = serializers.SerializerMethodField()
+    author_slug = serializers.SerializerMethodField()
+    has_liked = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FeedPost
+        fields = [
+            "id",
+            "author_type",
+            "author_id",
+            "author_name",
+            "author_slug",
+            "author_avatar",
+            "category",
+            "title",
+            "content",
+            "media_url",
+            "is_official",
+            "is_pinned",
+            "likes_count",
+            "comments_count",
+            "has_liked",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "likes_count",
+            "comments_count",
+            "has_liked",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_author_id(self, obj: FeedPost) -> str:
+        if obj.author_type == PostAuthorType.CLUB and obj.club_id:
+            return str(obj.club_id)
+        if obj.author_type == PostAuthorType.PLAYER and obj.player_id:
+            return str(obj.player_id)
+        if obj.author_type == PostAuthorType.ORGANIZATION and obj.organization_id:
+            return str(obj.organization_id)
+        return str(obj.author_user_id)
+
+    def get_author_name(self, obj: FeedPost) -> str:
+        if obj.author_type == PostAuthorType.CLUB and obj.club:
+            return obj.club.name
+        if obj.author_type == PostAuthorType.PLAYER and obj.player:
+            return obj.player.full_name
+        if obj.author_type == PostAuthorType.ORGANIZATION and obj.organization:
+            return obj.organization.name
+        return f"{obj.author_user.first_name} {obj.author_user.last_name}".strip() or obj.author_user.username or "Utilizador"
+
+    def get_author_slug(self, obj: FeedPost) -> str:
+        if obj.author_type == PostAuthorType.CLUB and obj.club:
+            return getattr(obj.club, "slug", str(obj.club.id))
+        if obj.author_type == PostAuthorType.PLAYER and obj.player:
+            return getattr(obj.player, "slug", str(obj.player.id))
+        if obj.author_type == PostAuthorType.ORGANIZATION and obj.organization:
+            return getattr(obj.organization, "slug", str(obj.organization.id))
+        return ""
+
+    def get_author_avatar(self, obj: FeedPost) -> str | None:
+        if obj.author_type == PostAuthorType.CLUB and obj.club and hasattr(obj.club, "logo") and obj.club.logo:
+            return obj.club.logo.url
+        if obj.author_type == PostAuthorType.PLAYER and obj.player and hasattr(obj.player, "avatar") and obj.player.avatar:
+            return obj.player.avatar.url
+        return None
+
+    def get_has_liked(self, obj: FeedPost) -> bool:
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return FeedPostLike.objects.filter(post=obj, user=request.user).exists()
+
+
+class FeedPostCreateSerializer(serializers.Serializer):
+    """Payload to create a new post on the Feed."""
+
+    author_type = serializers.ChoiceField(choices=PostAuthorType.choices)
+    category = serializers.ChoiceField(choices=PostCategory.choices, default=PostCategory.GENERAL)
+    title = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
+    content = serializers.CharField(min_length=3)
+    media_url = serializers.CharField(max_length=500, required=False, allow_blank=True, allow_null=True)
+    is_pinned = serializers.BooleanField(default=False)
+    
+    # Specific identity targets (checked against user permissions)
+    club_id = serializers.UUIDField(required=False, allow_null=True)
+    player_id = serializers.UUIDField(required=False, allow_null=True)
+    organization_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class FeedPostCommentSerializer(serializers.ModelSerializer):
+    """Comment on a feed post."""
+
+    author_name = serializers.SerializerMethodField()
+    author_username = serializers.CharField(source="user.username", read_only=True)
+
+    class Meta:
+        model = FeedPostComment
+        fields = [
+            "id",
+            "post",
+            "author_name",
+            "author_username",
+            "content",
+            "created_at",
+        ]
+        read_only_fields = ["id", "post", "author_name", "author_username", "created_at"]
+
+    def get_author_name(self, obj: FeedPostComment) -> str:
+        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return name or obj.user.username or "Adepto"

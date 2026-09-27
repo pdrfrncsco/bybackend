@@ -244,3 +244,168 @@ class FanMVPVote(UUIDModel, TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.user.email} voted {self.player_id} MVP for Match({self.match_id})"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# CONTENT PUBLISHING MODULE ("PUBLICAR NO FEED")
+# ─────────────────────────────────────────────────────────────────────
+
+class PostAuthorType(models.TextChoices):
+    ORGANIZATION = "organization", _("Organização / Federação")
+    CLUB = "club", _("Clube Oficial")
+    PLAYER = "player", _("Jogador")
+
+
+class PostCategory(models.TextChoices):
+    GENERAL = "general", _("Geral")
+    MATCHDAY = "matchday", _("Dia de Jogo / Convocatória")
+    ANNOUNCEMENT = "announcement", _("Comunicado Oficial")
+    TRAINING = "training", _("Treino & Bastidores")
+    HIGHLIGHT = "highlight", _("Vídeo & Lance")
+
+
+class FeedPost(UUIDModel, TimeStampedModel):
+    """
+    Rich social & editorial post published by an Organization, Club, or Player to the Fan Feed.
+    """
+
+    author_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="authored_feed_posts",
+        verbose_name=_("Author User"),
+    )
+    author_type = models.CharField(
+        max_length=20,
+        choices=PostAuthorType.choices,
+        verbose_name=_("Author Type"),
+    )
+    organization = models.ForeignKey(
+        "core.Tenant",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="feed_posts",
+        verbose_name=_("Organization"),
+    )
+    club = models.ForeignKey(
+        "clubs.Club",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="feed_posts",
+        verbose_name=_("Club"),
+    )
+    player = models.ForeignKey(
+        "players.Player",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="feed_posts",
+        verbose_name=_("Player"),
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=PostCategory.choices,
+        default=PostCategory.GENERAL,
+        verbose_name=_("Category"),
+    )
+    title = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name=_("Title / Headline"),
+    )
+    content = models.TextField(
+        verbose_name=_("Content / Text"),
+    )
+    media_url = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+        verbose_name=_("Media URL (Photo/Video)"),
+    )
+    is_official = models.BooleanField(
+        default=True,
+        verbose_name=_("Official Post"),
+    )
+    is_pinned = models.BooleanField(
+        default=False,
+        verbose_name=_("Pinned Post"),
+    )
+    likes_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name=_("Likes Count"),
+    )
+    comments_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name=_("Comments Count"),
+    )
+
+    class Meta:
+        verbose_name = _("Feed Post")
+        verbose_name_plural = _("Feed Posts")
+        ordering = ["-is_pinned", "-created_at"]
+
+    def __str__(self) -> str:
+        entity = self.club or self.player or self.organization or self.author_user
+        return f"FeedPost({self.author_type}:{entity} - {self.category})"
+
+
+class FeedPostLike(UUIDModel, TimeStampedModel):
+    """
+    User like on a specific FeedPost.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="feed_post_likes",
+        verbose_name=_("User"),
+    )
+    post = models.ForeignKey(
+        FeedPost,
+        on_delete=models.CASCADE,
+        related_name="likes",
+        verbose_name=_("Post"),
+    )
+
+    class Meta:
+        verbose_name = _("Feed Post Like")
+        verbose_name_plural = _("Feed Post Likes")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "post"],
+                name="unique_user_feed_post_like",
+            ),
+        ]
+
+
+class FeedPostComment(UUIDModel, TimeStampedModel):
+    """
+    Comment on a FeedPost with moderation status.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="feed_post_comments",
+        verbose_name=_("User"),
+    )
+    post = models.ForeignKey(
+        FeedPost,
+        on_delete=models.CASCADE,
+        related_name="comments",
+        verbose_name=_("Post"),
+    )
+    content = models.TextField(
+        verbose_name=_("Comment Content"),
+    )
+    is_moderated = models.BooleanField(
+        default=False,
+        verbose_name=_("Is Moderated"),
+    )
+
+    class Meta:
+        verbose_name = _("Feed Post Comment")
+        verbose_name_plural = _("Feed Post Comments")
+        ordering = ["created_at"]
