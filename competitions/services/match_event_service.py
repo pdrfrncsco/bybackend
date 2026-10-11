@@ -177,6 +177,50 @@ class MatchEventService:
 
         # Auto-sync player stats
         MatchEventService._sync_player_stats(event, operation="add")
+
+        player_name = None
+        if event.player:
+            player_name = getattr(event.player, "full_name", None) or f"{getattr(event.player, 'first_name', '')} {getattr(event.player, 'last_name', '')}".strip() or None
+
+        club_name = getattr(event.club, "name", None) if event.club else None
+        home_name = getattr(match.home_club, "name", None) if match.home_club else None
+        away_name = getattr(match.away_club, "name", None) if match.away_club else None
+        comp_name = getattr(match.competition, "name", None) if getattr(match, "competition", None) else None
+        comp_id = str(match.competition_id) if getattr(match, "competition_id", None) else None
+
+        event_labels = {
+            MatchEvent.EventType.GOAL: "Golo!",
+            MatchEvent.EventType.OWN_GOAL: "Golo na Própria Baliza",
+            MatchEvent.EventType.YELLOW_CARD: "Cartão Amarelo",
+            MatchEvent.EventType.RED_CARD: "Cartão Vermelho",
+            MatchEvent.EventType.YELLOW_RED: "Segundo Amarelo / Vermelho",
+            MatchEvent.EventType.SUBSTITUTION_IN: "Substituição",
+            MatchEvent.EventType.SUBSTITUTION_OUT: "Substituição",
+            MatchEvent.EventType.PENALTY_SCORED: "Golo de Penálti",
+            MatchEvent.EventType.PENALTY_MISSED: "Penálti Falhado",
+            MatchEvent.EventType.INJURY: "Lesão",
+            MatchEvent.EventType.VAR_REVIEW: "Revisão VAR",
+            MatchEvent.EventType.KICKOFF: "Início do Jogo",
+            MatchEvent.EventType.HALFTIME: "Intervalo",
+            MatchEvent.EventType.FULLTIME: "Fim do Tempo Regulamentar",
+        }
+        event_label = event_labels.get(event.event_type, "Evento de Jogo")
+        title = f"{event_label} ({event.minute}')"
+
+        desc_parts = []
+        if player_name:
+            desc_parts.append(player_name)
+        if club_name:
+            desc_parts.append(f"({club_name})")
+        if home_name and away_name:
+            desc_parts.append(f"no jogo {home_name} vs {away_name}")
+
+        message = f"{event_label} aos {event.minute}' de jogo"
+        if desc_parts:
+            message += f" · {' '.join(desc_parts)}"
+
+        link_url = f"/competitions/{comp_id}/matches/{match.id}" if comp_id else "/dashboard/competitions/matches"
+
         publish_event(Event(
             type=EventType.MATCH_EVENT_CREATED,
             tenant_id=str(tenant.id),
@@ -184,7 +228,17 @@ class MatchEventService:
                 "match_id": str(match.id),
                 "event_id": str(event.id),
                 "event_type": event.event_type,
+                "event_label": event_label,
                 "minute": event.minute,
+                "player_name": player_name,
+                "club_name": club_name,
+                "home_club_name": home_name,
+                "away_club_name": away_name,
+                "competition_id": comp_id,
+                "competition_name": comp_name,
+                "title": title,
+                "message": message,
+                "link_url": link_url,
             },
             origin="competitions.match_event_service",
         ))

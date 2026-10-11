@@ -239,10 +239,35 @@ class MatchService:
         if current_minute is not None:
             match.current_minute = max(0, min(int(current_minute), 130))
         match.save(update_fields=["status", "current_period", "current_minute", "updated_at"])
+        home_name = getattr(match.home_club, "name", None) if match.home_club else None
+        away_name = getattr(match.away_club, "name", None) if match.away_club else None
+        comp_id = str(match.competition_id) if getattr(match, "competition_id", None) else None
+        comp_name = getattr(match.competition, "name", None) if getattr(match, "competition", None) else None
+
+        title = "Partida Concluída" if status == Match.MatchStatus.FINISHED else "Partida Arquivada" if status == Match.MatchStatus.ARCHIVED else "Estado do Jogo Atualizado"
+        message = (
+            f"Resultado final: {home_name} {match.home_score} - {match.away_score} {away_name}"
+            if home_name and away_name and match.home_score is not None and match.away_score is not None
+            else f"O confronto {home_name or ''} vs {away_name or ''} foi atualizado para {status}.".strip()
+        )
+        link_url = f"/competitions/{comp_id}/matches/{match.id}" if comp_id else "/dashboard/competitions/matches"
+
         publish_event(Event(
             type=EventType.MATCH_ARCHIVED if status == Match.MatchStatus.ARCHIVED else EventType.MATCH_FINISHED if status == Match.MatchStatus.FINISHED else "MatchStateChanged",
             tenant_id=str(tenant.id),
-            payload={"match_id": str(match.id), "status": status},
+            payload={
+                "match_id": str(match.id),
+                "status": status,
+                "home_club_name": home_name,
+                "away_club_name": away_name,
+                "home_score": match.home_score,
+                "away_score": match.away_score,
+                "competition_id": comp_id,
+                "competition_name": comp_name,
+                "title": title,
+                "message": message,
+                "link_url": link_url,
+            },
             origin="competitions.match_service",
         ))
         return match
@@ -370,10 +395,27 @@ class MatchService:
         match.save(update_fields=["home_score", "away_score", "status", "current_period", "current_minute", "updated_at"])
 
         if status == Match.MatchStatus.FINISHED:
+            home_name = getattr(match.home_club, "name", None) if match.home_club else None
+            away_name = getattr(match.away_club, "name", None) if match.away_club else None
+            comp_id = str(match.competition_id) if getattr(match, "competition_id", None) else None
+            comp_name = getattr(match.competition, "name", None) if getattr(match, "competition", None) else None
+
             publish_event(Event(
                 type=EventType.MATCH_FINISHED,
                 tenant_id=str(tenant.id),
-                payload={"match_id": str(match.id), "status": status},
+                payload={
+                    "match_id": str(match.id),
+                    "status": status,
+                    "home_club_name": home_name,
+                    "away_club_name": away_name,
+                    "home_score": match.home_score,
+                    "away_score": match.away_score,
+                    "competition_id": comp_id,
+                    "competition_name": comp_name,
+                    "title": "Partida Concluída",
+                    "message": f"Resultado final: {home_name} {match.home_score} - {match.away_score} {away_name}" if home_name and away_name else "Partida finalizada.",
+                    "link_url": f"/competitions/{comp_id}/matches/{match.id}" if comp_id else "/dashboard/competitions/matches",
+                },
                 origin="competitions.match_service",
             ))
 

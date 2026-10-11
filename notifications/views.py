@@ -57,6 +57,21 @@ class MarkReadView(APIView):
         )
 
 
+class MarkAllReadView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        now = timezone.now()
+        marked = Notification.objects.filter(
+            recipient=request.user,
+            status=Notification.STATUS_PENDING,
+        ).update(status=Notification.STATUS_SENT, delivered_at=now)
+        return Response(
+            {"success": True, "message": "Todas as notificações foram marcadas como lidas.", "data": {"marked": marked}},
+            status=status.HTTP_200_OK,
+        )
+
+
 User = get_user_model()
 
 

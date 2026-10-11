@@ -46,3 +46,25 @@ class DeliveryTest(TestCase):
         self.assertEqual(notif2.status, Notification.STATUS_SENT)
         # Check that an email was sent
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_mark_all_read_marks_all_pending_notifications(self):
+        from django.contrib.auth import get_user_model
+        from notifications.views import MarkAllReadView
+
+        User = get_user_model()
+        user = User.objects.create_user(email='markall@example.com', password='pass')
+        Notification.objects.create(type='Test1', payload={'msg': '1'}, recipient=user, status=Notification.STATUS_PENDING)
+        Notification.objects.create(type='Test2', payload={'msg': '2'}, recipient=user, status=Notification.STATUS_PENDING)
+
+        from rest_framework.test import force_authenticate
+
+        request = APIRequestFactory().post('/api/v1/notifications/mark-all-read/')
+        force_authenticate(request, user=user)
+
+        response = MarkAllReadView.as_view()(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['data']['marked'], 2)
+
+        pending_count = Notification.objects.filter(recipient=user, status=Notification.STATUS_PENDING).count()
+        self.assertEqual(pending_count, 0)
+
